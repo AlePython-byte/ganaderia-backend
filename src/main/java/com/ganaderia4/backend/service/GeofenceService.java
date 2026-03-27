@@ -2,6 +2,8 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.GeofenceRequestDTO;
 import com.ganaderia4.backend.dto.GeofenceResponseDTO;
+import com.ganaderia4.backend.exception.ConflictException;
+import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Geofence;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -32,11 +34,11 @@ public class GeofenceService {
 
         if (requestDTO.getCowId() != null) {
             Cow cow = cowRepository.findById(requestDTO.getCowId())
-                    .orElseThrow(() -> new RuntimeException("Vaca no encontrada"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
             if (Boolean.TRUE.equals(requestDTO.getActive())
                     && geofenceRepository.findByCowAndActive(cow, true).isPresent()) {
-                throw new RuntimeException("La vaca ya tiene una geocerca activa asignada");
+                throw new ConflictException("La vaca ya tiene una geocerca activa asignada");
             }
 
             geofence.setCow(cow);
@@ -62,7 +64,7 @@ public class GeofenceService {
 
     public GeofenceResponseDTO getGeofenceById(Long id) {
         Geofence geofence = geofenceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Geocerca no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Geocerca no encontrada"));
 
         return mapToResponseDTO(geofence);
     }

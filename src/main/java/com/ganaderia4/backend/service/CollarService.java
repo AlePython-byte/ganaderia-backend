@@ -2,6 +2,8 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.CollarRequestDTO;
 import com.ganaderia4.backend.dto.CollarResponseDTO;
+import com.ganaderia4.backend.exception.ConflictException;
+import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.repository.CollarRepository;
@@ -24,7 +26,7 @@ public class CollarService {
 
     public CollarResponseDTO createCollar(CollarRequestDTO requestDTO) {
         if (collarRepository.findByIdentifier(requestDTO.getIdentifier()).isPresent()) {
-            throw new RuntimeException("Ya existe un collar con ese identificador");
+            throw new ConflictException("Ya existe un collar con ese identificador");
         }
 
         Collar collar = new Collar();
@@ -33,10 +35,10 @@ public class CollarService {
 
         if (requestDTO.getCowId() != null) {
             Cow cow = cowRepository.findById(requestDTO.getCowId())
-                    .orElseThrow(() -> new RuntimeException("Vaca no encontrada"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
             if (collarRepository.findByCow(cow).isPresent()) {
-                throw new RuntimeException("La vaca ya tiene un collar asociado");
+                throw new ConflictException("La vaca ya tiene un collar asociado");
             }
 
             collar.setCow(cow);
@@ -55,7 +57,7 @@ public class CollarService {
 
     public CollarResponseDTO getCollarById(Long id) {
         Collar collar = collarRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Collar no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
 
         return mapToResponseDTO(collar);
     }
@@ -69,7 +71,7 @@ public class CollarService {
 
     public CollarResponseDTO getCollarByIdentifier(String identifier) {
         Collar collar = collarRepository.findByIdentifier(identifier)
-                .orElseThrow(() -> new RuntimeException("Collar no encontrado con ese identificador"));
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado con ese identificador"));
 
         return mapToResponseDTO(collar);
     }

@@ -2,11 +2,13 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.LocationRequestDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
+import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
-import com.ganaderia4.backend.model.Geofence;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.repository.CollarRepository;
+import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
 import org.springframework.stereotype.Service;
@@ -20,17 +22,20 @@ public class LocationService {
 
     private final LocationRepository locationRepository;
     private final CollarRepository collarRepository;
+    private final CowRepository cowRepository;
     private final GeofenceRepository geofenceRepository;
     private final GeofenceService geofenceService;
     private final AlertService alertService;
 
     public LocationService(LocationRepository locationRepository,
                            CollarRepository collarRepository,
+                           CowRepository cowRepository,
                            GeofenceRepository geofenceRepository,
                            GeofenceService geofenceService,
                            AlertService alertService) {
         this.locationRepository = locationRepository;
         this.collarRepository = collarRepository;
+        this.cowRepository = cowRepository;
         this.geofenceRepository = geofenceRepository;
         this.geofenceService = geofenceService;
         this.alertService = alertService;
@@ -40,10 +45,10 @@ public class LocationService {
         validateCoordinates(requestDTO.getLatitude(), requestDTO.getLongitude());
 
         Collar collar = collarRepository.findByIdentifier(requestDTO.getCollarIdentifier())
-                .orElseThrow(() -> new RuntimeException("Collar no registrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no registrado"));
 
         if (collar.getCow() == null) {
-            throw new RuntimeException("El collar no está asociado a ninguna vaca");
+            throw new BadRequestException("El collar no está asociado a ninguna vaca");
         }
 
         Cow cow = collar.getCow();
@@ -69,14 +74,16 @@ public class LocationService {
             } else {
                 cow.setStatus("DENTRO");
             }
+
+            cowRepository.save(cow);
         });
 
         return mapToResponseDTO(savedLocation, collar.getIdentifier());
     }
 
     public List<LocationResponseDTO> getLocationHistoryByCow(Long cowId) {
-        Cow cow = new Cow();
-        cow.setId(cowId);
+        Cow cow = cowRepository.findById(cowId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
         return locationRepository.findByCowOrderByTimestampAsc(cow)
                 .stream()
@@ -85,8 +92,8 @@ public class LocationService {
     }
 
     public List<LocationResponseDTO> getLocationHistoryByCowAndDates(Long cowId, LocalDateTime start, LocalDateTime end) {
-        Cow cow = new Cow();
-        cow.setId(cowId);
+        Cow cow = cowRepository.findById(cowId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
         return locationRepository.findByCowAndTimestampBetweenOrderByTimestampAsc(cow, start, end)
                 .stream()
@@ -95,22 +102,22 @@ public class LocationService {
     }
 
     public LocationResponseDTO getLastLocationByCow(Long cowId) {
-        Cow cow = new Cow();
-        cow.setId(cowId);
+        Cow cow = cowRepository.findById(cowId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
         Location location = locationRepository.findTopByCowOrderByTimestampDesc(cow)
-                .orElseThrow(() -> new RuntimeException("No existe ubicación registrada para esa vaca"));
+                .orElseThrow(() -> new ResourceNotFoundException("No existe ubicación registrada para esa vaca"));
 
         return mapToResponseDTO(location, null);
     }
 
     private void validateCoordinates(Double latitude, Double longitude) {
         if (latitude < -90 || latitude > 90) {
-            throw new RuntimeException("Latitud no válida");
+            throw new BadRequestException("Latitud no válida");
         }
 
         if (longitude < -180 || longitude > 180) {
-            throw new RuntimeException("Longitud no válida");
+            throw new BadRequestException("Longitud no válida");
         }
     }
 

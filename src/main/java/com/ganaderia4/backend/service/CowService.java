@@ -2,6 +2,8 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.CowRequestDTO;
 import com.ganaderia4.backend.dto.CowResponseDTO;
+import com.ganaderia4.backend.exception.ConflictException;
+import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.repository.CowRepository;
 import org.springframework.stereotype.Service;
@@ -20,12 +22,12 @@ public class CowService {
 
     public CowResponseDTO createCow(CowRequestDTO requestDTO) {
         if (cowRepository.findByIdentifier(requestDTO.getIdentifier()).isPresent()) {
-            throw new RuntimeException("Ya existe una vaca con ese identificador");
+            throw new ConflictException("Ya existe una vaca con ese identificador");
         }
 
         if (requestDTO.getInternalCode() != null && !requestDTO.getInternalCode().isBlank()) {
             if (cowRepository.findByInternalCode(requestDTO.getInternalCode()).isPresent()) {
-                throw new RuntimeException("Ya existe una vaca con ese código interno");
+                throw new ConflictException("Ya existe una vaca con ese código interno");
             }
         }
 
@@ -50,7 +52,7 @@ public class CowService {
 
     public CowResponseDTO getCowById(Long id) {
         Cow cow = cowRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vaca no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
         return mapToResponseDTO(cow);
     }
@@ -64,7 +66,7 @@ public class CowService {
 
     public CowResponseDTO getCowByIdentifier(String identifier) {
         Cow cow = cowRepository.findByIdentifier(identifier)
-                .orElseThrow(() -> new RuntimeException("Vaca no encontrada con ese identificador"));
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada con ese identificador"));
 
         return mapToResponseDTO(cow);
     }

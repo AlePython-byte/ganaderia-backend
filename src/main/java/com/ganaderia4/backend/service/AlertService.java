@@ -1,5 +1,7 @@
 package com.ganaderia4.backend.service;
 
+import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AlertService {
@@ -35,15 +38,51 @@ public class AlertService {
         return alertRepository.save(alert);
     }
 
-    public List<Alert> getAllAlerts() {
-        return alertRepository.findAll();
+    public List<AlertResponseDTO> getAllAlerts() {
+        return alertRepository.findAll()
+                .stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
     }
 
-    public List<Alert> getAlertsByStatus(String status) {
-        return alertRepository.findByStatus(status);
+    public List<AlertResponseDTO> getAlertsByStatus(String status) {
+        return alertRepository.findByStatus(status)
+                .stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
     }
 
-    public List<Alert> getAlertsByType(String type) {
-        return alertRepository.findByType(type);
+    public List<AlertResponseDTO> getAlertsByType(String type) {
+        return alertRepository.findByType(type)
+                .stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    public AlertResponseDTO getAlertById(Long id) {
+        Alert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
+
+        return mapToResponseDTO(alert);
+    }
+
+    private AlertResponseDTO mapToResponseDTO(Alert alert) {
+        Long locationId = null;
+        if (alert.getLocation() != null) {
+            locationId = alert.getLocation().getId();
+        }
+
+        return new AlertResponseDTO(
+                alert.getId(),
+                alert.getType(),
+                alert.getMessage(),
+                alert.getCreatedAt(),
+                alert.getStatus(),
+                alert.getObservations(),
+                alert.getCow().getId(),
+                alert.getCow().getIdentifier(),
+                alert.getCow().getName(),
+                locationId
+        );
     }
 }
