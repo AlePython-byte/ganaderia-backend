@@ -13,6 +13,7 @@ import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +43,7 @@ public class LocationService {
         this.alertService = alertService;
     }
 
+    @Transactional
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
         validateCoordinates(requestDTO.getLatitude(), requestDTO.getLongitude());
 

@@ -1,9 +1,12 @@
 package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.dto.AlertUpdateRequestDTO;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.service.AlertService;
+import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,5 +39,26 @@ public class AlertController {
     @GetMapping("/type/{type}")
     public List<AlertResponseDTO> getAlertsByType(@PathVariable AlertType type) {
         return alertService.getAlertsByType(type);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public AlertResponseDTO updateAlert(@PathVariable Long id,
+                                        @Valid @RequestBody AlertUpdateRequestDTO requestDTO) {
+        return alertService.updateAlert(id, requestDTO);
+    }
+
+    @PatchMapping("/{id}/resolve")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public AlertResponseDTO resolveAlert(@PathVariable Long id,
+                                         @RequestParam(required = false) String observations) {
+        return alertService.resolveAlert(id, observations);
+    }
+
+    @PatchMapping("/{id}/discard")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public AlertResponseDTO discardAlert(@PathVariable Long id,
+                                         @RequestParam(required = false) String observations) {
+        return alertService.discardAlert(id, observations);
     }
 }

@@ -10,6 +10,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ public class CollarService {
         this.cowRepository = cowRepository;
     }
 
+    @Transactional
     public CollarResponseDTO createCollar(CollarRequestDTO requestDTO) {
         if (collarRepository.findByIdentifier(requestDTO.getIdentifier()).isPresent()) {
             throw new ConflictException("Ya existe un collar con ese identificador");

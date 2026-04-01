@@ -9,6 +9,7 @@ import com.ganaderia4.backend.model.Geofence;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,6 +25,7 @@ public class GeofenceService {
         this.cowRepository = cowRepository;
     }
 
+    @Transactional
     public GeofenceResponseDTO createGeofence(GeofenceRequestDTO requestDTO) {
         Geofence geofence = new Geofence();
         geofence.setName(requestDTO.getName());

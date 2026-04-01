@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.dto.AlertUpdateRequestDTO;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -9,6 +10,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.repository.AlertRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +25,7 @@ public class AlertService {
         this.alertRepository = alertRepository;
     }
 
+    @Transactional
     public Alert createExitGeofenceAlert(Cow cow, Location location) {
         if (alertRepository.findByCowAndTypeAndStatus(cow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE).isPresent()) {
             return null;
@@ -66,6 +69,52 @@ public class AlertService {
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
 
         return mapToResponseDTO(alert);
+    }
+
+    @Transactional
+    public AlertResponseDTO updateAlert(Long id, AlertUpdateRequestDTO requestDTO) {
+        Alert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
+
+        alert.setStatus(requestDTO.getStatus());
+        alert.setObservations(requestDTO.getObservations());
+
+        Alert updatedAlert = alertRepository.save(alert);
+        return mapToResponseDTO(updatedAlert);
+    }
+
+    @Transactional
+    public AlertResponseDTO resolveAlert(Long id, String observations) {
+        Alert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
+
+        alert.setStatus(AlertStatus.RESUELTA);
+
+        if (observations != null && !observations.isBlank()) {
+            alert.setObservations(observations);
+        } else if (alert.getObservations() == null || alert.getObservations().isBlank()) {
+            alert.setObservations("Alerta resuelta manualmente");
+        }
+
+        Alert updatedAlert = alertRepository.save(alert);
+        return mapToResponseDTO(updatedAlert);
+    }
+
+    @Transactional
+    public AlertResponseDTO discardAlert(Long id, String observations) {
+        Alert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
+
+        alert.setStatus(AlertStatus.DESCARTADA);
+
+        if (observations != null && !observations.isBlank()) {
+            alert.setObservations(observations);
+        } else if (alert.getObservations() == null || alert.getObservations().isBlank()) {
+            alert.setObservations("Alerta descartada manualmente");
+        }
+
+        Alert updatedAlert = alertRepository.save(alert);
+        return mapToResponseDTO(updatedAlert);
     }
 
     private AlertResponseDTO mapToResponseDTO(Alert alert) {
