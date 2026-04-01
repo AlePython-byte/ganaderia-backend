@@ -1,9 +1,7 @@
 package com.ganaderia4.backend.controller;
 
-import com.ganaderia4.backend.dto.UserRequestDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
 import com.ganaderia4.backend.service.UserService;
-import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,11 +14,6 @@ public class UserController {
 
     public UserController(UserService userService) {
         this.userService = userService;
-    }
-
-    @PostMapping
-    public UserResponseDTO createAdmin(@Valid @RequestBody UserRequestDTO requestDTO) {
-        return userService.createAdmin(requestDTO);
     }
 
     @GetMapping
