@@ -11,8 +11,9 @@ public class Alert {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String type;
+    private AlertType type;
 
     @Column(nullable = false)
     private String message;
@@ -20,8 +21,9 @@ public class Alert {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private AlertStatus status;
 
     private String observations;
 
@@ -36,7 +38,7 @@ public class Alert {
     public Alert() {
     }
 
-    public Alert(Long id, String type, String message, LocalDateTime createdAt, String status,
+    public Alert(Long id, AlertType type, String message, LocalDateTime createdAt, AlertStatus status,
                  String observations, Cow cow, Location location) {
         this.id = id;
         this.type = type;
@@ -56,11 +58,11 @@ public class Alert {
         this.id = id;
     }
 
-    public String getType() {
+    public AlertType getType() {
         return type;
     }
 
-    public void setType(String type) {
+    public void setType(AlertType type) {
         this.type = type;
     }
 
@@ -80,11 +82,11 @@ public class Alert {
         this.createdAt = createdAt;
     }
 
-    public String getStatus() {
+    public AlertStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(AlertStatus status) {
         this.status = status;
     }
 

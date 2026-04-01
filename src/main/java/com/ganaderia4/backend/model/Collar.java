@@ -13,8 +13,9 @@ public class Collar {
     @Column(nullable = false, unique = true)
     private String identifier;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private CollarStatus status;
 
     @OneToOne
     @JoinColumn(name = "cow_id", unique = true)
@@ -23,7 +24,7 @@ public class Collar {
     public Collar() {
     }
 
-    public Collar(Long id, String identifier, String status, Cow cow) {
+    public Collar(Long id, String identifier, CollarStatus status, Cow cow) {
         this.id = id;
         this.identifier = identifier;
         this.status = status;
@@ -46,11 +47,11 @@ public class Collar {
         this.identifier = identifier;
     }
 
-    public String getStatus() {
+    public CollarStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(CollarStatus status) {
         this.status = status;
     }
 
