@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.repository;
 
 import com.ganaderia4.backend.model.Collar;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,7 +12,7 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
 
     Optional<Collar> findByIdentifier(String identifier);
 
-    List<Collar> findByStatus(String status);
+    List<Collar> findByStatus(CollarStatus status);
 
     Optional<Collar> findByCow(Cow cow);
 }
