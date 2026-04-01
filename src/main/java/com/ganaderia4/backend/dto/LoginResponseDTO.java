@@ -6,16 +6,22 @@ public class LoginResponseDTO {
     private String name;
     private String email;
     private String role;
+    private String token;
+    private String tokenType;
+    private Long expiresIn;
     private String message;
 
     public LoginResponseDTO() {
     }
 
-    public LoginResponseDTO(Long id, String name, String email, String role, String message) {
+    public LoginResponseDTO(Long id, String name, String email, String role, String token, String tokenType, Long expiresIn, String message) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.role = role;
+        this.token = token;
+        this.tokenType = tokenType;
+        this.expiresIn = expiresIn;
         this.message = message;
     }
 
@@ -49,6 +55,30 @@ public class LoginResponseDTO {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public String getTokenType() {
+        return tokenType;
+    }
+
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
+    }
+
+    public Long getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(Long expiresIn) {
+        this.expiresIn = expiresIn;
     }
 
     public String getMessage() {
