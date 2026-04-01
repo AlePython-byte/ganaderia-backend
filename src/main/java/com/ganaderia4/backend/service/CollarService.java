@@ -5,6 +5,7 @@ import com.ganaderia4.backend.dto.CollarResponseDTO;
 import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -62,7 +63,7 @@ public class CollarService {
         return mapToResponseDTO(collar);
     }
 
-    public List<CollarResponseDTO> getCollarsByStatus(String status) {
+    public List<CollarResponseDTO> getCollarsByStatus(CollarStatus status) {
         return collarRepository.findByStatus(status)
                 .stream()
                 .map(this::mapToResponseDTO)
@@ -90,7 +91,7 @@ public class CollarService {
         return new CollarResponseDTO(
                 collar.getId(),
                 collar.getIdentifier(),
-                collar.getStatus(),
+                collar.getStatus().name(),
                 cowId,
                 cowIdentifier,
                 cowName

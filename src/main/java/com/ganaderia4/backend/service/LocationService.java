@@ -6,6 +6,7 @@ import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -70,9 +71,9 @@ public class LocationService {
 
             if (!inside) {
                 alertService.createExitGeofenceAlert(cow, savedLocation);
-                cow.setStatus("FUERA");
+                cow.setStatus(CowStatus.FUERA);
             } else {
-                cow.setStatus("DENTRO");
+                cow.setStatus(CowStatus.DENTRO);
             }
 
             cowRepository.save(cow);

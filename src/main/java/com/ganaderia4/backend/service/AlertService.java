@@ -3,6 +3,8 @@ package com.ganaderia4.backend.service;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Alert;
+import com.ganaderia4.backend.model.AlertStatus;
+import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.repository.AlertRepository;
@@ -22,15 +24,15 @@ public class AlertService {
     }
 
     public Alert createExitGeofenceAlert(Cow cow, Location location) {
-        if (alertRepository.findByCowAndTypeAndStatus(cow, "EXIT_GEOFENCE", "PENDIENTE").isPresent()) {
+        if (alertRepository.findByCowAndTypeAndStatus(cow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE).isPresent()) {
             return null;
         }
 
         Alert alert = new Alert();
-        alert.setType("EXIT_GEOFENCE");
+        alert.setType(AlertType.EXIT_GEOFENCE);
         alert.setMessage("La vaca " + cow.getIdentifier() + " salió de la geocerca activa");
         alert.setCreatedAt(LocalDateTime.now());
-        alert.setStatus("PENDIENTE");
+        alert.setStatus(AlertStatus.PENDIENTE);
         alert.setObservations("Alerta generada automáticamente por salida de geocerca");
         alert.setCow(cow);
         alert.setLocation(location);
@@ -45,14 +47,14 @@ public class AlertService {
                 .collect(Collectors.toList());
     }
 
-    public List<AlertResponseDTO> getAlertsByStatus(String status) {
+    public List<AlertResponseDTO> getAlertsByStatus(AlertStatus status) {
         return alertRepository.findByStatus(status)
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
 
-    public List<AlertResponseDTO> getAlertsByType(String type) {
+    public List<AlertResponseDTO> getAlertsByType(AlertType type) {
         return alertRepository.findByType(type)
                 .stream()
                 .map(this::mapToResponseDTO)
@@ -74,10 +76,10 @@ public class AlertService {
 
         return new AlertResponseDTO(
                 alert.getId(),
-                alert.getType(),
+                alert.getType().name(),
                 alert.getMessage(),
                 alert.getCreatedAt(),
-                alert.getStatus(),
+                alert.getStatus().name(),
                 alert.getObservations(),
                 alert.getCow().getId(),
                 alert.getCow().getIdentifier(),

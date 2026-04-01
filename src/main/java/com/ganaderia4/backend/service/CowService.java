@@ -5,6 +5,7 @@ import com.ganaderia4.backend.dto.CowResponseDTO;
 import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.CowRepository;
 import org.springframework.stereotype.Service;
 
@@ -57,7 +58,7 @@ public class CowService {
         return mapToResponseDTO(cow);
     }
 
-    public List<CowResponseDTO> getCowsByStatus(String status) {
+    public List<CowResponseDTO> getCowsByStatus(CowStatus status) {
         return cowRepository.findByStatus(status)
                 .stream()
                 .map(this::mapToResponseDTO)
@@ -77,7 +78,7 @@ public class CowService {
                 cow.getIdentifier(),
                 cow.getInternalCode(),
                 cow.getName(),
-                cow.getStatus(),
+                cow.getStatus().name(),
                 cow.getObservations()
         );
     }
