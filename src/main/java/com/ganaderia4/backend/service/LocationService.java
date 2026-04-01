@@ -12,12 +12,13 @@ import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class LocationService {
@@ -61,6 +62,7 @@ public class LocationService {
         location.setLongitude(requestDTO.getLongitude());
         location.setTimestamp(requestDTO.getTimestamp());
         location.setCow(cow);
+        location.setCollar(collar);
 
         Location savedLocation = locationRepository.save(location);
 
@@ -81,27 +83,31 @@ public class LocationService {
             cowRepository.save(cow);
         });
 
-        return mapToResponseDTO(savedLocation, collar.getIdentifier());
+        return mapToResponseDTO(savedLocation);
     }
 
-    public List<LocationResponseDTO> getLocationHistoryByCow(Long cowId) {
+    public Page<LocationResponseDTO> getLocationHistoryByCow(Long cowId, int page, int size) {
         Cow cow = cowRepository.findById(cowId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
-        return locationRepository.findByCowOrderByTimestampAsc(cow)
-                .stream()
-                .map(location -> mapToResponseDTO(location, null))
-                .collect(Collectors.toList());
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
+
+        return locationRepository.findByCowOrderByTimestampDesc(cow, pageable)
+                .map(this::mapToResponseDTO);
     }
 
-    public List<LocationResponseDTO> getLocationHistoryByCowAndDates(Long cowId, LocalDateTime start, LocalDateTime end) {
+    public Page<LocationResponseDTO> getLocationHistoryByCowAndDates(Long cowId,
+                                                                     LocalDateTime start,
+                                                                     LocalDateTime end,
+                                                                     int page,
+                                                                     int size) {
         Cow cow = cowRepository.findById(cowId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
-        return locationRepository.findByCowAndTimestampBetweenOrderByTimestampAsc(cow, start, end)
-                .stream()
-                .map(location -> mapToResponseDTO(location, null))
-                .collect(Collectors.toList());
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
+
+        return locationRepository.findByCowAndTimestampBetweenOrderByTimestampDesc(cow, start, end, pageable)
+                .map(this::mapToResponseDTO);
     }
 
     public LocationResponseDTO getLastLocationByCow(Long cowId) {
@@ -111,7 +117,7 @@ public class LocationService {
         Location location = locationRepository.findTopByCowOrderByTimestampDesc(cow)
                 .orElseThrow(() -> new ResourceNotFoundException("No existe ubicación registrada para esa vaca"));
 
-        return mapToResponseDTO(location, null);
+        return mapToResponseDTO(location);
     }
 
     private void validateCoordinates(Double latitude, Double longitude) {
@@ -124,7 +130,7 @@ public class LocationService {
         }
     }
 
-    private LocationResponseDTO mapToResponseDTO(Location location, String collarIdentifier) {
+    private LocationResponseDTO mapToResponseDTO(Location location) {
         return new LocationResponseDTO(
                 location.getId(),
                 location.getLatitude(),
@@ -133,7 +139,7 @@ public class LocationService {
                 location.getCow().getId(),
                 location.getCow().getIdentifier(),
                 location.getCow().getName(),
-                collarIdentifier
+                location.getCollar() != null ? location.getCollar().getIdentifier() : null
         );
     }
 }

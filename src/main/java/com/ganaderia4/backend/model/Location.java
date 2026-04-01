@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.model;
 
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,15 +25,20 @@ public class Location {
     @JoinColumn(name = "cow_id", nullable = false)
     private Cow cow;
 
+    @ManyToOne
+    @JoinColumn(name = "collar_id", nullable = false)
+    private Collar collar;
+
     public Location() {
     }
 
-    public Location(Long id, Double latitude, Double longitude, LocalDateTime timestamp, Cow cow) {
+    public Location(Long id, Double latitude, Double longitude, LocalDateTime timestamp, Cow cow, Collar collar) {
         this.id = id;
         this.latitude = latitude;
         this.longitude = longitude;
         this.timestamp = timestamp;
         this.cow = cow;
+        this.collar = collar;
     }
 
     public Long getId() {
@@ -73,5 +79,13 @@ public class Location {
 
     public void setCow(Cow cow) {
         this.cow = cow;
+    }
+
+    public Collar getCollar() {
+        return collar;
+    }
+
+    public void setCollar(Collar collar) {
+        this.collar = collar;
     }
 }
