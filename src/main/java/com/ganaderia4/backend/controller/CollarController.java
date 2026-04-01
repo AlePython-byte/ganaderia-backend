@@ -2,6 +2,7 @@ package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.CollarRequestDTO;
 import com.ganaderia4.backend.dto.CollarResponseDTO;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.service.CollarService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +35,7 @@ public class CollarController {
     }
 
     @GetMapping("/status/{status}")
-    public List<CollarResponseDTO> getCollarsByStatus(@PathVariable String status) {
+    public List<CollarResponseDTO> getCollarsByStatus(@PathVariable CollarStatus status) {
         return collarService.getCollarsByStatus(status);
     }
 

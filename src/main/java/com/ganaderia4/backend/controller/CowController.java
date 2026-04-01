@@ -2,6 +2,7 @@ package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.CowRequestDTO;
 import com.ganaderia4.backend.dto.CowResponseDTO;
+import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.service.CowService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +35,7 @@ public class CowController {
     }
 
     @GetMapping("/status/{status}")
-    public List<CowResponseDTO> getCowsByStatus(@PathVariable String status) {
+    public List<CowResponseDTO> getCowsByStatus(@PathVariable CowStatus status) {
         return cowService.getCowsByStatus(status);
     }
 

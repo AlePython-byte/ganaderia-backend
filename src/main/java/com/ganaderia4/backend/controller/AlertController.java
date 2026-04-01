@@ -1,6 +1,8 @@
 package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.model.AlertStatus;
+import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.service.AlertService;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,12 +29,12 @@ public class AlertController {
     }
 
     @GetMapping("/status/{status}")
-    public List<AlertResponseDTO> getAlertsByStatus(@PathVariable String status) {
+    public List<AlertResponseDTO> getAlertsByStatus(@PathVariable AlertStatus status) {
         return alertService.getAlertsByStatus(status);
     }
 
     @GetMapping("/type/{type}")
-    public List<AlertResponseDTO> getAlertsByType(@PathVariable String type) {
+    public List<AlertResponseDTO> getAlertsByType(@PathVariable AlertType type) {
         return alertService.getAlertsByType(type);
     }
 }
