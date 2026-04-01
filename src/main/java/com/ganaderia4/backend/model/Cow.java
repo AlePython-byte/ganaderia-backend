@@ -19,15 +19,16 @@ public class Cow {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private CowStatus status;
 
     private String observations;
 
     public Cow() {
     }
 
-    public Cow(Long id, String identifier, String internalCode, String name, String status, String observations) {
+    public Cow(Long id, String identifier, String internalCode, String name, CowStatus status, String observations) {
         this.id = id;
         this.identifier = identifier;
         this.internalCode = internalCode;
@@ -68,11 +69,11 @@ public class Cow {
         this.name = name;
     }
 
-    public String getStatus() {
+    public CowStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(CowStatus status) {
         this.status = status;
     }
 
