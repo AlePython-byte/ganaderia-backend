@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface CowRepository extends JpaRepository<Cow, Long> {
 
-    Optional<Cow> findByIdentifier(String identifier);
+    Optional<Cow> findByToken(String token);
 
     Optional<Cow> findByInternalCode(String internalCode);
 

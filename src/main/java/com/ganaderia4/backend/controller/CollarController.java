@@ -39,8 +39,8 @@ public class CollarController {
         return collarService.getCollarsByStatus(status);
     }
 
-    @GetMapping("/identifier/{identifier}")
-    public CollarResponseDTO getCollarByIdentifier(@PathVariable String identifier) {
-        return collarService.getCollarByIdentifier(identifier);
+    @GetMapping("/token/{token}")
+    public CollarResponseDTO getCollarByToken(@PathVariable String token) {
+        return collarService.getCollarByToken(token);
     }
 }

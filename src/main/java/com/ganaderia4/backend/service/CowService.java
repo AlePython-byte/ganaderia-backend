@@ -22,8 +22,8 @@ public class CowService {
     }
 
     public CowResponseDTO createCow(CowRequestDTO requestDTO) {
-        if (cowRepository.findByIdentifier(requestDTO.getIdentifier()).isPresent()) {
-            throw new ConflictException("Ya existe una vaca con ese identificador");
+        if (cowRepository.findByToken(requestDTO.getToken()).isPresent()) {
+            throw new ConflictException("Ya existe una vaca con ese token");
         }
 
         if (requestDTO.getInternalCode() != null && !requestDTO.getInternalCode().isBlank()) {
@@ -33,7 +33,7 @@ public class CowService {
         }
 
         Cow cow = new Cow();
-        cow.setIdentifier(requestDTO.getIdentifier());
+        cow.setToken(requestDTO.getToken());
         cow.setInternalCode(requestDTO.getInternalCode());
         cow.setName(requestDTO.getName());
         cow.setStatus(requestDTO.getStatus());
@@ -65,9 +65,9 @@ public class CowService {
                 .collect(Collectors.toList());
     }
 
-    public CowResponseDTO getCowByIdentifier(String identifier) {
-        Cow cow = cowRepository.findByIdentifier(identifier)
-                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada con ese identificador"));
+    public CowResponseDTO getCowByToken(String token) {
+        Cow cow = cowRepository.findByToken(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada con ese token"));
 
         return mapToResponseDTO(cow);
     }
@@ -75,7 +75,7 @@ public class CowService {
     private CowResponseDTO mapToResponseDTO(Cow cow) {
         return new CowResponseDTO(
                 cow.getId(),
-                cow.getIdentifier(),
+                cow.getToken(),
                 cow.getInternalCode(),
                 cow.getName(),
                 cow.getStatus().name(),

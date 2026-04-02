@@ -58,13 +58,13 @@ class LocationServiceTest {
     void setUp() {
         cow = new Cow();
         cow.setId(1L);
-        cow.setIdentifier("VACA-001");
+        cow.setToken("VACA-001");
         cow.setName("Luna");
         cow.setStatus(CowStatus.DENTRO);
 
         collar = new Collar();
         collar.setId(1L);
-        collar.setIdentifier("COL-001");
+        collar.setToken("COL-001");
         collar.setStatus(CollarStatus.ACTIVO);
         collar.setCow(cow);
 
@@ -81,12 +81,12 @@ class LocationServiceTest {
     @Test
     void shouldCreateAlertAndSetCowOutsideWhenLocationIsOutsideGeofence() {
         LocationRequestDTO request = new LocationRequestDTO();
-        request.setCollarIdentifier("COL-001");
+        request.setCollarToken("COL-001");
         request.setLatitude(2.0);
         request.setLongitude(2.0);
         request.setTimestamp(LocalDateTime.now());
 
-        when(collarRepository.findByIdentifier("COL-001")).thenReturn(Optional.of(collar));
+        when(collarRepository.findByToken("COL-001")).thenReturn(Optional.of(collar));
 
         when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> {
             Location location = invocation.getArgument(0);
@@ -101,8 +101,8 @@ class LocationServiceTest {
         LocationResponseDTO response = locationService.registerLocation(request);
 
         assertNotNull(response);
-        assertEquals("VACA-001", response.getCowIdentifier());
-        assertEquals("COL-001", response.getCollarIdentifier());
+        assertEquals("VACA-001", response.getCowToken());
+        assertEquals("COL-001", response.getCollarToken());
         assertEquals(CowStatus.FUERA, cow.getStatus());
 
         verify(alertService).createExitGeofenceAlert(eq(cow), any(Location.class));
@@ -114,12 +114,12 @@ class LocationServiceTest {
         cow.setStatus(CowStatus.FUERA);
 
         LocationRequestDTO request = new LocationRequestDTO();
-        request.setCollarIdentifier("COL-001");
+        request.setCollarToken("COL-001");
         request.setLatitude(1.0);
         request.setLongitude(1.0);
         request.setTimestamp(LocalDateTime.now());
 
-        when(collarRepository.findByIdentifier("COL-001")).thenReturn(Optional.of(collar));
+        when(collarRepository.findByToken("COL-001")).thenReturn(Optional.of(collar));
 
         when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> {
             Location location = invocation.getArgument(0);
@@ -134,7 +134,7 @@ class LocationServiceTest {
         LocationResponseDTO response = locationService.registerLocation(request);
 
         assertNotNull(response);
-        assertEquals("VACA-001", response.getCowIdentifier());
+        assertEquals("VACA-001", response.getCowToken());
         assertEquals(CowStatus.DENTRO, cow.getStatus());
 
         verify(alertService, never()).createExitGeofenceAlert(any(Cow.class), any(Location.class));

@@ -33,7 +33,7 @@ public class AlertService {
 
         Alert alert = new Alert();
         alert.setType(AlertType.EXIT_GEOFENCE);
-        alert.setMessage("La vaca " + cow.getIdentifier() + " salió de la geocerca activa");
+        alert.setMessage("La vaca " + cow.getToken() + " salió de la geocerca activa");
         alert.setCreatedAt(LocalDateTime.now());
         alert.setStatus(AlertStatus.PENDIENTE);
         alert.setObservations("Alerta generada automáticamente por salida de geocerca");
@@ -131,7 +131,7 @@ public class AlertService {
                 alert.getStatus().name(),
                 alert.getObservations(),
                 alert.getCow().getId(),
-                alert.getCow().getIdentifier(),
+                alert.getCow().getToken(),
                 alert.getCow().getName(),
                 locationId
         );

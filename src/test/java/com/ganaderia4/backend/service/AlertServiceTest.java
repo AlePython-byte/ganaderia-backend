@@ -37,7 +37,7 @@ class AlertServiceTest {
     void setUp() {
         cow = new Cow();
         cow.setId(1L);
-        cow.setIdentifier("VACA-001");
+        cow.setToken("VACA-001");
         cow.setName("Luna");
 
         location = new Location();
@@ -111,7 +111,7 @@ class AlertServiceTest {
 
         assertEquals("RESUELTA", response.getStatus());
         assertEquals("Caso revisado", response.getObservations());
-        assertEquals("VACA-001", response.getCowIdentifier());
+        assertEquals("VACA-001", response.getCowToken());
 
         verify(alertRepository).save(any(Alert.class));
     }

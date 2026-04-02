@@ -99,12 +99,12 @@ public class GeofenceService {
 
     private GeofenceResponseDTO mapToResponseDTO(Geofence geofence) {
         Long cowId = null;
-        String cowIdentifier = null;
+        String cowToken = null;
         String cowName = null;
 
         if (geofence.getCow() != null) {
             cowId = geofence.getCow().getId();
-            cowIdentifier = geofence.getCow().getIdentifier();
+            cowToken = geofence.getCow().getToken();
             cowName = geofence.getCow().getName();
         }
 
@@ -116,7 +116,7 @@ public class GeofenceService {
                 geofence.getRadiusMeters(),
                 geofence.getActive(),
                 cowId,
-                cowIdentifier,
+                cowToken,
                 cowName
         );
     }

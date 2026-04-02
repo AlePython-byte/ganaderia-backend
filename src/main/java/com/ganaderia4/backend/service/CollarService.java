@@ -28,12 +28,12 @@ public class CollarService {
 
     @Transactional
     public CollarResponseDTO createCollar(CollarRequestDTO requestDTO) {
-        if (collarRepository.findByIdentifier(requestDTO.getIdentifier()).isPresent()) {
-            throw new ConflictException("Ya existe un collar con ese identificador");
+        if (collarRepository.findByToken(requestDTO.getToken()).isPresent()) {
+            throw new ConflictException("Ya existe un collar con ese token");
         }
 
         Collar collar = new Collar();
-        collar.setIdentifier(requestDTO.getIdentifier());
+        collar.setToken(requestDTO.getToken());
         collar.setStatus(requestDTO.getStatus());
 
         if (requestDTO.getCowId() != null) {
@@ -72,30 +72,30 @@ public class CollarService {
                 .collect(Collectors.toList());
     }
 
-    public CollarResponseDTO getCollarByIdentifier(String identifier) {
-        Collar collar = collarRepository.findByIdentifier(identifier)
-                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado con ese identificador"));
+    public CollarResponseDTO getCollarByToken(String token) {
+        Collar collar = collarRepository.findByToken(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado con ese token"));
 
         return mapToResponseDTO(collar);
     }
 
     private CollarResponseDTO mapToResponseDTO(Collar collar) {
         Long cowId = null;
-        String cowIdentifier = null;
+        String cowToken = null;
         String cowName = null;
 
         if (collar.getCow() != null) {
             cowId = collar.getCow().getId();
-            cowIdentifier = collar.getCow().getIdentifier();
+            cowToken = collar.getCow().getToken();
             cowName = collar.getCow().getName();
         }
 
         return new CollarResponseDTO(
                 collar.getId(),
-                collar.getIdentifier(),
+                collar.getToken(),
                 collar.getStatus().name(),
                 cowId,
-                cowIdentifier,
+                cowToken,
                 cowName
         );
     }

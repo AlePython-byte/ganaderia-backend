@@ -48,7 +48,7 @@ public class LocationService {
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
         validateCoordinates(requestDTO.getLatitude(), requestDTO.getLongitude());
 
-        Collar collar = collarRepository.findByIdentifier(requestDTO.getCollarIdentifier())
+        Collar collar = collarRepository.findByToken(requestDTO.getCollarToken())
                 .orElseThrow(() -> new ResourceNotFoundException("Collar no registrado"));
 
         if (collar.getCow() == null) {
@@ -137,9 +137,9 @@ public class LocationService {
                 location.getLongitude(),
                 location.getTimestamp(),
                 location.getCow().getId(),
-                location.getCow().getIdentifier(),
+                location.getCow().getToken(),
                 location.getCow().getName(),
-                location.getCollar() != null ? location.getCollar().getIdentifier() : null
+                location.getCollar() != null ? location.getCollar().getToken() : null
         );
     }
 }

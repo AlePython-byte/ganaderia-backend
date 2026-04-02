@@ -39,8 +39,8 @@ public class CowController {
         return cowService.getCowsByStatus(status);
     }
 
-    @GetMapping("/identifier/{identifier}")
-    public CowResponseDTO getCowByIdentifier(@PathVariable String identifier) {
-        return cowService.getCowByIdentifier(identifier);
+    @GetMapping("/token/{token}")
+    public CowResponseDTO getCowByToken(@PathVariable String token) {
+        return cowService.getCowByToken(token);
     }
 }

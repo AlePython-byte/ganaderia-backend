@@ -10,7 +10,7 @@ import java.util.Optional;
 
 public interface CollarRepository extends JpaRepository<Collar, Long> {
 
-    Optional<Collar> findByIdentifier(String identifier);
+    Optional<Collar> findByToken(String token);
 
     List<Collar> findByStatus(CollarStatus status);
 
