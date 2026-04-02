@@ -8,9 +8,9 @@ import jakarta.validation.constraints.Size;
 
 public class CollarRequestDTO {
 
-    @NotBlank(message = "El identificador del collar es obligatorio")
-    @Size(max = 50, message = "El identificador del collar no puede superar 50 caracteres")
-    private String identifier;
+    @NotBlank(message = "El token del collar es obligatorio")
+    @Size(max = 50, message = "El token del collar no puede superar 50 caracteres")
+    private String token;
 
     @NotNull(message = "El estado del collar es obligatorio")
     private CollarStatus status;
@@ -21,12 +21,12 @@ public class CollarRequestDTO {
     public CollarRequestDTO() {
     }
 
-    public String getIdentifier() {
-        return identifier;
+    public String getToken() {
+        return token;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public CollarStatus getStatus() {

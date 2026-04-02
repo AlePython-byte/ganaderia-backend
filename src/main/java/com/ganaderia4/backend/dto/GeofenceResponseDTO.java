@@ -9,7 +9,7 @@ public class GeofenceResponseDTO {
     private Double radiusMeters;
     private Boolean active;
     private Long cowId;
-    private String cowIdentifier;
+    private String cowToken;
     private String cowName;
 
     public GeofenceResponseDTO() {
@@ -17,7 +17,7 @@ public class GeofenceResponseDTO {
 
     public GeofenceResponseDTO(Long id, String name, Double centerLatitude, Double centerLongitude,
                                Double radiusMeters, Boolean active, Long cowId,
-                               String cowIdentifier, String cowName) {
+                               String cowToken, String cowName) {
         this.id = id;
         this.name = name;
         this.centerLatitude = centerLatitude;
@@ -25,7 +25,7 @@ public class GeofenceResponseDTO {
         this.radiusMeters = radiusMeters;
         this.active = active;
         this.cowId = cowId;
-        this.cowIdentifier = cowIdentifier;
+        this.cowToken = cowToken;
         this.cowName = cowName;
     }
 
@@ -85,12 +85,12 @@ public class GeofenceResponseDTO {
         this.cowId = cowId;
     }
 
-    public String getCowIdentifier() {
-        return cowIdentifier;
+    public String getCowToken() {
+        return cowToken;
     }
 
-    public void setCowIdentifier(String cowIdentifier) {
-        this.cowIdentifier = cowIdentifier;
+    public void setCowToken(String cowToken) {
+        this.cowToken = cowToken;
     }
 
     public String getCowName() {

@@ -10,8 +10,8 @@ public class Collar {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String identifier;
+    @Column(name = "identifier", nullable = false, unique = true)
+    private String token;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -24,9 +24,9 @@ public class Collar {
     public Collar() {
     }
 
-    public Collar(Long id, String identifier, CollarStatus status, Cow cow) {
+    public Collar(Long id, String token, CollarStatus status, Cow cow) {
         this.id = id;
-        this.identifier = identifier;
+        this.token = token;
         this.status = status;
         this.cow = cow;
     }
@@ -39,12 +39,12 @@ public class Collar {
         this.id = id;
     }
 
-    public String getIdentifier() {
-        return identifier;
+    public String getToken() {
+        return token;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public CollarStatus getStatus() {

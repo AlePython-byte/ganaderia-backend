@@ -10,8 +10,8 @@ public class Cow {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String identifier;
+    @Column(name = "identifier", nullable = false, unique = true)
+    private String token;
 
     @Column(unique = true)
     private String internalCode;
@@ -28,9 +28,9 @@ public class Cow {
     public Cow() {
     }
 
-    public Cow(Long id, String identifier, String internalCode, String name, CowStatus status, String observations) {
+    public Cow(Long id, String token, String internalCode, String name, CowStatus status, String observations) {
         this.id = id;
-        this.identifier = identifier;
+        this.token = token;
         this.internalCode = internalCode;
         this.name = name;
         this.status = status;
@@ -45,12 +45,12 @@ public class Cow {
         this.id = id;
     }
 
-    public String getIdentifier() {
-        return identifier;
+    public String getToken() {
+        return token;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public String getInternalCode() {

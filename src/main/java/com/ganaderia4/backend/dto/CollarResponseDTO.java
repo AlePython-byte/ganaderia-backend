@@ -3,21 +3,21 @@ package com.ganaderia4.backend.dto;
 public class CollarResponseDTO {
 
     private Long id;
-    private String identifier;
+    private String token;
     private String status;
     private Long cowId;
-    private String cowIdentifier;
+    private String cowToken;
     private String cowName;
 
     public CollarResponseDTO() {
     }
 
-    public CollarResponseDTO(Long id, String identifier, String status, Long cowId, String cowIdentifier, String cowName) {
+    public CollarResponseDTO(Long id, String token, String status, Long cowId, String cowToken, String cowName) {
         this.id = id;
-        this.identifier = identifier;
+        this.token = token;
         this.status = status;
         this.cowId = cowId;
-        this.cowIdentifier = cowIdentifier;
+        this.cowToken = cowToken;
         this.cowName = cowName;
     }
 
@@ -29,12 +29,12 @@ public class CollarResponseDTO {
         this.id = id;
     }
 
-    public String getIdentifier() {
-        return identifier;
+    public String getToken() {
+        return token;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public String getStatus() {
@@ -53,12 +53,12 @@ public class CollarResponseDTO {
         this.cowId = cowId;
     }
 
-    public String getCowIdentifier() {
-        return cowIdentifier;
+    public String getCowToken() {
+        return cowToken;
     }
 
-    public void setCowIdentifier(String cowIdentifier) {
-        this.cowIdentifier = cowIdentifier;
+    public void setCowToken(String cowToken) {
+        this.cowToken = cowToken;
     }
 
     public String getCowName() {

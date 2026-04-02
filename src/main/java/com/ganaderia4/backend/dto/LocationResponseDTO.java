@@ -9,23 +9,23 @@ public class LocationResponseDTO {
     private Double longitude;
     private LocalDateTime timestamp;
     private Long cowId;
-    private String cowIdentifier;
+    private String cowToken;
     private String cowName;
-    private String collarIdentifier;
+    private String collarToken;
 
     public LocationResponseDTO() {
     }
 
     public LocationResponseDTO(Long id, Double latitude, Double longitude, LocalDateTime timestamp,
-                               Long cowId, String cowIdentifier, String cowName, String collarIdentifier) {
+                               Long cowId, String cowToken, String cowName, String collarToken) {
         this.id = id;
         this.latitude = latitude;
         this.longitude = longitude;
         this.timestamp = timestamp;
         this.cowId = cowId;
-        this.cowIdentifier = cowIdentifier;
+        this.cowToken = cowToken;
         this.cowName = cowName;
-        this.collarIdentifier = collarIdentifier;
+        this.collarToken = collarToken;
     }
 
     public Long getId() {
@@ -68,12 +68,12 @@ public class LocationResponseDTO {
         this.cowId = cowId;
     }
 
-    public String getCowIdentifier() {
-        return cowIdentifier;
+    public String getCowToken() {
+        return cowToken;
     }
 
-    public void setCowIdentifier(String cowIdentifier) {
-        this.cowIdentifier = cowIdentifier;
+    public void setCowToken(String cowToken) {
+        this.cowToken = cowToken;
     }
 
     public String getCowName() {
@@ -84,11 +84,11 @@ public class LocationResponseDTO {
         this.cowName = cowName;
     }
 
-    public String getCollarIdentifier() {
-        return collarIdentifier;
+    public String getCollarToken() {
+        return collarToken;
     }
 
-    public void setCollarIdentifier(String collarIdentifier) {
-        this.collarIdentifier = collarIdentifier;
+    public void setCollarToken(String collarToken) {
+        this.collarToken = collarToken;
     }
 }

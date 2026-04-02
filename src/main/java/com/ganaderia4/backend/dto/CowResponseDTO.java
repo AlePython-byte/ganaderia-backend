@@ -3,7 +3,7 @@ package com.ganaderia4.backend.dto;
 public class CowResponseDTO {
 
     private Long id;
-    private String identifier;
+    private String token;
     private String internalCode;
     private String name;
     private String status;
@@ -12,9 +12,9 @@ public class CowResponseDTO {
     public CowResponseDTO() {
     }
 
-    public CowResponseDTO(Long id, String identifier, String internalCode, String name, String status, String observations) {
+    public CowResponseDTO(Long id, String token, String internalCode, String name, String status, String observations) {
         this.id = id;
-        this.identifier = identifier;
+        this.token = token;
         this.internalCode = internalCode;
         this.name = name;
         this.status = status;
@@ -29,12 +29,12 @@ public class CowResponseDTO {
         this.id = id;
     }
 
-    public String getIdentifier() {
-        return identifier;
+    public String getToken() {
+        return token;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public String getInternalCode() {

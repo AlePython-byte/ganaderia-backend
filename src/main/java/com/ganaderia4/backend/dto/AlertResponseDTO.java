@@ -11,7 +11,7 @@ public class AlertResponseDTO {
     private String status;
     private String observations;
     private Long cowId;
-    private String cowIdentifier;
+    private String cowToken;
     private String cowName;
     private Long locationId;
 
@@ -20,7 +20,7 @@ public class AlertResponseDTO {
 
     public AlertResponseDTO(Long id, String type, String message, LocalDateTime createdAt,
                             String status, String observations, Long cowId,
-                            String cowIdentifier, String cowName, Long locationId) {
+                            String cowToken, String cowName, Long locationId) {
         this.id = id;
         this.type = type;
         this.message = message;
@@ -28,7 +28,7 @@ public class AlertResponseDTO {
         this.status = status;
         this.observations = observations;
         this.cowId = cowId;
-        this.cowIdentifier = cowIdentifier;
+        this.cowToken = cowToken;
         this.cowName = cowName;
         this.locationId = locationId;
     }
@@ -89,12 +89,12 @@ public class AlertResponseDTO {
         this.cowId = cowId;
     }
 
-    public String getCowIdentifier() {
-        return cowIdentifier;
+    public String getCowToken() {
+        return cowToken;
     }
 
-    public void setCowIdentifier(String cowIdentifier) {
-        this.cowIdentifier = cowIdentifier;
+    public void setCowToken(String cowToken) {
+        this.cowToken = cowToken;
     }
 
     public String getCowName() {

@@ -7,9 +7,9 @@ import jakarta.validation.constraints.Size;
 
 public class CowRequestDTO {
 
-    @NotBlank(message = "El identificador es obligatorio")
-    @Size(max = 50, message = "El identificador no puede superar 50 caracteres")
-    private String identifier;
+    @NotBlank(message = "El token es obligatorio")
+    @Size(max = 50, message = "El token no puede superar 50 caracteres")
+    private String token;
 
     @Size(max = 50, message = "El código interno no puede superar 50 caracteres")
     private String internalCode;
@@ -27,12 +27,12 @@ public class CowRequestDTO {
     public CowRequestDTO() {
     }
 
-    public String getIdentifier() {
-        return identifier;
+    public String getToken() {
+        return token;
     }
 
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public String getInternalCode() {

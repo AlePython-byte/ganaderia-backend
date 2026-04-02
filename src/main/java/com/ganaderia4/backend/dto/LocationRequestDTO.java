@@ -11,9 +11,9 @@ import java.time.LocalDateTime;
 
 public class LocationRequestDTO {
 
-    @NotBlank(message = "El identificador del collar es obligatorio")
-    @Size(max = 50, message = "El identificador del collar no puede superar 50 caracteres")
-    private String collarIdentifier;
+    @NotBlank(message = "El token del collar es obligatorio")
+    @Size(max = 50, message = "El token del collar no puede superar 50 caracteres")
+    private String collarToken;
 
     @NotNull(message = "La latitud es obligatoria")
     @DecimalMin(value = "-90.0", message = "La latitud mínima permitida es -90")
@@ -32,12 +32,12 @@ public class LocationRequestDTO {
     public LocationRequestDTO() {
     }
 
-    public String getCollarIdentifier() {
-        return collarIdentifier;
+    public String getCollarToken() {
+        return collarToken;
     }
 
-    public void setCollarIdentifier(String collarIdentifier) {
-        this.collarIdentifier = collarIdentifier;
+    public void setCollarToken(String collarToken) {
+        this.collarToken = collarToken;
     }
 
     public Double getLatitude() {
