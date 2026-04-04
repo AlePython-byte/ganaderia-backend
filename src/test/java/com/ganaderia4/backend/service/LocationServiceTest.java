@@ -8,6 +8,9 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.Geofence;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.pattern.adapter.location.ApiLocationRequestAdapter;
+import com.ganaderia4.backend.pattern.adapter.location.DeviceLocationPayloadAdapter;
+import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
@@ -46,6 +49,12 @@ class LocationServiceTest {
 
     @Mock
     private AlertService alertService;
+
+    @Mock
+    private ApiLocationRequestAdapter apiLocationRequestAdapter;
+
+    @Mock
+    private DeviceLocationPayloadAdapter deviceLocationPayloadAdapter;
 
     @InjectMocks
     private LocationService locationService;
@@ -86,6 +95,9 @@ class LocationServiceTest {
         request.setLongitude(2.0);
         request.setTimestamp(LocalDateTime.now());
 
+        LocationCommand command = new LocationCommand("COL-001", 2.0, 2.0, request.getTimestamp());
+
+        when(apiLocationRequestAdapter.adapt(request)).thenReturn(command);
         when(collarRepository.findByToken("COL-001")).thenReturn(Optional.of(collar));
 
         when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> {
@@ -95,7 +107,7 @@ class LocationServiceTest {
         });
 
         when(geofenceRepository.findByCowAndActive(cow, true)).thenReturn(Optional.of(geofence));
-        when(geofenceService.isInsideGeofence(request.getLatitude(), request.getLongitude(), geofence))
+        when(geofenceService.isInsideGeofence(command.getLatitude(), command.getLongitude(), geofence))
                 .thenReturn(false);
 
         LocationResponseDTO response = locationService.registerLocation(request);
@@ -105,6 +117,7 @@ class LocationServiceTest {
         assertEquals("COL-001", response.getCollarToken());
         assertEquals(CowStatus.FUERA, cow.getStatus());
 
+        verify(apiLocationRequestAdapter).adapt(request);
         verify(alertService).createExitGeofenceAlert(eq(cow), any(Location.class));
         verify(cowRepository).save(cow);
     }
@@ -119,6 +132,9 @@ class LocationServiceTest {
         request.setLongitude(1.0);
         request.setTimestamp(LocalDateTime.now());
 
+        LocationCommand command = new LocationCommand("COL-001", 1.0, 1.0, request.getTimestamp());
+
+        when(apiLocationRequestAdapter.adapt(request)).thenReturn(command);
         when(collarRepository.findByToken("COL-001")).thenReturn(Optional.of(collar));
 
         when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> {
@@ -128,7 +144,7 @@ class LocationServiceTest {
         });
 
         when(geofenceRepository.findByCowAndActive(cow, true)).thenReturn(Optional.of(geofence));
-        when(geofenceService.isInsideGeofence(request.getLatitude(), request.getLongitude(), geofence))
+        when(geofenceService.isInsideGeofence(command.getLatitude(), command.getLongitude(), geofence))
                 .thenReturn(true);
 
         LocationResponseDTO response = locationService.registerLocation(request);
@@ -137,6 +153,7 @@ class LocationServiceTest {
         assertEquals("VACA-001", response.getCowToken());
         assertEquals(CowStatus.DENTRO, cow.getStatus());
 
+        verify(apiLocationRequestAdapter).adapt(request);
         verify(alertService, never()).createExitGeofenceAlert(any(Cow.class), any(Location.class));
         verify(cowRepository).save(cow);
     }

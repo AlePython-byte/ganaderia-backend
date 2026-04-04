@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.service;
 
+import com.ganaderia4.backend.dto.DeviceLocationPayloadDTO;
 import com.ganaderia4.backend.dto.LocationRequestDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
@@ -8,6 +9,9 @@ import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.pattern.adapter.location.ApiLocationRequestAdapter;
+import com.ganaderia4.backend.pattern.adapter.location.DeviceLocationPayloadAdapter;
+import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
 import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -30,26 +34,43 @@ public class LocationService {
     private final GeofenceRepository geofenceRepository;
     private final GeofenceService geofenceService;
     private final AlertService alertService;
+    private final ApiLocationRequestAdapter apiLocationRequestAdapter;
+    private final DeviceLocationPayloadAdapter deviceLocationPayloadAdapter;
 
     public LocationService(LocationRepository locationRepository,
                            CollarRepository collarRepository,
                            CowRepository cowRepository,
                            GeofenceRepository geofenceRepository,
                            GeofenceService geofenceService,
-                           AlertService alertService) {
+                           AlertService alertService,
+                           ApiLocationRequestAdapter apiLocationRequestAdapter,
+                           DeviceLocationPayloadAdapter deviceLocationPayloadAdapter) {
         this.locationRepository = locationRepository;
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
         this.geofenceRepository = geofenceRepository;
         this.geofenceService = geofenceService;
         this.alertService = alertService;
+        this.apiLocationRequestAdapter = apiLocationRequestAdapter;
+        this.deviceLocationPayloadAdapter = deviceLocationPayloadAdapter;
     }
 
     @Transactional
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
-        validateCoordinates(requestDTO.getLatitude(), requestDTO.getLongitude());
+        LocationCommand command = apiLocationRequestAdapter.adapt(requestDTO);
+        return registerLocationInternal(command);
+    }
 
-        Collar collar = collarRepository.findByToken(requestDTO.getCollarToken())
+    @Transactional
+    public LocationResponseDTO registerLocationFromDevice(DeviceLocationPayloadDTO payloadDTO) {
+        LocationCommand command = deviceLocationPayloadAdapter.adapt(payloadDTO);
+        return registerLocationInternal(command);
+    }
+
+    private LocationResponseDTO registerLocationInternal(LocationCommand command) {
+        validateCoordinates(command.getLatitude(), command.getLongitude());
+
+        Collar collar = collarRepository.findByToken(command.getCollarToken())
                 .orElseThrow(() -> new ResourceNotFoundException("Collar no registrado"));
 
         if (collar.getCow() == null) {
@@ -59,9 +80,9 @@ public class LocationService {
         Cow cow = collar.getCow();
 
         Location location = new Location();
-        location.setLatitude(requestDTO.getLatitude());
-        location.setLongitude(requestDTO.getLongitude());
-        location.setTimestamp(requestDTO.getTimestamp());
+        location.setLatitude(command.getLatitude());
+        location.setLongitude(command.getLongitude());
+        location.setTimestamp(command.getTimestamp());
         location.setCow(cow);
         location.setCollar(collar);
 
