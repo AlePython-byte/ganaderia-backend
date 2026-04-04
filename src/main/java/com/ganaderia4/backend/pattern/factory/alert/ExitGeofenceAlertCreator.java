@@ -5,6 +5,7 @@ import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.pattern.builder.AlertBuilder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -19,14 +20,14 @@ public class ExitGeofenceAlertCreator implements AlertCreator {
 
     @Override
     public Alert create(Cow cow, Location location) {
-        Alert alert = new Alert();
-        alert.setType(AlertType.EXIT_GEOFENCE);
-        alert.setMessage("La vaca " + cow.getToken() + " salió de la geocerca activa");
-        alert.setCreatedAt(LocalDateTime.now());
-        alert.setStatus(AlertStatus.PENDIENTE);
-        alert.setObservations("Alerta generada automáticamente por salida de geocerca");
-        alert.setCow(cow);
-        alert.setLocation(location);
-        return alert;
+        return new AlertBuilder()
+                .type(AlertType.EXIT_GEOFENCE)
+                .message("La vaca " + cow.getToken() + " salió de la geocerca activa")
+                .createdAt(LocalDateTime.now())
+                .status(AlertStatus.PENDIENTE)
+                .observations("Alerta generada automáticamente por salida de geocerca")
+                .cow(cow)
+                .location(location)
+                .build();
     }
 }

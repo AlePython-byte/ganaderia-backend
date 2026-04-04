@@ -8,6 +8,7 @@ import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
@@ -131,15 +132,15 @@ public class LocationService {
     }
 
     private LocationResponseDTO mapToResponseDTO(Location location) {
-        return new LocationResponseDTO(
-                location.getId(),
-                location.getLatitude(),
-                location.getLongitude(),
-                location.getTimestamp(),
-                location.getCow().getId(),
-                location.getCow().getToken(),
-                location.getCow().getName(),
-                location.getCollar() != null ? location.getCollar().getToken() : null
-        );
+        return new LocationResponseDTOBuilder()
+                .id(location.getId())
+                .latitude(location.getLatitude())
+                .longitude(location.getLongitude())
+                .timestamp(location.getTimestamp())
+                .cowId(location.getCow().getId())
+                .cowToken(location.getCow().getToken())
+                .cowName(location.getCow().getName())
+                .collarToken(location.getCollar() != null ? location.getCollar().getToken() : null)
+                .build();
     }
 }
