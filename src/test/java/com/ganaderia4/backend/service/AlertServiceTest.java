@@ -6,6 +6,7 @@ import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
 import com.ganaderia4.backend.repository.AlertRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,6 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,6 +26,9 @@ class AlertServiceTest {
 
     @Mock
     private AlertRepository alertRepository;
+
+    @Mock
+    private AlertFactory alertFactory;
 
     @InjectMocks
     private AlertService alertService;
@@ -48,13 +51,23 @@ class AlertServiceTest {
 
     @Test
     void shouldCreateExitGeofenceAlertWhenNoPendingAlertExists() {
+        Alert alertToCreate = new Alert();
+        alertToCreate.setType(AlertType.EXIT_GEOFENCE);
+        alertToCreate.setStatus(AlertStatus.PENDIENTE);
+        alertToCreate.setCow(cow);
+        alertToCreate.setLocation(location);
+        alertToCreate.setMessage("La vaca VACA-001 salió de la geocerca activa");
+        alertToCreate.setCreatedAt(LocalDateTime.now());
+
         when(alertRepository.findByCowAndTypeAndStatus(
                 cow,
                 AlertType.EXIT_GEOFENCE,
                 AlertStatus.PENDIENTE
         )).thenReturn(Optional.empty());
 
-        when(alertRepository.save(any(Alert.class))).thenAnswer(invocation -> {
+        when(alertFactory.createAlert(AlertType.EXIT_GEOFENCE, cow, location)).thenReturn(alertToCreate);
+
+        when(alertRepository.save(alertToCreate)).thenAnswer(invocation -> {
             Alert alert = invocation.getArgument(0);
             alert.setId(100L);
             return alert;
@@ -69,7 +82,8 @@ class AlertServiceTest {
         assertEquals(location, created.getLocation());
         assertTrue(created.getMessage().contains("VACA-001"));
 
-        verify(alertRepository).save(any(Alert.class));
+        verify(alertFactory).createAlert(AlertType.EXIT_GEOFENCE, cow, location);
+        verify(alertRepository).save(alertToCreate);
     }
 
     @Test
@@ -90,6 +104,7 @@ class AlertServiceTest {
         Alert result = alertService.createExitGeofenceAlert(cow, location);
 
         assertNull(result);
+        verify(alertFactory, never()).createAlert(any(), any(), any());
         verify(alertRepository, never()).save(any(Alert.class));
     }
 

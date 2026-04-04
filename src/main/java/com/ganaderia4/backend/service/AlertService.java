@@ -8,11 +8,11 @@ import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
 import com.ganaderia4.backend.repository.AlertRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,9 +20,11 @@ import java.util.stream.Collectors;
 public class AlertService {
 
     private final AlertRepository alertRepository;
+    private final AlertFactory alertFactory;
 
-    public AlertService(AlertRepository alertRepository) {
+    public AlertService(AlertRepository alertRepository, AlertFactory alertFactory) {
         this.alertRepository = alertRepository;
+        this.alertFactory = alertFactory;
     }
 
     @Transactional
@@ -31,15 +33,7 @@ public class AlertService {
             return null;
         }
 
-        Alert alert = new Alert();
-        alert.setType(AlertType.EXIT_GEOFENCE);
-        alert.setMessage("La vaca " + cow.getToken() + " salió de la geocerca activa");
-        alert.setCreatedAt(LocalDateTime.now());
-        alert.setStatus(AlertStatus.PENDIENTE);
-        alert.setObservations("Alerta generada automáticamente por salida de geocerca");
-        alert.setCow(cow);
-        alert.setLocation(location);
-
+        Alert alert = alertFactory.createAlert(AlertType.EXIT_GEOFENCE, cow, location);
         return alertRepository.save(alert);
     }
 
