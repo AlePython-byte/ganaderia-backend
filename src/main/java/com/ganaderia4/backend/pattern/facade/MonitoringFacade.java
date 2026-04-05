@@ -9,11 +9,12 @@ import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
 import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
+import com.ganaderia4.backend.pattern.observer.geofence.GeofenceExitEvent;
+import com.ganaderia4.backend.pattern.observer.geofence.GeofenceExitNotifier;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
-import com.ganaderia4.backend.service.AlertService;
 import com.ganaderia4.backend.service.GeofenceService;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,20 +27,20 @@ public class MonitoringFacade {
     private final CowRepository cowRepository;
     private final GeofenceRepository geofenceRepository;
     private final GeofenceService geofenceService;
-    private final AlertService alertService;
+    private final GeofenceExitNotifier geofenceExitNotifier;
 
     public MonitoringFacade(LocationRepository locationRepository,
                             CollarRepository collarRepository,
                             CowRepository cowRepository,
                             GeofenceRepository geofenceRepository,
                             GeofenceService geofenceService,
-                            AlertService alertService) {
+                            GeofenceExitNotifier geofenceExitNotifier) {
         this.locationRepository = locationRepository;
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
         this.geofenceRepository = geofenceRepository;
         this.geofenceService = geofenceService;
-        this.alertService = alertService;
+        this.geofenceExitNotifier = geofenceExitNotifier;
     }
 
     @Transactional
@@ -72,13 +73,11 @@ public class MonitoringFacade {
             );
 
             if (!inside) {
-                alertService.createExitGeofenceAlert(cow, savedLocation);
-                cow.setStatus(CowStatus.FUERA);
+                geofenceExitNotifier.notifyExit(new GeofenceExitEvent(cow, savedLocation));
             } else {
                 cow.setStatus(CowStatus.DENTRO);
+                cowRepository.save(cow);
             }
-
-            cowRepository.save(cow);
         });
 
         return new LocationResponseDTOBuilder()
