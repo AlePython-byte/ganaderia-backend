@@ -6,6 +6,7 @@ import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Geofence;
+import com.ganaderia4.backend.pattern.strategy.geofence.GeofenceStrategyResolver;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import org.springframework.stereotype.Service;
@@ -19,10 +20,14 @@ public class GeofenceService {
 
     private final GeofenceRepository geofenceRepository;
     private final CowRepository cowRepository;
+    private final GeofenceStrategyResolver geofenceStrategyResolver;
 
-    public GeofenceService(GeofenceRepository geofenceRepository, CowRepository cowRepository) {
+    public GeofenceService(GeofenceRepository geofenceRepository,
+                           CowRepository cowRepository,
+                           GeofenceStrategyResolver geofenceStrategyResolver) {
         this.geofenceRepository = geofenceRepository;
         this.cowRepository = cowRepository;
+        this.geofenceStrategyResolver = geofenceStrategyResolver;
     }
 
     @Transactional
@@ -72,29 +77,8 @@ public class GeofenceService {
     }
 
     public boolean isInsideGeofence(Double latitude, Double longitude, Geofence geofence) {
-        double distance = calculateDistanceMeters(
-                latitude,
-                longitude,
-                geofence.getCenterLatitude(),
-                geofence.getCenterLongitude()
-        );
-
-        return distance <= geofence.getRadiusMeters();
-    }
-
-    private double calculateDistanceMeters(double lat1, double lon1, double lat2, double lon2) {
-        final int earthRadius = 6371000;
-
-        double latDistance = Math.toRadians(lat2 - lat1);
-        double lonDistance = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return earthRadius * c;
+        return geofenceStrategyResolver.resolve(geofence)
+                .isInside(latitude, longitude, geofence);
     }
 
     private GeofenceResponseDTO mapToResponseDTO(Geofence geofence) {
