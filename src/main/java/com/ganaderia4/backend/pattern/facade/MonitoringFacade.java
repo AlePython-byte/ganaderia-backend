@@ -26,26 +26,23 @@ public class MonitoringFacade {
     private final GeofenceRepository geofenceRepository;
     private final GeofenceService geofenceService;
     private final GeofenceExitNotifier geofenceExitNotifier;
-    private final LocationValidationChain locationValidationChain;
 
     public MonitoringFacade(LocationRepository locationRepository,
                             CowRepository cowRepository,
                             GeofenceRepository geofenceRepository,
                             GeofenceService geofenceService,
-                            GeofenceExitNotifier geofenceExitNotifier,
-                            LocationValidationChain locationValidationChain) {
+                            GeofenceExitNotifier geofenceExitNotifier) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
         this.geofenceRepository = geofenceRepository;
         this.geofenceService = geofenceService;
         this.geofenceExitNotifier = geofenceExitNotifier;
-        this.locationValidationChain = locationValidationChain;
     }
 
     @Transactional
-    public LocationResponseDTO processLocation(LocationCommand command) {
+    public LocationResponseDTO processLocation(LocationCommand command, LocationValidationChain validationChain) {
         LocationValidationContext validationContext = new LocationValidationContext(command);
-        locationValidationChain.validate(validationContext);
+        validationChain.validate(validationContext);
 
         Collar collar = validationContext.getCollar();
         Cow cow = validationContext.getCow();

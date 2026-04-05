@@ -2,9 +2,10 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.LocationRequestDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
-import com.ganaderia4.backend.pattern.adapter.location.ApiLocationRequestAdapter;
-import com.ganaderia4.backend.pattern.adapter.location.DeviceLocationPayloadAdapter;
+import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
+import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactoryProvider;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
+import com.ganaderia4.backend.pattern.chain.location.LocationValidationChain;
 import com.ganaderia4.backend.pattern.facade.MonitoringFacade;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
 
 import java.time.LocalDateTime;
 
@@ -32,19 +32,22 @@ class LocationServiceTest {
     private CowRepository cowRepository;
 
     @Mock
-    private ApiLocationRequestAdapter apiLocationRequestAdapter;
-
-    @Mock
-    private DeviceLocationPayloadAdapter deviceLocationPayloadAdapter;
-
-    @Mock
     private MonitoringFacade monitoringFacade;
+
+    @Mock
+    private LocationProcessingFactoryProvider locationProcessingFactoryProvider;
+
+    @Mock
+    private LocationProcessingFactory<LocationRequestDTO> apiLocationProcessingFactory;
+
+    @Mock
+    private LocationValidationChain locationValidationChain;
 
     @InjectMocks
     private LocationService locationService;
 
     @Test
-    void shouldDelegateApiLocationProcessingToFacade() {
+    void shouldDelegateApiLocationProcessingUsingAbstractFactory() {
         LocationRequestDTO request = new LocationRequestDTO();
         request.setCollarToken("COL-001");
         request.setLatitude(2.0);
@@ -57,8 +60,11 @@ class LocationServiceTest {
         responseDTO.setCowToken("VACA-001");
         responseDTO.setCollarToken("COL-001");
 
-        when(apiLocationRequestAdapter.adapt(request)).thenReturn(command);
-        when(monitoringFacade.processLocation(command)).thenReturn(responseDTO);
+        when(locationProcessingFactoryProvider.<LocationRequestDTO>getFactory("API"))
+                .thenReturn(apiLocationProcessingFactory);
+        when(apiLocationProcessingFactory.createCommand(request)).thenReturn(command);
+        when(apiLocationProcessingFactory.getValidationChain()).thenReturn(locationValidationChain);
+        when(monitoringFacade.processLocation(command, locationValidationChain)).thenReturn(responseDTO);
 
         LocationResponseDTO response = locationService.registerLocation(request);
 
@@ -66,12 +72,14 @@ class LocationServiceTest {
         assertEquals("VACA-001", response.getCowToken());
         assertEquals("COL-001", response.getCollarToken());
 
-        verify(apiLocationRequestAdapter).adapt(request);
-        verify(monitoringFacade).processLocation(command);
+        verify(locationProcessingFactoryProvider).getFactory("API");
+        verify(apiLocationProcessingFactory).createCommand(request);
+        verify(apiLocationProcessingFactory).getValidationChain();
+        verify(monitoringFacade).processLocation(command, locationValidationChain);
     }
 
     @Test
-    void shouldDelegateApiLocationInsideFlowToFacade() {
+    void shouldDelegateAnotherApiLocationUsingAbstractFactory() {
         LocationRequestDTO request = new LocationRequestDTO();
         request.setCollarToken("COL-001");
         request.setLatitude(1.0);
@@ -84,8 +92,11 @@ class LocationServiceTest {
         responseDTO.setCowToken("VACA-001");
         responseDTO.setCollarToken("COL-001");
 
-        when(apiLocationRequestAdapter.adapt(request)).thenReturn(command);
-        when(monitoringFacade.processLocation(command)).thenReturn(responseDTO);
+        when(locationProcessingFactoryProvider.<LocationRequestDTO>getFactory("API"))
+                .thenReturn(apiLocationProcessingFactory);
+        when(apiLocationProcessingFactory.createCommand(request)).thenReturn(command);
+        when(apiLocationProcessingFactory.getValidationChain()).thenReturn(locationValidationChain);
+        when(monitoringFacade.processLocation(command, locationValidationChain)).thenReturn(responseDTO);
 
         LocationResponseDTO response = locationService.registerLocation(request);
 
@@ -93,7 +104,9 @@ class LocationServiceTest {
         assertEquals("VACA-001", response.getCowToken());
         assertEquals("COL-001", response.getCollarToken());
 
-        verify(apiLocationRequestAdapter).adapt(request);
-        verify(monitoringFacade).processLocation(command);
+        verify(locationProcessingFactoryProvider).getFactory("API");
+        verify(apiLocationProcessingFactory).createCommand(request);
+        verify(apiLocationProcessingFactory).getValidationChain();
+        verify(monitoringFacade).processLocation(command, locationValidationChain);
     }
 }
