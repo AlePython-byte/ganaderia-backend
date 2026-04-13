@@ -3,6 +3,7 @@ package com.ganaderia4.backend.service;
 import com.ganaderia4.backend.dto.DeviceLocationPayloadDTO;
 import com.ganaderia4.backend.dto.LocationRequestDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
@@ -18,10 +19,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
 public class LocationService {
+
+    private static final Duration MAX_FUTURE_DRIFT = Duration.ofMinutes(5);
+    private static final Duration MAX_PAST_AGE = Duration.ofDays(7);
 
     private final LocationRepository locationRepository;
     private final CowRepository cowRepository;
@@ -61,6 +66,8 @@ public class LocationService {
     }
 
     public LocationResponseDTO registerLocationFromDevice(DeviceLocationPayloadDTO payloadDTO) {
+        validateDevicePayload(payloadDTO);
+
         LocationProcessingFactory<DeviceLocationPayloadDTO> factory =
                 locationProcessingFactoryProvider.getFactory("DEVICE");
 
@@ -112,6 +119,46 @@ public class LocationService {
                 .orElseThrow(() -> new ResourceNotFoundException("No existe ubicación registrada para esa vaca"));
 
         return mapToResponseDTO(location);
+    }
+
+    private void validateDevicePayload(DeviceLocationPayloadDTO payloadDTO) {
+        if (payloadDTO == null) {
+            throw new BadRequestException("Payload de dispositivo inválido");
+        }
+
+        if (payloadDTO.getDeviceToken() == null || payloadDTO.getDeviceToken().isBlank()) {
+            throw new BadRequestException("Token de dispositivo inválido");
+        }
+
+        if (payloadDTO.getLat() == null) {
+            throw new BadRequestException("La latitud es obligatoria");
+        }
+
+        if (payloadDTO.getLon() == null) {
+            throw new BadRequestException("La longitud es obligatoria");
+        }
+
+        if (payloadDTO.getReportedAt() == null) {
+            throw new BadRequestException("El timestamp reportado es obligatorio");
+        }
+
+        if (payloadDTO.getLat() < -90.0 || payloadDTO.getLat() > 90.0) {
+            throw new BadRequestException("La latitud está fuera de rango");
+        }
+
+        if (payloadDTO.getLon() < -180.0 || payloadDTO.getLon() > 180.0) {
+            throw new BadRequestException("La longitud está fuera de rango");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (payloadDTO.getReportedAt().isAfter(now.plus(MAX_FUTURE_DRIFT))) {
+            throw new BadRequestException("El timestamp reportado no puede estar demasiado en el futuro");
+        }
+
+        if (payloadDTO.getReportedAt().isBefore(now.minus(MAX_PAST_AGE))) {
+            throw new BadRequestException("El timestamp reportado es demasiado antiguo para ser procesado");
+        }
     }
 
     private LocationResponseDTO mapToResponseDTO(Location location) {
