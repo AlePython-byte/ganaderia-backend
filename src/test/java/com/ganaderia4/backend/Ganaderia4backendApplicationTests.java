@@ -1,12 +1,9 @@
 package com.ganaderia4.backend;
 
+import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class Ganaderia4backendApplicationTests {
+class Ganaderia4backendApplicationTests extends AbstractIntegrationTest {
 
     @Test
     void contextLoads() {
