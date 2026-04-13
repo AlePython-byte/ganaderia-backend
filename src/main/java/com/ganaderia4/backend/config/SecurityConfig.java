@@ -99,6 +99,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/collars/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
 
+                        .requestMatchers(HttpMethod.PATCH, "/api/collars/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
+
                         .requestMatchers(HttpMethod.GET, "/api/locations/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 

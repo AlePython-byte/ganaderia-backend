@@ -124,6 +124,54 @@ public class CollarService {
         return mapToResponseDTO(updatedCollar);
     }
 
+    @Transactional
+    public CollarResponseDTO enableCollar(Long id) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        if (Boolean.TRUE.equals(collar.getEnabled())) {
+            return mapToResponseDTO(collar);
+        }
+
+        collar.setEnabled(true);
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "ENABLE_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Habilitación de collar con token " + updatedCollar.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
+    }
+
+    @Transactional
+    public CollarResponseDTO disableCollar(Long id) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        if (Boolean.FALSE.equals(collar.getEnabled())) {
+            return mapToResponseDTO(collar);
+        }
+
+        collar.setEnabled(false);
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "DISABLE_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Deshabilitación de collar con token " + updatedCollar.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
+    }
+
     public List<CollarResponseDTO> getAllCollars() {
         return collarRepository.findAll()
                 .stream()

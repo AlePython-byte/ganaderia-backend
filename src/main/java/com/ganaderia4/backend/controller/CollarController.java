@@ -30,6 +30,16 @@ public class CollarController {
         return collarService.updateCollar(id, requestDTO);
     }
 
+    @PatchMapping("/{id}/enable")
+    public CollarResponseDTO enableCollar(@PathVariable Long id) {
+        return collarService.enableCollar(id);
+    }
+
+    @PatchMapping("/{id}/disable")
+    public CollarResponseDTO disableCollar(@PathVariable Long id) {
+        return collarService.disableCollar(id);
+    }
+
     @GetMapping
     public List<CollarResponseDTO> getAllCollars() {
         return collarService.getAllCollars();
