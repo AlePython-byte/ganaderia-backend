@@ -172,6 +172,43 @@ public class CollarService {
         return mapToResponseDTO(updatedCollar);
     }
 
+    @Transactional
+    public CollarResponseDTO reassignCollar(Long collarId, Long cowId) {
+        Collar collar = collarRepository.findById(collarId)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        Cow targetCow = cowRepository.findById(cowId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+        if (collar.getCow() != null && collar.getCow().getId().equals(targetCow.getId())) {
+            return mapToResponseDTO(collar);
+        }
+
+        collarRepository.findByCow(targetCow)
+                .filter(existingCollar -> !existingCollar.getId().equals(collar.getId()))
+                .ifPresent(existingCollar -> {
+                    throw new ConflictException("La vaca destino ya tiene otro collar asociado");
+                });
+
+        String previousCowToken = collar.getCow() != null ? collar.getCow().getToken() : "SIN_VACA";
+        collar.setCow(targetCow);
+
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "REASSIGN_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Reasignación de collar " + updatedCollar.getToken()
+                        + " desde " + previousCowToken
+                        + " hacia " + targetCow.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
+    }
+
     public List<CollarResponseDTO> getAllCollars() {
         return collarRepository.findAll()
                 .stream()

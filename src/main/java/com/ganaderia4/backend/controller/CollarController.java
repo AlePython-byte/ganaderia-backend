@@ -40,6 +40,12 @@ public class CollarController {
         return collarService.disableCollar(id);
     }
 
+    @PatchMapping("/{id}/assign/{cowId}")
+    public CollarResponseDTO reassignCollar(@PathVariable Long id,
+                                            @PathVariable Long cowId) {
+        return collarService.reassignCollar(id, cowId);
+    }
+
     @GetMapping
     public List<CollarResponseDTO> getAllCollars() {
         return collarService.getAllCollars();
