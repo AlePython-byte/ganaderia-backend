@@ -3,6 +3,7 @@ package com.ganaderia4.backend.repository;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.DeviceSignalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
@@ -18,4 +19,10 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
     Optional<Collar> findByCow(Cow cow);
 
     List<Collar> findByEnabledTrueAndLastSeenAtBefore(LocalDateTime threshold);
+
+    List<Collar> findByEnabledTrueAndSignalStatus(DeviceSignalStatus signalStatus);
+
+    long countByStatus(CollarStatus status);
+
+    long countByEnabledTrueAndSignalStatus(DeviceSignalStatus signalStatus);
 }

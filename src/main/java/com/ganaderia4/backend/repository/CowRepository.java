@@ -14,4 +14,6 @@ public interface CowRepository extends JpaRepository<Cow, Long> {
     Optional<Cow> findByInternalCode(String internalCode);
 
     List<Cow> findByStatus(CowStatus status);
+
+    long countByStatus(CowStatus status);
 }

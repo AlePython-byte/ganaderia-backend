@@ -62,6 +62,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/audit-logs/**").hasRole("ADMINISTRADOR")
 
+                        .requestMatchers(HttpMethod.GET, "/api/dashboard/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
                         .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/alerts/**")
