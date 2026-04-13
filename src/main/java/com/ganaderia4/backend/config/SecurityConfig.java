@@ -71,10 +71,10 @@ public class SecurityConfig {
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
                         .requestMatchers(HttpMethod.PUT, "/api/alerts/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+                        .hasRole("ADMINISTRADOR")
 
                         .requestMatchers(HttpMethod.PATCH, "/api/alerts/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+                        .hasRole("ADMINISTRADOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/cows/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
