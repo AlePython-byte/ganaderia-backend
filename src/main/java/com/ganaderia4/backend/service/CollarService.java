@@ -47,6 +47,14 @@ public class CollarService {
             collar.setCow(cow);
         }
 
+        collar.setBatteryLevel(requestDTO.getBatteryLevel());
+        collar.setLastSeenAt(requestDTO.getLastSeenAt());
+        collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : com.ganaderia4.backend.model.DeviceSignalStatus.SIN_SENAL);
+        collar.setFirmwareVersion(requestDTO.getFirmwareVersion());
+        collar.setGpsAccuracy(requestDTO.getGpsAccuracy());
+        collar.setEnabled(requestDTO.getEnabled() != null ? requestDTO.getEnabled() : true);
+        collar.setNotes(requestDTO.getNotes());
+
         Collar savedCollar = collarRepository.save(collar);
         return mapToResponseDTO(savedCollar);
     }
@@ -96,7 +104,14 @@ public class CollarService {
                 collar.getStatus().name(),
                 cowId,
                 cowToken,
-                cowName
+                cowName,
+                collar.getBatteryLevel(),
+                collar.getLastSeenAt(),
+                collar.getSignalStatus() != null ? collar.getSignalStatus().name() : null,
+                collar.getFirmwareVersion(),
+                collar.getGpsAccuracy(),
+                collar.getEnabled(),
+                collar.getNotes()
         );
     }
 }
