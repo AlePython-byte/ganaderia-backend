@@ -6,6 +6,7 @@ import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
+import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
@@ -13,6 +14,7 @@ import com.ganaderia4.backend.repository.AlertRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,6 +36,35 @@ public class AlertService {
         }
 
         Alert alert = alertFactory.createAlert(AlertType.EXIT_GEOFENCE, cow, location);
+        return alertRepository.save(alert);
+    }
+
+    @Transactional
+    public Alert createCollarOfflineAlert(Collar collar) {
+        if (collar == null || collar.getCow() == null) {
+            return null;
+        }
+
+        Cow cow = collar.getCow();
+
+        if (alertRepository.findByCowAndTypeAndStatus(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE).isPresent()) {
+            return null;
+        }
+
+        Alert alert = new Alert();
+        alert.setType(AlertType.COLLAR_OFFLINE);
+        alert.setCow(cow);
+        alert.setLocation(null);
+        alert.setCreatedAt(LocalDateTime.now());
+        alert.setStatus(AlertStatus.PENDIENTE);
+
+        String lastSeenText = collar.getLastSeenAt() != null
+                ? collar.getLastSeenAt().toString()
+                : "sin registros previos";
+
+        alert.setMessage("El collar " + collar.getToken() + " no ha reportado ubicación recientemente. Último reporte: " + lastSeenText);
+        alert.setObservations("Alerta operativa generada automáticamente por falta de reporte del dispositivo");
+
         return alertRepository.save(alert);
     }
 

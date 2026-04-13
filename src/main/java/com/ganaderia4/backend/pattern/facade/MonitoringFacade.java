@@ -2,8 +2,10 @@ package com.ganaderia4.backend.pattern.facade;
 
 import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.model.Collar;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
+import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
 import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
@@ -11,6 +13,7 @@ import com.ganaderia4.backend.pattern.chain.location.LocationValidationChain;
 import com.ganaderia4.backend.pattern.chain.location.LocationValidationContext;
 import com.ganaderia4.backend.pattern.observer.geofence.GeofenceExitEvent;
 import com.ganaderia4.backend.pattern.observer.geofence.GeofenceExitNotifier;
+import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
@@ -23,17 +26,20 @@ public class MonitoringFacade {
 
     private final LocationRepository locationRepository;
     private final CowRepository cowRepository;
+    private final CollarRepository collarRepository;
     private final GeofenceRepository geofenceRepository;
     private final GeofenceService geofenceService;
     private final GeofenceExitNotifier geofenceExitNotifier;
 
     public MonitoringFacade(LocationRepository locationRepository,
                             CowRepository cowRepository,
+                            CollarRepository collarRepository,
                             GeofenceRepository geofenceRepository,
                             GeofenceService geofenceService,
                             GeofenceExitNotifier geofenceExitNotifier) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
+        this.collarRepository = collarRepository;
         this.geofenceRepository = geofenceRepository;
         this.geofenceService = geofenceService;
         this.geofenceExitNotifier = geofenceExitNotifier;
@@ -46,6 +52,15 @@ public class MonitoringFacade {
 
         Collar collar = validationContext.getCollar();
         Cow cow = validationContext.getCow();
+
+        collar.setLastSeenAt(command.getTimestamp());
+        collar.setStatus(CollarStatus.ACTIVO);
+
+        if (collar.getSignalStatus() == null || collar.getSignalStatus() == DeviceSignalStatus.SIN_SENAL) {
+            collar.setSignalStatus(DeviceSignalStatus.MEDIA);
+        }
+
+        collarRepository.save(collar);
 
         Location location = new Location();
         location.setLatitude(command.getLatitude());
