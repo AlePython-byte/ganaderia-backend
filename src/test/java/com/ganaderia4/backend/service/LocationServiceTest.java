@@ -43,6 +43,9 @@ class LocationServiceTest {
     @Mock
     private LocationValidationChain locationValidationChain;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     @InjectMocks
     private LocationService locationService;
 

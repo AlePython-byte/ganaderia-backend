@@ -30,6 +30,9 @@ class AlertServiceTest {
     @Mock
     private AlertFactory alertFactory;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     @InjectMocks
     private AlertService alertService;
 
