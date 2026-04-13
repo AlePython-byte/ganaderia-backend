@@ -57,6 +57,19 @@ public class MonitoringFacade {
         Collar collar = validationContext.getCollar();
         Cow cow = validationContext.getCow();
 
+        Location duplicatedLocation = locationRepository
+                .findFirstByCollarAndTimestampAndLatitudeAndLongitude(
+                        collar,
+                        command.getTimestamp(),
+                        command.getLatitude(),
+                        command.getLongitude()
+                )
+                .orElse(null);
+
+        if (duplicatedLocation != null) {
+            return mapToResponseDTO(duplicatedLocation);
+        }
+
         collar.setLastSeenAt(command.getTimestamp());
         collar.setStatus(CollarStatus.ACTIVO);
 
@@ -94,15 +107,19 @@ public class MonitoringFacade {
             }
         });
 
+        return mapToResponseDTO(savedLocation);
+    }
+
+    private LocationResponseDTO mapToResponseDTO(Location location) {
         return new LocationResponseDTOBuilder()
-                .id(savedLocation.getId())
-                .latitude(savedLocation.getLatitude())
-                .longitude(savedLocation.getLongitude())
-                .timestamp(savedLocation.getTimestamp())
-                .cowId(savedLocation.getCow().getId())
-                .cowToken(savedLocation.getCow().getToken())
-                .cowName(savedLocation.getCow().getName())
-                .collarToken(savedLocation.getCollar() != null ? savedLocation.getCollar().getToken() : null)
+                .id(location.getId())
+                .latitude(location.getLatitude())
+                .longitude(location.getLongitude())
+                .timestamp(location.getTimestamp())
+                .cowId(location.getCow().getId())
+                .cowToken(location.getCow().getToken())
+                .cowName(location.getCow().getName())
+                .collarToken(location.getCollar() != null ? location.getCollar().getToken() : null)
                 .build();
     }
 }
