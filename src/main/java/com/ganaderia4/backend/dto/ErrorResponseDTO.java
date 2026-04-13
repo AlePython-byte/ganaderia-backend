@@ -6,16 +6,25 @@ public class ErrorResponseDTO {
 
     private int status;
     private String error;
+    private String code;
     private String message;
+    private String path;
     private LocalDateTime timestamp;
 
     public ErrorResponseDTO() {
     }
 
-    public ErrorResponseDTO(int status, String error, String message, LocalDateTime timestamp) {
+    public ErrorResponseDTO(int status,
+                            String error,
+                            String code,
+                            String message,
+                            String path,
+                            LocalDateTime timestamp) {
         this.status = status;
         this.error = error;
+        this.code = code;
         this.message = message;
+        this.path = path;
         this.timestamp = timestamp;
     }
 
@@ -35,12 +44,28 @@ public class ErrorResponseDTO {
         this.error = error;
     }
 
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
     public String getMessage() {
         return message;
     }
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 
     public LocalDateTime getTimestamp() {

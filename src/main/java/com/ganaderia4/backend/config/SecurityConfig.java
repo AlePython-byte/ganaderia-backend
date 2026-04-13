@@ -1,10 +1,14 @@
 package com.ganaderia4.backend.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ganaderia4.backend.dto.ErrorResponseDTO;
+import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,11 +19,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.time.LocalDateTime;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
@@ -86,12 +93,47 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"message\":\"No autorizado\"}");
-                }))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeErrorResponse(
+                                        response,
+                                        HttpStatus.UNAUTHORIZED,
+                                        ApiErrorCode.UNAUTHORIZED,
+                                        "No autorizado",
+                                        request.getRequestURI()
+                                )
+                        )
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeErrorResponse(
+                                        response,
+                                        HttpStatus.FORBIDDEN,
+                                        ApiErrorCode.FORBIDDEN,
+                                        "Acceso denegado",
+                                        request.getRequestURI()
+                                )
+                        )
+                )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    private void writeErrorResponse(HttpServletResponse response,
+                                    HttpStatus status,
+                                    ApiErrorCode code,
+                                    String message,
+                                    String path) throws java.io.IOException {
+        ErrorResponseDTO error = new ErrorResponseDTO(
+                status.value(),
+                status.getReasonPhrase(),
+                code.name(),
+                message,
+                path,
+                LocalDateTime.now()
+        );
+
+        response.setStatus(status.value());
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(objectMapper.writeValueAsString(error));
     }
 }
