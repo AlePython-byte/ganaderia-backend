@@ -14,6 +14,8 @@ import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
 import com.ganaderia4.backend.pattern.facade.MonitoringFacade;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -24,6 +26,8 @@ import java.time.LocalDateTime;
 
 @Service
 public class LocationService {
+
+    private static final Logger log = LoggerFactory.getLogger(LocationService.class);
 
     private static final Duration MAX_FUTURE_DRIFT = Duration.ofMinutes(5);
     private static final Duration MAX_PAST_AGE = Duration.ofDays(7);
@@ -74,6 +78,13 @@ public class LocationService {
         LocationCommand command = factory.createCommand(payloadDTO);
         LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
 
+        log.info(
+                "Ubicación registrada desde dispositivo {} para vaca {} en {}",
+                maskToken(payloadDTO.getDeviceToken()),
+                response.getCowToken(),
+                response.getTimestamp()
+        );
+
         auditLogService.log(
                 "REGISTER_DEVICE_LOCATION",
                 "LOCATION",
@@ -123,42 +134,80 @@ public class LocationService {
 
     private void validateDevicePayload(DeviceLocationPayloadDTO payloadDTO) {
         if (payloadDTO == null) {
+            log.warn("Se rechazó un payload de dispositivo nulo");
             throw new BadRequestException("Payload de dispositivo inválido");
         }
 
         if (payloadDTO.getDeviceToken() == null || payloadDTO.getDeviceToken().isBlank()) {
+            log.warn("Se rechazó un payload por token de dispositivo inválido");
             throw new BadRequestException("Token de dispositivo inválido");
         }
 
         if (payloadDTO.getLat() == null) {
+            log.warn("Se rechazó payload del dispositivo {} por latitud nula", maskToken(payloadDTO.getDeviceToken()));
             throw new BadRequestException("La latitud es obligatoria");
         }
 
         if (payloadDTO.getLon() == null) {
+            log.warn("Se rechazó payload del dispositivo {} por longitud nula", maskToken(payloadDTO.getDeviceToken()));
             throw new BadRequestException("La longitud es obligatoria");
         }
 
         if (payloadDTO.getReportedAt() == null) {
+            log.warn("Se rechazó payload del dispositivo {} por timestamp nulo", maskToken(payloadDTO.getDeviceToken()));
             throw new BadRequestException("El timestamp reportado es obligatorio");
         }
 
         if (payloadDTO.getLat() < -90.0 || payloadDTO.getLat() > 90.0) {
+            log.warn(
+                    "Se rechazó payload del dispositivo {} por latitud fuera de rango: {}",
+                    maskToken(payloadDTO.getDeviceToken()),
+                    payloadDTO.getLat()
+            );
             throw new BadRequestException("La latitud está fuera de rango");
         }
 
         if (payloadDTO.getLon() < -180.0 || payloadDTO.getLon() > 180.0) {
+            log.warn(
+                    "Se rechazó payload del dispositivo {} por longitud fuera de rango: {}",
+                    maskToken(payloadDTO.getDeviceToken()),
+                    payloadDTO.getLon()
+            );
             throw new BadRequestException("La longitud está fuera de rango");
         }
 
         LocalDateTime now = LocalDateTime.now();
 
         if (payloadDTO.getReportedAt().isAfter(now.plus(MAX_FUTURE_DRIFT))) {
+            log.warn(
+                    "Se rechazó payload del dispositivo {} por timestamp futuro excesivo: {}",
+                    maskToken(payloadDTO.getDeviceToken()),
+                    payloadDTO.getReportedAt()
+            );
             throw new BadRequestException("El timestamp reportado no puede estar demasiado en el futuro");
         }
 
         if (payloadDTO.getReportedAt().isBefore(now.minus(MAX_PAST_AGE))) {
+            log.warn(
+                    "Se rechazó payload del dispositivo {} por timestamp demasiado antiguo: {}",
+                    maskToken(payloadDTO.getDeviceToken()),
+                    payloadDTO.getReportedAt()
+            );
             throw new BadRequestException("El timestamp reportado es demasiado antiguo para ser procesado");
         }
+    }
+
+    private String maskToken(String token) {
+        if (token == null || token.isBlank()) {
+            return "UNKNOWN";
+        }
+
+        String trimmed = token.trim();
+        if (trimmed.length() <= 4) {
+            return "****";
+        }
+
+        return "****" + trimmed.substring(trimmed.length() - 4);
     }
 
     private LocationResponseDTO mapToResponseDTO(Location location) {

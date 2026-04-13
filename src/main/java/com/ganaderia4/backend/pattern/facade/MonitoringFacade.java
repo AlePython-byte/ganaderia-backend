@@ -19,11 +19,15 @@ import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
 import com.ganaderia4.backend.service.AlertService;
 import com.ganaderia4.backend.service.GeofenceService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class MonitoringFacade {
+
+    private static final Logger log = LoggerFactory.getLogger(MonitoringFacade.class);
 
     private final LocationRepository locationRepository;
     private final CowRepository cowRepository;
@@ -67,6 +71,13 @@ public class MonitoringFacade {
                 .orElse(null);
 
         if (duplicatedLocation != null) {
+            log.info(
+                    "Ubicación duplicada ignorada para collar {} en {} ({}, {})",
+                    collar.getToken(),
+                    command.getTimestamp(),
+                    command.getLatitude(),
+                    command.getLongitude()
+            );
             return mapToResponseDTO(duplicatedLocation);
         }
 
