@@ -200,6 +200,77 @@ public class AlertService {
         return mapToResponseDTO(updatedAlert);
     }
 
+    @Transactional
+    public Alert resolvePendingExitGeofenceAlert(Cow cow, LocalDateTime recoveredAt) {
+        return alertRepository.findByCowAndTypeAndStatus(cow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE)
+                .map(alert -> {
+                    alert.setStatus(AlertStatus.RESUELTA);
+
+                    String automaticObservation =
+                            "Alerta resuelta automáticamente: la vaca volvió a estar dentro de la geocerca el " + recoveredAt;
+
+                    alert.setObservations(mergeObservations(alert.getObservations(), automaticObservation));
+
+                    Alert updatedAlert = alertRepository.save(alert);
+
+                    auditLogService.log(
+                            "AUTO_RESOLVE_EXIT_GEOFENCE_ALERT",
+                            "ALERT",
+                            updatedAlert.getId(),
+                            "SYSTEM",
+                            "SYSTEM",
+                            "Resolución automática de alerta de salida de geocerca para vaca " + cow.getToken(),
+                            true
+                    );
+
+                    return updatedAlert;
+                })
+                .orElse(null);
+    }
+
+    @Transactional
+    public Alert resolvePendingCollarOfflineAlert(Collar collar, LocalDateTime recoveredAt) {
+        if (collar == null || collar.getCow() == null) {
+            return null;
+        }
+
+        Cow cow = collar.getCow();
+
+        return alertRepository.findByCowAndTypeAndStatus(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE)
+                .map(alert -> {
+                    alert.setStatus(AlertStatus.RESUELTA);
+
+                    String automaticObservation =
+                            "Alerta resuelta automáticamente: el collar " + collar.getToken()
+                                    + " volvió a reportar ubicación el " + recoveredAt;
+
+                    alert.setObservations(mergeObservations(alert.getObservations(), automaticObservation));
+
+                    Alert updatedAlert = alertRepository.save(alert);
+
+                    auditLogService.log(
+                            "AUTO_RESOLVE_COLLAR_OFFLINE_ALERT",
+                            "ALERT",
+                            updatedAlert.getId(),
+                            "SYSTEM",
+                            "SYSTEM",
+                            "Resolución automática de alerta de collar offline " + collar.getToken(),
+                            true
+                    );
+
+                    return updatedAlert;
+                })
+                .orElse(null);
+    }
+
+    private String mergeObservations(String currentObservations, String newObservation) {
+        if (currentObservations == null || currentObservations.isBlank()) {
+            return newObservation;
+        }
+
+        return currentObservations + " | " + newObservation;
+    }
+
     private AlertResponseDTO mapToResponseDTO(Alert alert) {
         Long locationId = null;
         if (alert.getLocation() != null) {

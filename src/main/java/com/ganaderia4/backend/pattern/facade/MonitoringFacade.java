@@ -17,6 +17,7 @@ import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
+import com.ganaderia4.backend.service.AlertService;
 import com.ganaderia4.backend.service.GeofenceService;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,19 +31,22 @@ public class MonitoringFacade {
     private final GeofenceRepository geofenceRepository;
     private final GeofenceService geofenceService;
     private final GeofenceExitNotifier geofenceExitNotifier;
+    private final AlertService alertService;
 
     public MonitoringFacade(LocationRepository locationRepository,
                             CowRepository cowRepository,
                             CollarRepository collarRepository,
                             GeofenceRepository geofenceRepository,
                             GeofenceService geofenceService,
-                            GeofenceExitNotifier geofenceExitNotifier) {
+                            GeofenceExitNotifier geofenceExitNotifier,
+                            AlertService alertService) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
         this.collarRepository = collarRepository;
         this.geofenceRepository = geofenceRepository;
         this.geofenceService = geofenceService;
         this.geofenceExitNotifier = geofenceExitNotifier;
+        this.alertService = alertService;
     }
 
     @Transactional
@@ -61,6 +65,8 @@ public class MonitoringFacade {
         }
 
         collarRepository.save(collar);
+
+        alertService.resolvePendingCollarOfflineAlert(collar, command.getTimestamp());
 
         Location location = new Location();
         location.setLatitude(command.getLatitude());
@@ -83,6 +89,8 @@ public class MonitoringFacade {
             } else {
                 cow.setStatus(CowStatus.DENTRO);
                 cowRepository.save(cow);
+
+                alertService.resolvePendingExitGeofenceAlert(cow, savedLocation.getTimestamp());
             }
         });
 
