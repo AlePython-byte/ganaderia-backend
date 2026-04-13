@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.service;
 
+import com.ganaderia4.backend.dto.UserCreateRequestDTO;
 import com.ganaderia4.backend.dto.UserRequestDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
 import com.ganaderia4.backend.exception.ConflictException;
@@ -18,27 +19,34 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
+    }
+
+    public UserResponseDTO createUser(UserCreateRequestDTO requestDTO) {
+        return createUserInternal(
+                requestDTO.getName(),
+                requestDTO.getEmail(),
+                requestDTO.getPassword(),
+                requestDTO.getRole(),
+                requestDTO.getActive() != null ? requestDTO.getActive() : true
+        );
     }
 
     public UserResponseDTO createAdmin(UserRequestDTO requestDTO) {
-        if (userRepository.findByEmail(requestDTO.getEmail()).isPresent()) {
-            throw new ConflictException("Ya existe un usuario con ese correo");
-        }
-
-        User user = new User();
-        user.setName(requestDTO.getName());
-        user.setEmail(requestDTO.getEmail());
-        user.setPassword(passwordEncoder.encode(requestDTO.getPassword()));
-        user.setRole(Role.ADMINISTRADOR);
-        user.setActive(true);
-
-        User savedUser = userRepository.save(user);
-
-        return mapToResponseDTO(savedUser);
+        return createUserInternal(
+                requestDTO.getName(),
+                requestDTO.getEmail(),
+                requestDTO.getPassword(),
+                Role.ADMINISTRADOR,
+                true
+        );
     }
 
     public List<UserResponseDTO> getAllUsers() {
@@ -65,6 +73,36 @@ public class UserService {
     public User getUserEntityByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con ese correo"));
+    }
+
+    private UserResponseDTO createUserInternal(String name,
+                                               String email,
+                                               String rawPassword,
+                                               Role role,
+                                               Boolean active) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new ConflictException("Ya existe un usuario con ese correo");
+        }
+
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setRole(role);
+        user.setActive(active != null ? active : true);
+
+        User savedUser = userRepository.save(user);
+
+        auditLogService.logWithCurrentActor(
+                "CREATE_USER",
+                "USER",
+                savedUser.getId(),
+                "API",
+                "Creación de usuario " + savedUser.getEmail() + " con rol " + savedUser.getRole().name(),
+                true
+        );
+
+        return mapToResponseDTO(savedUser);
     }
 
     private UserResponseDTO mapToResponseDTO(User user) {

@@ -49,7 +49,41 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+
+                        .requestMatchers("/api/auth/me").authenticated()
+
                         .requestMatchers("/api/users/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/api/audit-logs/**").hasRole("ADMINISTRADOR")
+
+                        .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+
+                        .requestMatchers(HttpMethod.GET, "/api/alerts/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.PUT, "/api/alerts/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+
+                        .requestMatchers(HttpMethod.PATCH, "/api/alerts/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+
+                        .requestMatchers(HttpMethod.GET, "/api/cows/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+
+                        .requestMatchers(HttpMethod.POST, "/api/cows/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+
+                        .requestMatchers(HttpMethod.GET, "/api/collars/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.POST, "/api/collars/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.GET, "/api/locations/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.POST, "/api/locations/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
