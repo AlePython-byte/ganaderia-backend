@@ -3,6 +3,7 @@ package com.ganaderia4.backend.config;
 import javax.sql.DataSource;
 
 import org.flywaydb.core.Flyway;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.context.annotation.Bean;
@@ -11,12 +12,18 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class FlywayManualConfig {
 
+    @Value("${spring.flyway.locations:classpath:db/migration}")
+    private String flywayLocations;
+
+    @Value("${spring.flyway.baseline-on-migrate:false}")
+    private boolean baselineOnMigrate;
+
     @Bean
     public Flyway flyway(DataSource dataSource) {
         Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)
-                .locations("classpath:db/migration")
-                .baselineOnMigrate(false)
+                .locations(flywayLocations)
+                .baselineOnMigrate(baselineOnMigrate)
                 .load();
 
         flyway.migrate();
