@@ -105,4 +105,16 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(error, status);
     }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMethodNotSupportedException(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+        return buildErrorResponse(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                ApiErrorCode.BAD_REQUEST,
+                "Método HTTP no permitido para este endpoint",
+                request.getRequestURI()
+        );
+    }
 }

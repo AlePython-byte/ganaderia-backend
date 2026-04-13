@@ -24,6 +24,12 @@ public class CowController {
         return cowService.createCow(requestDTO);
     }
 
+    @PutMapping("/{id}")
+    public CowResponseDTO updateCow(@PathVariable Long id,
+                                    @Valid @RequestBody CowRequestDTO requestDTO) {
+        return cowService.updateCow(id, requestDTO);
+    }
+
     @GetMapping
     public List<CowResponseDTO> getAllCows() {
         return cowService.getAllCows();
