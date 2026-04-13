@@ -87,10 +87,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/cows/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
 
+                        .requestMatchers(HttpMethod.PUT, "/api/cows/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+
                         .requestMatchers(HttpMethod.GET, "/api/collars/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
                         .requestMatchers(HttpMethod.POST, "/api/collars/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.PUT, "/api/collars/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
 
                         .requestMatchers(HttpMethod.GET, "/api/locations/**")

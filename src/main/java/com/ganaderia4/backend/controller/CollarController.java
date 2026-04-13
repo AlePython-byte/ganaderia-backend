@@ -24,6 +24,12 @@ public class CollarController {
         return collarService.createCollar(requestDTO);
     }
 
+    @PutMapping("/{id}")
+    public CollarResponseDTO updateCollar(@PathVariable Long id,
+                                          @Valid @RequestBody CollarRequestDTO requestDTO) {
+        return collarService.updateCollar(id, requestDTO);
+    }
+
     @GetMapping
     public List<CollarResponseDTO> getAllCollars() {
         return collarService.getAllCollars();
