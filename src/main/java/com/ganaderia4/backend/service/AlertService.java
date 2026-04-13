@@ -23,10 +23,14 @@ public class AlertService {
 
     private final AlertRepository alertRepository;
     private final AlertFactory alertFactory;
+    private final AuditLogService auditLogService;
 
-    public AlertService(AlertRepository alertRepository, AlertFactory alertFactory) {
+    public AlertService(AlertRepository alertRepository,
+                        AlertFactory alertFactory,
+                        AuditLogService auditLogService) {
         this.alertRepository = alertRepository;
         this.alertFactory = alertFactory;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -36,7 +40,19 @@ public class AlertService {
         }
 
         Alert alert = alertFactory.createAlert(AlertType.EXIT_GEOFENCE, cow, location);
-        return alertRepository.save(alert);
+        Alert savedAlert = alertRepository.save(alert);
+
+        auditLogService.log(
+                "CREATE_EXIT_GEOFENCE_ALERT",
+                "ALERT",
+                savedAlert.getId(),
+                "SYSTEM",
+                "SYSTEM",
+                "Alerta automática por salida de geocerca para vaca " + cow.getToken(),
+                true
+        );
+
+        return savedAlert;
     }
 
     @Transactional
@@ -65,7 +81,19 @@ public class AlertService {
         alert.setMessage("El collar " + collar.getToken() + " no ha reportado ubicación recientemente. Último reporte: " + lastSeenText);
         alert.setObservations("Alerta operativa generada automáticamente por falta de reporte del dispositivo");
 
-        return alertRepository.save(alert);
+        Alert savedAlert = alertRepository.save(alert);
+
+        auditLogService.log(
+                "CREATE_COLLAR_OFFLINE_ALERT",
+                "ALERT",
+                savedAlert.getId(),
+                "SYSTEM",
+                "SYSTEM",
+                "Alerta automática por collar offline " + collar.getToken(),
+                true
+        );
+
+        return savedAlert;
     }
 
     public List<AlertResponseDTO> getAllAlerts() {
@@ -105,6 +133,16 @@ public class AlertService {
         alert.setObservations(requestDTO.getObservations());
 
         Alert updatedAlert = alertRepository.save(alert);
+
+        auditLogService.logWithCurrentActor(
+                "UPDATE_ALERT",
+                "ALERT",
+                updatedAlert.getId(),
+                "API",
+                "Actualización de alerta " + updatedAlert.getId(),
+                true
+        );
+
         return mapToResponseDTO(updatedAlert);
     }
 
@@ -122,6 +160,16 @@ public class AlertService {
         }
 
         Alert updatedAlert = alertRepository.save(alert);
+
+        auditLogService.logWithCurrentActor(
+                "RESOLVE_ALERT",
+                "ALERT",
+                updatedAlert.getId(),
+                "API",
+                "Resolución manual de alerta " + updatedAlert.getId(),
+                true
+        );
+
         return mapToResponseDTO(updatedAlert);
     }
 
@@ -139,6 +187,16 @@ public class AlertService {
         }
 
         Alert updatedAlert = alertRepository.save(alert);
+
+        auditLogService.logWithCurrentActor(
+                "DISCARD_ALERT",
+                "ALERT",
+                updatedAlert.getId(),
+                "API",
+                "Descarte manual de alerta " + updatedAlert.getId(),
+                true
+        );
+
         return mapToResponseDTO(updatedAlert);
     }
 

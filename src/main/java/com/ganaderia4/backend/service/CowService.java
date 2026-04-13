@@ -16,9 +16,11 @@ import java.util.stream.Collectors;
 public class CowService {
 
     private final CowRepository cowRepository;
+    private final AuditLogService auditLogService;
 
-    public CowService(CowRepository cowRepository) {
+    public CowService(CowRepository cowRepository, AuditLogService auditLogService) {
         this.cowRepository = cowRepository;
+        this.auditLogService = auditLogService;
     }
 
     public CowResponseDTO createCow(CowRequestDTO requestDTO) {
@@ -40,6 +42,15 @@ public class CowService {
         cow.setObservations(requestDTO.getObservations());
 
         Cow savedCow = cowRepository.save(cow);
+
+        auditLogService.logWithCurrentActor(
+                "CREATE_COW",
+                "COW",
+                savedCow.getId(),
+                "API",
+                "Creación de vaca con token " + savedCow.getToken(),
+                true
+        );
 
         return mapToResponseDTO(savedCow);
     }

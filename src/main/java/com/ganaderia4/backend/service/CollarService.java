@@ -7,6 +7,7 @@ import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,14 @@ public class CollarService {
 
     private final CollarRepository collarRepository;
     private final CowRepository cowRepository;
+    private final AuditLogService auditLogService;
 
-    public CollarService(CollarRepository collarRepository, CowRepository cowRepository) {
+    public CollarService(CollarRepository collarRepository,
+                         CowRepository cowRepository,
+                         AuditLogService auditLogService) {
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -49,13 +54,23 @@ public class CollarService {
 
         collar.setBatteryLevel(requestDTO.getBatteryLevel());
         collar.setLastSeenAt(requestDTO.getLastSeenAt());
-        collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : com.ganaderia4.backend.model.DeviceSignalStatus.SIN_SENAL);
+        collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : DeviceSignalStatus.SIN_SENAL);
         collar.setFirmwareVersion(requestDTO.getFirmwareVersion());
         collar.setGpsAccuracy(requestDTO.getGpsAccuracy());
         collar.setEnabled(requestDTO.getEnabled() != null ? requestDTO.getEnabled() : true);
         collar.setNotes(requestDTO.getNotes());
 
         Collar savedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "CREATE_COLLAR",
+                "COLLAR",
+                savedCollar.getId(),
+                "API",
+                "Creación de collar con token " + savedCollar.getToken(),
+                true
+        );
+
         return mapToResponseDTO(savedCollar);
     }
 

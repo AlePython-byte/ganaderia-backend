@@ -27,15 +27,18 @@ public class LocationService {
     private final CowRepository cowRepository;
     private final MonitoringFacade monitoringFacade;
     private final LocationProcessingFactoryProvider locationProcessingFactoryProvider;
+    private final AuditLogService auditLogService;
 
     public LocationService(LocationRepository locationRepository,
                            CowRepository cowRepository,
                            MonitoringFacade monitoringFacade,
-                           LocationProcessingFactoryProvider locationProcessingFactoryProvider) {
+                           LocationProcessingFactoryProvider locationProcessingFactoryProvider,
+                           AuditLogService auditLogService) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
         this.monitoringFacade = monitoringFacade;
         this.locationProcessingFactoryProvider = locationProcessingFactoryProvider;
+        this.auditLogService = auditLogService;
     }
 
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
@@ -43,7 +46,18 @@ public class LocationService {
                 locationProcessingFactoryProvider.getFactory("API");
 
         LocationCommand command = factory.createCommand(requestDTO);
-        return monitoringFacade.processLocation(command, factory.getValidationChain());
+        LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
+
+        auditLogService.logWithCurrentActor(
+                "REGISTER_LOCATION",
+                "LOCATION",
+                response.getId(),
+                "API",
+                "Registro manual/API de ubicación para vaca " + response.getCowToken(),
+                true
+        );
+
+        return response;
     }
 
     public LocationResponseDTO registerLocationFromDevice(DeviceLocationPayloadDTO payloadDTO) {
@@ -51,7 +65,19 @@ public class LocationService {
                 locationProcessingFactoryProvider.getFactory("DEVICE");
 
         LocationCommand command = factory.createCommand(payloadDTO);
-        return monitoringFacade.processLocation(command, factory.getValidationChain());
+        LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
+
+        auditLogService.log(
+                "REGISTER_DEVICE_LOCATION",
+                "LOCATION",
+                response.getId(),
+                payloadDTO.getDeviceToken(),
+                "DEVICE",
+                "Registro de ubicación desde dispositivo/collar " + payloadDTO.getDeviceToken(),
+                true
+        );
+
+        return response;
     }
 
     public Page<LocationResponseDTO> getLocationHistoryByCow(Long cowId, int page, int size) {

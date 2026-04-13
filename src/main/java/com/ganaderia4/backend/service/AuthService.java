@@ -16,11 +16,16 @@ public class AuthService {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuditLogService auditLogService;
 
-    public AuthService(UserService userService, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserService userService,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService,
+                       AuditLogService auditLogService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.auditLogService = auditLogService;
     }
 
     public LoginResponseDTO login(LoginRequestDTO requestDTO) {
@@ -29,14 +34,42 @@ public class AuthService {
         try {
             user = userService.getUserEntityByEmail(requestDTO.getEmail());
         } catch (ResourceNotFoundException ex) {
+            auditLogService.log(
+                    "LOGIN_FAILED",
+                    "USER",
+                    null,
+                    requestDTO.getEmail(),
+                    "AUTH",
+                    "Intento de inicio de sesión con correo no registrado",
+                    false
+            );
             throw new BadRequestException("Credenciales inválidas");
         }
 
         if (!Boolean.TRUE.equals(user.getActive()) || !passwordEncoder.matches(requestDTO.getPassword(), user.getPassword())) {
+            auditLogService.log(
+                    "LOGIN_FAILED",
+                    "USER",
+                    user.getId(),
+                    user.getEmail(),
+                    "AUTH",
+                    "Credenciales inválidas o usuario inactivo",
+                    false
+            );
             throw new BadRequestException("Credenciales inválidas");
         }
 
         String token = jwtService.generateToken(user);
+
+        auditLogService.log(
+                "LOGIN_SUCCESS",
+                "USER",
+                user.getId(),
+                user.getEmail(),
+                "AUTH",
+                "Inicio de sesión exitoso",
+                true
+        );
 
         return new LoginResponseDTO(
                 user.getId(),
