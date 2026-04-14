@@ -9,7 +9,11 @@ import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.service.AlertReportService;
 import com.ganaderia4.backend.service.CollarReportService;
 import com.ganaderia4.backend.service.CowIncidentReportService;
+import com.ganaderia4.backend.service.ReportCsvService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,13 +29,16 @@ public class ReportController {
     private final AlertReportService alertReportService;
     private final CollarReportService collarReportService;
     private final CowIncidentReportService cowIncidentReportService;
+    private final ReportCsvService reportCsvService;
 
     public ReportController(AlertReportService alertReportService,
                             CollarReportService collarReportService,
-                            CowIncidentReportService cowIncidentReportService) {
+                            CowIncidentReportService cowIncidentReportService,
+                            ReportCsvService reportCsvService) {
         this.alertReportService = alertReportService;
         this.collarReportService = collarReportService;
         this.cowIncidentReportService = cowIncidentReportService;
+        this.reportCsvService = reportCsvService;
     }
 
     @GetMapping("/alerts")
@@ -57,6 +64,36 @@ public class ReportController {
         filter.setStatus(status);
 
         return alertReportService.getAlertReport(filter);
+    }
+
+    @GetMapping("/alerts/export.csv")
+    public ResponseEntity<byte[]> exportAlertReportCsv(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+
+            @RequestParam(required = false)
+            AlertType type,
+
+            @RequestParam(required = false)
+            AlertStatus status
+    ) {
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setType(type);
+        filter.setStatus(status);
+
+        byte[] csvBytes = reportCsvService.exportAlertsReportCsv(filter);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=alert-report.csv")
+                .body(csvBytes);
     }
 
     @GetMapping("/offline-collars")
