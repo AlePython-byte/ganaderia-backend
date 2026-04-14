@@ -41,3 +41,15 @@ jobs:
 
       - name: Run clean test
         run: ./mvnw clean test
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ganaderia4backend:${{ github.sha }} .
