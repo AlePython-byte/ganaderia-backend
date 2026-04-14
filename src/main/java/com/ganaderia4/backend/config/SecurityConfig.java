@@ -1,8 +1,11 @@
 package com.ganaderia4.backend.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
+import com.ganaderia4.backend.observability.RequestCorrelationFilter;
 import com.ganaderia4.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -26,7 +29,12 @@ import java.time.LocalDateTime;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private final RequestCorrelationFilter requestCorrelationFilter = new RequestCorrelationFilter();
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
@@ -59,11 +67,19 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/auth/me").authenticated()
 
+                        .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
+                        .hasRole("ADMINISTRADOR")
+
                         .requestMatchers("/api/users/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/audit-logs/**").hasRole("ADMINISTRADOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.GET, "/api/reports/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+
+                        .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
@@ -71,10 +87,10 @@ public class SecurityConfig {
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
                         .requestMatchers(HttpMethod.PUT, "/api/alerts/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+                        .hasRole("ADMINISTRADOR")
 
                         .requestMatchers(HttpMethod.PATCH, "/api/alerts/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+                        .hasRole("ADMINISTRADOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/cows/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
@@ -82,10 +98,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/cows/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
 
+                        .requestMatchers(HttpMethod.PUT, "/api/cows/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+
                         .requestMatchers(HttpMethod.GET, "/api/collars/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
                         .requestMatchers(HttpMethod.POST, "/api/collars/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.PUT, "/api/collars/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
+
+                        .requestMatchers(HttpMethod.PATCH, "/api/collars/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")
 
                         .requestMatchers(HttpMethod.GET, "/api/locations/**")
@@ -116,6 +141,7 @@ public class SecurityConfig {
                                 )
                         )
                 )
+                .addFilterBefore(requestCorrelationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

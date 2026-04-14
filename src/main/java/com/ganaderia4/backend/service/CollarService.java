@@ -38,7 +38,7 @@ public class CollarService {
         }
 
         Collar collar = new Collar();
-        collar.setToken(requestDTO.getToken());
+        collar.setToken(requestDTO.getToken().trim());
         collar.setStatus(requestDTO.getStatus());
 
         if (requestDTO.getCowId() != null) {
@@ -55,10 +55,10 @@ public class CollarService {
         collar.setBatteryLevel(requestDTO.getBatteryLevel());
         collar.setLastSeenAt(requestDTO.getLastSeenAt());
         collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : DeviceSignalStatus.SIN_SENAL);
-        collar.setFirmwareVersion(requestDTO.getFirmwareVersion());
+        collar.setFirmwareVersion(normalizeNullable(requestDTO.getFirmwareVersion()));
         collar.setGpsAccuracy(requestDTO.getGpsAccuracy());
         collar.setEnabled(requestDTO.getEnabled() != null ? requestDTO.getEnabled() : true);
-        collar.setNotes(requestDTO.getNotes());
+        collar.setNotes(normalizeNullable(requestDTO.getNotes()));
 
         Collar savedCollar = collarRepository.save(collar);
 
@@ -72,6 +72,141 @@ public class CollarService {
         );
 
         return mapToResponseDTO(savedCollar);
+    }
+
+    @Transactional
+    public CollarResponseDTO updateCollar(Long id, CollarRequestDTO requestDTO) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        String newToken = requestDTO.getToken().trim();
+
+        collarRepository.findByToken(newToken)
+                .filter(existingCollar -> !existingCollar.getId().equals(collar.getId()))
+                .ifPresent(existingCollar -> {
+                    throw new ConflictException("Ya existe otro collar con ese token");
+                });
+
+        Cow cow = null;
+        if (requestDTO.getCowId() != null) {
+            cow = cowRepository.findById(requestDTO.getCowId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+            collarRepository.findByCow(cow)
+                    .filter(existingCollar -> !existingCollar.getId().equals(collar.getId()))
+                    .ifPresent(existingCollar -> {
+                        throw new ConflictException("La vaca ya tiene otro collar asociado");
+                    });
+        }
+
+        collar.setToken(newToken);
+        collar.setStatus(requestDTO.getStatus());
+        collar.setCow(cow);
+        collar.setBatteryLevel(requestDTO.getBatteryLevel());
+        collar.setLastSeenAt(requestDTO.getLastSeenAt());
+        collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : DeviceSignalStatus.SIN_SENAL);
+        collar.setFirmwareVersion(normalizeNullable(requestDTO.getFirmwareVersion()));
+        collar.setGpsAccuracy(requestDTO.getGpsAccuracy());
+        collar.setEnabled(requestDTO.getEnabled() != null ? requestDTO.getEnabled() : true);
+        collar.setNotes(normalizeNullable(requestDTO.getNotes()));
+
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "UPDATE_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Actualización de collar con token " + updatedCollar.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
+    }
+
+    @Transactional
+    public CollarResponseDTO enableCollar(Long id) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        if (Boolean.TRUE.equals(collar.getEnabled())) {
+            return mapToResponseDTO(collar);
+        }
+
+        collar.setEnabled(true);
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "ENABLE_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Habilitación de collar con token " + updatedCollar.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
+    }
+
+    @Transactional
+    public CollarResponseDTO disableCollar(Long id) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        if (Boolean.FALSE.equals(collar.getEnabled())) {
+            return mapToResponseDTO(collar);
+        }
+
+        collar.setEnabled(false);
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "DISABLE_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Deshabilitación de collar con token " + updatedCollar.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
+    }
+
+    @Transactional
+    public CollarResponseDTO reassignCollar(Long collarId, Long cowId) {
+        Collar collar = collarRepository.findById(collarId)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        Cow targetCow = cowRepository.findById(cowId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+        if (collar.getCow() != null && collar.getCow().getId().equals(targetCow.getId())) {
+            return mapToResponseDTO(collar);
+        }
+
+        collarRepository.findByCow(targetCow)
+                .filter(existingCollar -> !existingCollar.getId().equals(collar.getId()))
+                .ifPresent(existingCollar -> {
+                    throw new ConflictException("La vaca destino ya tiene otro collar asociado");
+                });
+
+        String previousCowToken = collar.getCow() != null ? collar.getCow().getToken() : "SIN_VACA";
+        collar.setCow(targetCow);
+
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "REASSIGN_COLLAR",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Reasignación de collar " + updatedCollar.getToken()
+                        + " desde " + previousCowToken
+                        + " hacia " + targetCow.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCollar);
     }
 
     public List<CollarResponseDTO> getAllCollars() {
@@ -100,6 +235,13 @@ public class CollarService {
                 .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado con ese token"));
 
         return mapToResponseDTO(collar);
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private CollarResponseDTO mapToResponseDTO(Collar collar) {

@@ -24,6 +24,28 @@ public class CollarController {
         return collarService.createCollar(requestDTO);
     }
 
+    @PutMapping("/{id}")
+    public CollarResponseDTO updateCollar(@PathVariable Long id,
+                                          @Valid @RequestBody CollarRequestDTO requestDTO) {
+        return collarService.updateCollar(id, requestDTO);
+    }
+
+    @PatchMapping("/{id}/enable")
+    public CollarResponseDTO enableCollar(@PathVariable Long id) {
+        return collarService.enableCollar(id);
+    }
+
+    @PatchMapping("/{id}/disable")
+    public CollarResponseDTO disableCollar(@PathVariable Long id) {
+        return collarService.disableCollar(id);
+    }
+
+    @PatchMapping("/{id}/assign/{cowId}")
+    public CollarResponseDTO reassignCollar(@PathVariable Long id,
+                                            @PathVariable Long cowId) {
+        return collarService.reassignCollar(id, cowId);
+    }
+
     @GetMapping
     public List<CollarResponseDTO> getAllCollars() {
         return collarService.getAllCollars();

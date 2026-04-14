@@ -8,6 +8,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.CowRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public class CowService {
         this.auditLogService = auditLogService;
     }
 
+    @Transactional
     public CowResponseDTO createCow(CowRequestDTO requestDTO) {
         if (cowRepository.findByToken(requestDTO.getToken()).isPresent()) {
             throw new ConflictException("Ya existe una vaca con ese token");
@@ -35,11 +37,11 @@ public class CowService {
         }
 
         Cow cow = new Cow();
-        cow.setToken(requestDTO.getToken());
-        cow.setInternalCode(requestDTO.getInternalCode());
-        cow.setName(requestDTO.getName());
+        cow.setToken(requestDTO.getToken().trim());
+        cow.setInternalCode(normalizeNullable(requestDTO.getInternalCode()));
+        cow.setName(requestDTO.getName().trim());
         cow.setStatus(requestDTO.getStatus());
-        cow.setObservations(requestDTO.getObservations());
+        cow.setObservations(normalizeNullable(requestDTO.getObservations()));
 
         Cow savedCow = cowRepository.save(cow);
 
@@ -53,6 +55,48 @@ public class CowService {
         );
 
         return mapToResponseDTO(savedCow);
+    }
+
+    @Transactional
+    public CowResponseDTO updateCow(Long id, CowRequestDTO requestDTO) {
+        Cow cow = cowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+        String newToken = requestDTO.getToken().trim();
+        String newInternalCode = normalizeNullable(requestDTO.getInternalCode());
+
+        cowRepository.findByToken(newToken)
+                .filter(existingCow -> !existingCow.getId().equals(cow.getId()))
+                .ifPresent(existingCow -> {
+                    throw new ConflictException("Ya existe otra vaca con ese token");
+                });
+
+        if (newInternalCode != null) {
+            cowRepository.findByInternalCode(newInternalCode)
+                    .filter(existingCow -> !existingCow.getId().equals(cow.getId()))
+                    .ifPresent(existingCow -> {
+                        throw new ConflictException("Ya existe otra vaca con ese código interno");
+                    });
+        }
+
+        cow.setToken(newToken);
+        cow.setInternalCode(newInternalCode);
+        cow.setName(requestDTO.getName().trim());
+        cow.setStatus(requestDTO.getStatus());
+        cow.setObservations(normalizeNullable(requestDTO.getObservations()));
+
+        Cow updatedCow = cowRepository.save(cow);
+
+        auditLogService.logWithCurrentActor(
+                "UPDATE_COW",
+                "COW",
+                updatedCow.getId(),
+                "API",
+                "Actualización de vaca con token " + updatedCow.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCow);
     }
 
     public List<CowResponseDTO> getAllCows() {
@@ -81,6 +125,13 @@ public class CowService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada con ese token"));
 
         return mapToResponseDTO(cow);
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private CowResponseDTO mapToResponseDTO(Cow cow) {

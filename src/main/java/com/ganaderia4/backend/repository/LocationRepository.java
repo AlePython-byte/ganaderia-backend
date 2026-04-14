@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.repository;
 
+import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
 import org.springframework.data.domain.Page;
@@ -19,4 +20,11 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
     Optional<Location> findTopByCowOrderByTimestampDesc(Cow cow);
 
     List<Location> findTop10ByOrderByTimestampDesc();
+
+    Optional<Location> findFirstByCollarAndTimestampAndLatitudeAndLongitude(
+            Collar collar,
+            LocalDateTime timestamp,
+            Double latitude,
+            Double longitude
+    );
 }
