@@ -10,6 +10,7 @@ on:
     branches:
       - develop
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -53,3 +54,17 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t ganaderia4backend:${{ github.sha }} .
+
+  deploy-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - build-and-test
+      - docker-build
+    if: github.ref == 'refs/heads/develop'
+
+    steps:
+      - name: Trigger Render deploy hook
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
