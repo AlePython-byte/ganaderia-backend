@@ -9,6 +9,8 @@ import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.notification.NotificationDispatcher;
+import com.ganaderia4.backend.notification.NotificationMessage;
 import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
 import com.ganaderia4.backend.repository.AlertRepository;
@@ -26,15 +28,18 @@ public class AlertService {
     private final AlertFactory alertFactory;
     private final AuditLogService auditLogService;
     private final DomainMetricsService domainMetricsService;
+    private final NotificationDispatcher notificationDispatcher;
 
     public AlertService(AlertRepository alertRepository,
                         AlertFactory alertFactory,
                         AuditLogService auditLogService,
-                        DomainMetricsService domainMetricsService) {
+                        DomainMetricsService domainMetricsService,
+                        NotificationDispatcher notificationDispatcher) {
         this.alertRepository = alertRepository;
         this.alertFactory = alertFactory;
         this.auditLogService = auditLogService;
         this.domainMetricsService = domainMetricsService;
+        this.notificationDispatcher = notificationDispatcher;
     }
 
     @Transactional
@@ -57,6 +62,7 @@ public class AlertService {
         );
 
         domainMetricsService.incrementAlertCreated(savedAlert.getType());
+        sendCriticalAlertNotification(savedAlert);
 
         return savedAlert;
     }
@@ -100,6 +106,7 @@ public class AlertService {
         );
 
         domainMetricsService.incrementAlertCreated(savedAlert.getType());
+        sendCriticalAlertNotification(savedAlert);
 
         return savedAlert;
     }
@@ -289,6 +296,30 @@ public class AlertService {
                     return updatedAlert;
                 })
                 .orElse(null);
+    }
+
+    private void sendCriticalAlertNotification(Alert alert) {
+        if (alert == null || alert.getType() == null || alert.getCow() == null) {
+            return;
+        }
+
+        if (alert.getType() != AlertType.COLLAR_OFFLINE && alert.getType() != AlertType.EXIT_GEOFENCE) {
+            return;
+        }
+
+        NotificationMessage notificationMessage = NotificationMessage.builder()
+                .eventType("CRITICAL_ALERT_CREATED")
+                .title("Nueva alerta crítica")
+                .message(alert.getMessage())
+                .severity("HIGH")
+                .metadata("alertId", String.valueOf(alert.getId()))
+                .metadata("alertType", alert.getType().name())
+                .metadata("cowId", String.valueOf(alert.getCow().getId()))
+                .metadata("cowToken", alert.getCow().getToken())
+                .metadata("cowName", alert.getCow().getName())
+                .build();
+
+        notificationDispatcher.dispatch(notificationMessage);
     }
 
     private void recordStatusTransition(AlertStatus previousStatus, Alert alert) {

@@ -4,8 +4,12 @@ import com.ganaderia4.backend.dto.AlertResponseDTO;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
+import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.notification.NotificationDispatcher;
+import com.ganaderia4.backend.notification.NotificationMessage;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
 import com.ganaderia4.backend.repository.AlertRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.ganaderia4.backend.observability.DomainMetricsService;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -32,10 +35,13 @@ class AlertServiceTest {
     private AlertFactory alertFactory;
 
     @Mock
+    private AuditLogService auditLogService;
+
+    @Mock
     private DomainMetricsService domainMetricsService;
 
     @Mock
-    private AuditLogService auditLogService;
+    private NotificationDispatcher notificationDispatcher;
 
     @InjectMocks
     private AlertService alertService;
@@ -91,6 +97,8 @@ class AlertServiceTest {
 
         verify(alertFactory).createAlert(AlertType.EXIT_GEOFENCE, cow, location);
         verify(alertRepository).save(alertToCreate);
+        verify(domainMetricsService).incrementAlertCreated(AlertType.EXIT_GEOFENCE);
+        verify(notificationDispatcher).dispatch(any(NotificationMessage.class));
     }
 
     @Test
@@ -113,6 +121,69 @@ class AlertServiceTest {
         assertNull(result);
         verify(alertFactory, never()).createAlert(any(), any(), any());
         verify(alertRepository, never()).save(any(Alert.class));
+        verify(domainMetricsService, never()).incrementAlertCreated(any());
+        verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
+    }
+
+    @Test
+    void shouldCreateCollarOfflineAlertAndDispatchNotification() {
+        Collar collar = new Collar();
+        collar.setId(30L);
+        collar.setToken("COLLAR-001");
+        collar.setCow(cow);
+        collar.setLastSeenAt(LocalDateTime.now().minusMinutes(20));
+
+        when(alertRepository.findByCowAndTypeAndStatus(
+                cow,
+                AlertType.COLLAR_OFFLINE,
+                AlertStatus.PENDIENTE
+        )).thenReturn(Optional.empty());
+
+        when(alertRepository.save(any(Alert.class))).thenAnswer(invocation -> {
+            Alert alert = invocation.getArgument(0);
+            alert.setId(300L);
+            return alert;
+        });
+
+        Alert created = alertService.createCollarOfflineAlert(collar);
+
+        assertNotNull(created);
+        assertEquals(AlertType.COLLAR_OFFLINE, created.getType());
+        assertEquals(AlertStatus.PENDIENTE, created.getStatus());
+        assertEquals(cow, created.getCow());
+        assertTrue(created.getMessage().contains("COLLAR-001"));
+
+        verify(alertRepository).save(any(Alert.class));
+        verify(domainMetricsService).incrementAlertCreated(AlertType.COLLAR_OFFLINE);
+        verify(notificationDispatcher).dispatch(any(NotificationMessage.class));
+    }
+
+    @Test
+    void shouldNotDuplicatePendingCollarOfflineAlert() {
+        Collar collar = new Collar();
+        collar.setId(31L);
+        collar.setToken("COLLAR-002");
+        collar.setCow(cow);
+        collar.setLastSeenAt(LocalDateTime.now().minusMinutes(25));
+
+        Alert existingAlert = new Alert();
+        existingAlert.setId(301L);
+        existingAlert.setCow(cow);
+        existingAlert.setType(AlertType.COLLAR_OFFLINE);
+        existingAlert.setStatus(AlertStatus.PENDIENTE);
+
+        when(alertRepository.findByCowAndTypeAndStatus(
+                cow,
+                AlertType.COLLAR_OFFLINE,
+                AlertStatus.PENDIENTE
+        )).thenReturn(Optional.of(existingAlert));
+
+        Alert result = alertService.createCollarOfflineAlert(collar);
+
+        assertNull(result);
+        verify(alertRepository, never()).save(any(Alert.class));
+        verify(domainMetricsService, never()).incrementAlertCreated(AlertType.COLLAR_OFFLINE);
+        verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
     }
 
     @Test
@@ -136,5 +207,6 @@ class AlertServiceTest {
         assertEquals("VACA-001", response.getCowToken());
 
         verify(alertRepository).save(any(Alert.class));
+        verify(domainMetricsService).incrementAlertResolved(AlertType.EXIT_GEOFENCE);
     }
 }
