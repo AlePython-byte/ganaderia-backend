@@ -2,11 +2,13 @@ package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.dto.CowIncidentReportDTO;
 import com.ganaderia4.backend.dto.OfflineCollarReportDTO;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.service.AlertReportService;
 import com.ganaderia4.backend.service.CollarReportService;
+import com.ganaderia4.backend.service.CowIncidentReportService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,11 +24,14 @@ public class ReportController {
 
     private final AlertReportService alertReportService;
     private final CollarReportService collarReportService;
+    private final CowIncidentReportService cowIncidentReportService;
 
     public ReportController(AlertReportService alertReportService,
-                            CollarReportService collarReportService) {
+                            CollarReportService collarReportService,
+                            CowIncidentReportService cowIncidentReportService) {
         this.alertReportService = alertReportService;
         this.collarReportService = collarReportService;
+        this.cowIncidentReportService = cowIncidentReportService;
     }
 
     @GetMapping("/alerts")
@@ -57,5 +62,33 @@ public class ReportController {
     @GetMapping("/offline-collars")
     public List<OfflineCollarReportDTO> getOfflineCollarsReport() {
         return collarReportService.getOfflineCollarsReport();
+    }
+
+    @GetMapping("/cows-most-incidents")
+    public List<CowIncidentReportDTO> getCowsMostIncidentsReport(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+
+            @RequestParam(required = false)
+            AlertType type,
+
+            @RequestParam(required = false)
+            AlertStatus status,
+
+            @RequestParam(required = false)
+            Integer limit
+    ) {
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setType(type);
+        filter.setStatus(status);
+
+        return cowIncidentReportService.getCowsMostIncidentsReport(filter, limit);
     }
 }
