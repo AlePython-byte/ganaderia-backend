@@ -76,6 +76,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
+                        .requestMatchers(HttpMethod.GET, "/api/reports/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+
+                        .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
+
                         .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/alerts/**")

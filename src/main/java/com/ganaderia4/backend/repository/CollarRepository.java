@@ -5,6 +5,7 @@ import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.ganaderia4.backend.model.DeviceSignalStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +16,8 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
     Optional<Collar> findByToken(String token);
 
     List<Collar> findByStatus(CollarStatus status);
+
+    List<Collar> findByEnabledTrueAndSignalStatusOrderByLastSeenAtAsc(DeviceSignalStatus signalStatus);
 
     Optional<Collar> findByCow(Cow cow);
 
