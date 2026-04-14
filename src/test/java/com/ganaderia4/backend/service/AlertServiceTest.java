@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -29,6 +30,9 @@ class AlertServiceTest {
 
     @Mock
     private AlertFactory alertFactory;
+
+    @Mock
+    private DomainMetricsService domainMetricsService;
 
     @Mock
     private AuditLogService auditLogService;

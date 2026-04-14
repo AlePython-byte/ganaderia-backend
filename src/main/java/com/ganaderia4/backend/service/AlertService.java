@@ -9,6 +9,7 @@ import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
 import com.ganaderia4.backend.repository.AlertRepository;
 import org.springframework.stereotype.Service;
@@ -24,13 +25,16 @@ public class AlertService {
     private final AlertRepository alertRepository;
     private final AlertFactory alertFactory;
     private final AuditLogService auditLogService;
+    private final DomainMetricsService domainMetricsService;
 
     public AlertService(AlertRepository alertRepository,
                         AlertFactory alertFactory,
-                        AuditLogService auditLogService) {
+                        AuditLogService auditLogService,
+                        DomainMetricsService domainMetricsService) {
         this.alertRepository = alertRepository;
         this.alertFactory = alertFactory;
         this.auditLogService = auditLogService;
+        this.domainMetricsService = domainMetricsService;
     }
 
     @Transactional
@@ -51,6 +55,8 @@ public class AlertService {
                 "Alerta automática por salida de geocerca para vaca " + cow.getToken(),
                 true
         );
+
+        domainMetricsService.incrementAlertCreated(savedAlert.getType());
 
         return savedAlert;
     }
@@ -93,6 +99,8 @@ public class AlertService {
                 true
         );
 
+        domainMetricsService.incrementAlertCreated(savedAlert.getType());
+
         return savedAlert;
     }
 
@@ -129,6 +137,8 @@ public class AlertService {
         Alert alert = alertRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
 
+        AlertStatus previousStatus = alert.getStatus();
+
         alert.setStatus(requestDTO.getStatus());
         alert.setObservations(requestDTO.getObservations());
 
@@ -143,6 +153,8 @@ public class AlertService {
                 true
         );
 
+        recordStatusTransition(previousStatus, updatedAlert);
+
         return mapToResponseDTO(updatedAlert);
     }
 
@@ -150,6 +162,8 @@ public class AlertService {
     public AlertResponseDTO resolveAlert(Long id, String observations) {
         Alert alert = alertRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
+
+        AlertStatus previousStatus = alert.getStatus();
 
         alert.setStatus(AlertStatus.RESUELTA);
 
@@ -170,6 +184,8 @@ public class AlertService {
                 true
         );
 
+        recordStatusTransition(previousStatus, updatedAlert);
+
         return mapToResponseDTO(updatedAlert);
     }
 
@@ -177,6 +193,8 @@ public class AlertService {
     public AlertResponseDTO discardAlert(Long id, String observations) {
         Alert alert = alertRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
+
+        AlertStatus previousStatus = alert.getStatus();
 
         alert.setStatus(AlertStatus.DESCARTADA);
 
@@ -197,6 +215,8 @@ public class AlertService {
                 true
         );
 
+        recordStatusTransition(previousStatus, updatedAlert);
+
         return mapToResponseDTO(updatedAlert);
     }
 
@@ -204,6 +224,8 @@ public class AlertService {
     public Alert resolvePendingExitGeofenceAlert(Cow cow, LocalDateTime recoveredAt) {
         return alertRepository.findByCowAndTypeAndStatus(cow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE)
                 .map(alert -> {
+                    AlertStatus previousStatus = alert.getStatus();
+
                     alert.setStatus(AlertStatus.RESUELTA);
 
                     String automaticObservation =
@@ -223,6 +245,8 @@ public class AlertService {
                             true
                     );
 
+                    recordStatusTransition(previousStatus, updatedAlert);
+
                     return updatedAlert;
                 })
                 .orElse(null);
@@ -238,6 +262,8 @@ public class AlertService {
 
         return alertRepository.findByCowAndTypeAndStatus(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE)
                 .map(alert -> {
+                    AlertStatus previousStatus = alert.getStatus();
+
                     alert.setStatus(AlertStatus.RESUELTA);
 
                     String automaticObservation =
@@ -258,9 +284,25 @@ public class AlertService {
                             true
                     );
 
+                    recordStatusTransition(previousStatus, updatedAlert);
+
                     return updatedAlert;
                 })
                 .orElse(null);
+    }
+
+    private void recordStatusTransition(AlertStatus previousStatus, Alert alert) {
+        if (alert == null || alert.getType() == null || alert.getStatus() == null) {
+            return;
+        }
+
+        if (previousStatus != AlertStatus.RESUELTA && alert.getStatus() == AlertStatus.RESUELTA) {
+            domainMetricsService.incrementAlertResolved(alert.getType());
+        }
+
+        if (previousStatus != AlertStatus.DESCARTADA && alert.getStatus() == AlertStatus.DESCARTADA) {
+            domainMetricsService.incrementAlertDiscarded(alert.getType());
+        }
     }
 
     private String mergeObservations(String currentObservations, String newObservation) {
