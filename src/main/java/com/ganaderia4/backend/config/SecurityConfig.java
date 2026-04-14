@@ -67,6 +67,9 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/auth/me").authenticated()
 
+                        .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
+                        .hasRole("ADMINISTRADOR")
+
                         .requestMatchers("/api/users/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/audit-logs/**").hasRole("ADMINISTRADOR")
 
