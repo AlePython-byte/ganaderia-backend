@@ -5,7 +5,7 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("deviceMonitoring")
 public class DeviceMonitoringHealthIndicator implements HealthIndicator {
 
     @Value("${app.device-monitor.offline-threshold-minutes:15}")
