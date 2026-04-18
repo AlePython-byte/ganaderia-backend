@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
@@ -15,11 +16,18 @@ import com.ganaderia4.backend.repository.AlertRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -208,5 +216,69 @@ class AlertServiceTest {
 
         verify(alertRepository).save(any(Alert.class));
         verify(domainMetricsService).incrementAlertResolved(AlertType.EXIT_GEOFENCE);
+    }
+
+    @Test
+    void shouldReturnPagedAlertsWithFiltersAndSafeSort() {
+        Alert alert = new Alert();
+        alert.setId(50L);
+        alert.setType(AlertType.COLLAR_OFFLINE);
+        alert.setMessage("Collar sin reporte");
+        alert.setCreatedAt(LocalDateTime.now());
+        alert.setStatus(AlertStatus.PENDIENTE);
+        alert.setCow(cow);
+
+        when(alertRepository.findAll(anyAlertSpecification(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(alert)));
+
+        Page<AlertResponseDTO> response = alertService.getAlertsPage(
+                AlertStatus.PENDIENTE,
+                AlertType.COLLAR_OFFLINE,
+                0,
+                20,
+                "createdAt",
+                "DESC"
+        );
+
+        assertEquals(1, response.getTotalElements());
+        assertEquals("COLLAR_OFFLINE", response.getContent().get(0).getType());
+        assertEquals("PENDIENTE", response.getContent().get(0).getStatus());
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(alertRepository).findAll(anyAlertSpecification(), pageableCaptor.capture());
+
+        Pageable pageable = pageableCaptor.getValue();
+        assertEquals(0, pageable.getPageNumber());
+        assertEquals(20, pageable.getPageSize());
+        assertEquals(Sort.Direction.DESC, pageable.getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
+    void shouldRejectPagedAlertsWhenPageSizeIsTooLarge() {
+        assertThrows(BadRequestException.class, () -> alertService.getAlertsPage(
+                null,
+                null,
+                0,
+                101,
+                "createdAt",
+                "DESC"
+        ));
+    }
+
+    @Test
+    void shouldRejectPagedAlertsWhenSortFieldIsNotAllowed() {
+        assertThrows(BadRequestException.class, () -> alertService.getAlertsPage(
+                null,
+                null,
+                0,
+                20,
+                "cow.password",
+                "DESC"
+        ));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Specification<Alert> anyAlertSpecification() {
+        return any(Specification.class);
     }
 }

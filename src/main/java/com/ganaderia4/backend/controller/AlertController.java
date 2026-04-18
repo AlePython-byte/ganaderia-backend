@@ -6,6 +6,7 @@ import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.service.AlertService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +25,18 @@ public class AlertController {
     @GetMapping
     public List<AlertResponseDTO> getAllAlerts() {
         return alertService.getAllAlerts();
+    }
+
+    @GetMapping("/page")
+    public Page<AlertResponseDTO> getAlertsPage(
+            @RequestParam(required = false) AlertStatus status,
+            @RequestParam(required = false) AlertType type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "DESC") String direction
+    ) {
+        return alertService.getAlertsPage(status, type, page, size, sort, direction);
     }
 
     @GetMapping("/{id}")
