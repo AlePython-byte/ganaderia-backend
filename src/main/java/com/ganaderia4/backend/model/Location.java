@@ -5,7 +5,13 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "locations")
+@Table(
+        name = "locations",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_locations_collar_timestamp_coordinates",
+                columnNames = {"collar_id", "timestamp", "latitude", "longitude"}
+        )
+)
 public class Location {
 
     @Id
