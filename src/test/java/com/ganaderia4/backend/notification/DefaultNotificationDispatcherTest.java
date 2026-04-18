@@ -31,6 +31,33 @@ class DefaultNotificationDispatcherTest {
     }
 
     @Test
+    void shouldContinueDispatchingWhenOneServiceFails() {
+        NotificationService failingService = mock(NotificationService.class);
+        NotificationService successfulService = mock(NotificationService.class);
+
+        when(failingService.getChannel()).thenReturn(NotificationChannel.LOG);
+        doThrow(new RuntimeException("fallo simulado"))
+                .when(failingService)
+                .send(any(NotificationMessage.class));
+
+        DefaultNotificationDispatcher dispatcher =
+                new DefaultNotificationDispatcher(List.of(failingService, successfulService));
+
+        NotificationMessage message = NotificationMessage.builder()
+                .eventType("CRITICAL_ALERT_CREATED")
+                .title("Nueva alerta critica")
+                .message("Mensaje de prueba")
+                .severity("HIGH")
+                .metadata("alertType", "COLLAR_OFFLINE")
+                .build();
+
+        dispatcher.dispatch(message);
+
+        verify(failingService).send(message);
+        verify(successfulService).send(message);
+    }
+
+    @Test
     void shouldDoNothingWhenMessageIsNull() {
         NotificationService service = mock(NotificationService.class);
 
