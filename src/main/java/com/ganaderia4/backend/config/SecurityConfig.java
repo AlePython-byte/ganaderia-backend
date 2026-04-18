@@ -56,7 +56,6 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(
                                 "/api/auth/login",
-                                "/api/device/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -64,6 +63,7 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/device/locations").permitAll()
 
                         .requestMatchers("/api/auth/me").authenticated()
 
