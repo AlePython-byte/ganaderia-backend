@@ -1,6 +1,8 @@
 package com.ganaderia4.backend.security;
 
 import com.ganaderia4.backend.exception.DeviceUnauthorizedException;
+import com.ganaderia4.backend.observability.DomainMetricsService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import javax.crypto.Mac;
@@ -27,7 +29,12 @@ class DeviceRequestAuthenticationServiceTest {
 
     @Test
     void shouldAuthenticateSignedRequest() throws Exception {
-        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(300, "");
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
+                300,
+                "",
+                new DomainMetricsService(meterRegistry)
+        );
         String token = "COLLAR-UNIT-001";
         String timestamp = Instant.now().toString();
         String nonce = UUID.randomUUID().toString();
@@ -36,11 +43,17 @@ class DeviceRequestAuthenticationServiceTest {
         String authenticatedToken = service.authenticate(token, timestamp, nonce, signature, METHOD, PATH, BODY);
 
         assertEquals(token, authenticatedToken);
+        assertEquals(1.0, meterRegistry.counter("ganaderia.device.requests.accepted").count());
     }
 
     @Test
     void shouldRejectInvalidSignature() {
-        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(300, "");
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
+                300,
+                "",
+                new DomainMetricsService(meterRegistry)
+        );
 
         assertThrows(DeviceUnauthorizedException.class, () -> service.authenticate(
                 "COLLAR-UNIT-002",
@@ -51,11 +64,22 @@ class DeviceRequestAuthenticationServiceTest {
                 PATH,
                 BODY
         ));
+
+        assertEquals(1.0, meterRegistry.counter(
+                "ganaderia.device.requests.rejected",
+                "reason",
+                "invalid_signature"
+        ).count());
     }
 
     @Test
     void shouldRejectExpiredTimestamp() throws Exception {
-        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(300, "");
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
+                300,
+                "",
+                new DomainMetricsService(meterRegistry)
+        );
         String token = "COLLAR-UNIT-003";
         String timestamp = Instant.now().minusSeconds(301).toString();
         String nonce = UUID.randomUUID().toString();
@@ -70,11 +94,22 @@ class DeviceRequestAuthenticationServiceTest {
                 PATH,
                 BODY
         ));
+
+        assertEquals(1.0, meterRegistry.counter(
+                "ganaderia.device.requests.rejected",
+                "reason",
+                "expired_timestamp"
+        ).count());
     }
 
     @Test
     void shouldRejectReusedNonce() throws Exception {
-        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(300, "");
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
+                300,
+                "",
+                new DomainMetricsService(meterRegistry)
+        );
         String token = "COLLAR-UNIT-004";
         String timestamp = Instant.now().toString();
         String nonce = UUID.randomUUID().toString();
@@ -91,6 +126,12 @@ class DeviceRequestAuthenticationServiceTest {
                 PATH,
                 BODY
         ));
+
+        assertEquals(1.0, meterRegistry.counter(
+                "ganaderia.device.requests.rejected",
+                "reason",
+                "replayed_nonce"
+        ).count());
     }
 
     private String sign(String token, String timestamp, String nonce, String body) throws Exception {

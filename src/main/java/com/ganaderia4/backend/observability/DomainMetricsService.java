@@ -15,6 +15,8 @@ public class DomainMetricsService {
     private static final String ALERTS_RESOLVED = "ganaderia.alerts.resolved";
     private static final String ALERTS_DISCARDED = "ganaderia.alerts.discarded";
     private static final String COLLARS_MARKED_OFFLINE = "ganaderia.collars.marked_offline";
+    private static final String DEVICE_REQUESTS_ACCEPTED = "ganaderia.device.requests.accepted";
+    private static final String DEVICE_REQUESTS_REJECTED = "ganaderia.device.requests.rejected";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -37,6 +39,22 @@ public class DomainMetricsService {
 
     public void incrementCollarMarkedOffline() {
         counterWithoutTags(COLLARS_MARKED_OFFLINE).increment();
+    }
+
+    public void incrementDeviceRequestAccepted() {
+        counterWithoutTags(DEVICE_REQUESTS_ACCEPTED).increment();
+    }
+
+    public void incrementDeviceRequestRejected(String reason) {
+        String reasonValue = reason != null && !reason.isBlank() ? reason : "UNKNOWN";
+        String key = DEVICE_REQUESTS_REJECTED + "|reason=" + reasonValue;
+
+        counters.computeIfAbsent(key, ignored ->
+                Counter.builder(DEVICE_REQUESTS_REJECTED)
+                        .description("Contador de solicitudes de dispositivo rechazadas")
+                        .tag("reason", reasonValue)
+                        .register(meterRegistry)
+        ).increment();
     }
 
     private Counter counterWithAlertType(String metricName, AlertType type) {

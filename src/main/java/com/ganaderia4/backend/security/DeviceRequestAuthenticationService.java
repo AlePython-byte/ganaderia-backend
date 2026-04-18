@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.security;
 
 import com.ganaderia4.backend.exception.DeviceUnauthorizedException;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,14 +26,17 @@ public class DeviceRequestAuthenticationService {
 
     private final Duration validityWindow;
     private final String hmacPepper;
+    private final DomainMetricsService domainMetricsService;
     private final Map<String, Instant> usedNonces = new ConcurrentHashMap<>();
 
     public DeviceRequestAuthenticationService(
             @Value("${device.auth.window-seconds:300}") long windowSeconds,
-            @Value("${device.auth.hmac-pepper:}") String hmacPepper
+            @Value("${device.auth.hmac-pepper:}") String hmacPepper,
+            DomainMetricsService domainMetricsService
     ) {
         this.validityWindow = Duration.ofSeconds(windowSeconds);
         this.hmacPepper = hmacPepper == null ? "" : hmacPepper;
+        this.domainMetricsService = domainMetricsService;
     }
 
     public String authenticate(String deviceToken,
@@ -57,21 +61,22 @@ public class DeviceRequestAuthenticationService {
 
         String expectedSignature = calculateSignature(sanitizedToken, canonicalRequest);
         if (!constantTimeEquals(expectedSignature, sanitizedSignature)) {
-            throw new DeviceUnauthorizedException("Firma de dispositivo invalida");
+            throw unauthorized("invalid_signature", "Firma de dispositivo invalida");
         }
 
         registerNonce(sanitizedToken, sanitizedNonce, requestTimestamp);
+        domainMetricsService.incrementDeviceRequestAccepted();
         return sanitizedToken;
     }
 
     private String sanitizeDeviceToken(String deviceToken) {
         if (deviceToken == null || deviceToken.isBlank()) {
-            throw new DeviceUnauthorizedException("Token de dispositivo ausente o invalido");
+            throw unauthorized("missing_token", "Token de dispositivo ausente o invalido");
         }
 
         String sanitizedToken = deviceToken.trim();
         if (sanitizedToken.length() > MAX_DEVICE_TOKEN_LENGTH) {
-            throw new DeviceUnauthorizedException("Token de dispositivo demasiado largo o invalido");
+            throw unauthorized("token_too_long", "Token de dispositivo demasiado largo o invalido");
         }
 
         return sanitizedToken;
@@ -79,12 +84,12 @@ public class DeviceRequestAuthenticationService {
 
     private String sanitizeNonce(String nonce) {
         if (nonce == null || nonce.isBlank()) {
-            throw new DeviceUnauthorizedException("Nonce de dispositivo ausente o invalido");
+            throw unauthorized("missing_nonce", "Nonce de dispositivo ausente o invalido");
         }
 
         String sanitizedNonce = nonce.trim();
         if (sanitizedNonce.length() > MAX_NONCE_LENGTH) {
-            throw new DeviceUnauthorizedException("Nonce de dispositivo demasiado largo o invalido");
+            throw unauthorized("nonce_too_long", "Nonce de dispositivo demasiado largo o invalido");
         }
 
         return sanitizedNonce;
@@ -92,12 +97,12 @@ public class DeviceRequestAuthenticationService {
 
     private String sanitizeSignature(String signature) {
         if (signature == null || signature.isBlank()) {
-            throw new DeviceUnauthorizedException("Firma de dispositivo ausente o invalida");
+            throw unauthorized("missing_signature", "Firma de dispositivo ausente o invalida");
         }
 
         String sanitizedSignature = signature.trim();
         if (sanitizedSignature.length() > MAX_SIGNATURE_LENGTH) {
-            throw new DeviceUnauthorizedException("Firma de dispositivo demasiado larga o invalida");
+            throw unauthorized("signature_too_long", "Firma de dispositivo demasiado larga o invalida");
         }
 
         return sanitizedSignature;
@@ -105,20 +110,20 @@ public class DeviceRequestAuthenticationService {
 
     private Instant parseAndValidateTimestamp(String timestampHeader) {
         if (timestampHeader == null || timestampHeader.isBlank()) {
-            throw new DeviceUnauthorizedException("Timestamp de dispositivo ausente o invalido");
+            throw unauthorized("missing_timestamp", "Timestamp de dispositivo ausente o invalido");
         }
 
         Instant requestTimestamp;
         try {
             requestTimestamp = Instant.parse(timestampHeader.trim());
         } catch (DateTimeParseException ex) {
-            throw new DeviceUnauthorizedException("Timestamp de dispositivo ausente o invalido");
+            throw unauthorized("invalid_timestamp", "Timestamp de dispositivo ausente o invalido");
         }
 
         Instant now = Instant.now();
         if (requestTimestamp.isBefore(now.minus(validityWindow))
                 || requestTimestamp.isAfter(now.plus(validityWindow))) {
-            throw new DeviceUnauthorizedException("Timestamp de dispositivo expirado o fuera de ventana");
+            throw unauthorized("expired_timestamp", "Timestamp de dispositivo expirado o fuera de ventana");
         }
 
         return requestTimestamp;
@@ -143,7 +148,7 @@ public class DeviceRequestAuthenticationService {
             byte[] signatureBytes = mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(signatureBytes);
         } catch (Exception ex) {
-            throw new DeviceUnauthorizedException("No fue posible validar la firma del dispositivo");
+            throw unauthorized("signature_validation_error", "No fue posible validar la firma del dispositivo");
         }
     }
 
@@ -167,7 +172,7 @@ public class DeviceRequestAuthenticationService {
         Instant previous = usedNonces.putIfAbsent(nonceKey, expiresAt);
 
         if (previous != null && previous.isAfter(Instant.now())) {
-            throw new DeviceUnauthorizedException("Nonce de dispositivo ya utilizado");
+            throw unauthorized("replayed_nonce", "Nonce de dispositivo ya utilizado");
         }
 
         if (previous != null) {
@@ -186,5 +191,10 @@ public class DeviceRequestAuthenticationService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private DeviceUnauthorizedException unauthorized(String reason, String message) {
+        domainMetricsService.incrementDeviceRequestRejected(reason);
+        return new DeviceUnauthorizedException(message);
     }
 }

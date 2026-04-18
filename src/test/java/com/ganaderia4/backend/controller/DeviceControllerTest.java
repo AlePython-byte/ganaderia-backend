@@ -3,8 +3,10 @@ package com.ganaderia4.backend.controller;
 import com.ganaderia4.backend.dto.DeviceLocationPayloadDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.exception.GlobalExceptionHandler;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.security.DeviceRequestAuthenticationService;
 import com.ganaderia4.backend.service.LocationService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +48,11 @@ class DeviceControllerTest {
 
         DeviceController controller = new DeviceController(
                 locationService,
-                new DeviceRequestAuthenticationService(300, ""),
+                new DeviceRequestAuthenticationService(
+                        300,
+                        "",
+                        new DomainMetricsService(new SimpleMeterRegistry())
+                ),
                 validator
         );
 
