@@ -73,7 +73,7 @@ El objetivo principal es detectar eventos relevantes del negocio, como:
 
 ## Tecnologías utilizadas
 
-- **Java 21**
+- **Java 17**
 - **Spring Boot**
 - **Spring Security**
 - **JWT**
@@ -153,7 +153,7 @@ La autorización depende del endpoint y del método HTTP.
 
 Antes de ejecutar el proyecto necesitas:
 
-- Java 21
+- Java 17
 - Maven Wrapper incluido en el proyecto
 - PostgreSQL
 - Docker
