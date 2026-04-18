@@ -174,6 +174,7 @@ public class AlertService {
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
 
         AlertStatus previousStatus = alert.getStatus();
+        validateStatusTransition(previousStatus, requestDTO.getStatus());
 
         alert.setStatus(requestDTO.getStatus());
         alert.setObservations(requestDTO.getObservations());
@@ -200,6 +201,7 @@ public class AlertService {
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
 
         AlertStatus previousStatus = alert.getStatus();
+        validateStatusTransition(previousStatus, AlertStatus.RESUELTA);
 
         alert.setStatus(AlertStatus.RESUELTA);
 
@@ -231,6 +233,7 @@ public class AlertService {
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta no encontrada"));
 
         AlertStatus previousStatus = alert.getStatus();
+        validateStatusTransition(previousStatus, AlertStatus.DESCARTADA);
 
         alert.setStatus(AlertStatus.DESCARTADA);
 
@@ -363,6 +366,25 @@ public class AlertService {
         if (previousStatus != AlertStatus.DESCARTADA && alert.getStatus() == AlertStatus.DESCARTADA) {
             domainMetricsService.incrementAlertDiscarded(alert.getType());
         }
+    }
+
+    private void validateStatusTransition(AlertStatus currentStatus, AlertStatus targetStatus) {
+        if (currentStatus == null || targetStatus == null) {
+            throw new BadRequestException("Transicion de estado de alerta invalida");
+        }
+
+        if (currentStatus == targetStatus) {
+            return;
+        }
+
+        if (currentStatus == AlertStatus.PENDIENTE
+                && (targetStatus == AlertStatus.RESUELTA || targetStatus == AlertStatus.DESCARTADA)) {
+            return;
+        }
+
+        throw new BadRequestException(
+                "Transicion de estado de alerta no permitida: " + currentStatus + " -> " + targetStatus
+        );
     }
 
     private String mergeObservations(String currentObservations, String newObservation) {

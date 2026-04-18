@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.dto.AlertUpdateRequestDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -219,6 +220,57 @@ class AlertServiceTest {
     }
 
     @Test
+    void shouldRejectResolvingDiscardedAlert() {
+        Alert alert = createPersistedAlert(AlertStatus.DESCARTADA);
+
+        when(alertRepository.findById(1L)).thenReturn(Optional.of(alert));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertService.resolveAlert(1L, "Intento invalido")
+        );
+
+        assertEquals("Transicion de estado de alerta no permitida: DESCARTADA -> RESUELTA", exception.getMessage());
+        verify(alertRepository, never()).save(any(Alert.class));
+        verify(auditLogService, never()).logWithCurrentActor(any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void shouldRejectDiscardingResolvedAlert() {
+        Alert alert = createPersistedAlert(AlertStatus.RESUELTA);
+
+        when(alertRepository.findById(1L)).thenReturn(Optional.of(alert));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertService.discardAlert(1L, "Intento invalido")
+        );
+
+        assertEquals("Transicion de estado de alerta no permitida: RESUELTA -> DESCARTADA", exception.getMessage());
+        verify(alertRepository, never()).save(any(Alert.class));
+        verify(auditLogService, never()).logWithCurrentActor(any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void shouldRejectReopeningTerminalAlertThroughUpdate() {
+        Alert alert = createPersistedAlert(AlertStatus.RESUELTA);
+        AlertUpdateRequestDTO request = new AlertUpdateRequestDTO();
+        request.setStatus(AlertStatus.PENDIENTE);
+        request.setObservations("Reabrir");
+
+        when(alertRepository.findById(1L)).thenReturn(Optional.of(alert));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertService.updateAlert(1L, request)
+        );
+
+        assertEquals("Transicion de estado de alerta no permitida: RESUELTA -> PENDIENTE", exception.getMessage());
+        verify(alertRepository, never()).save(any(Alert.class));
+        verify(auditLogService, never()).logWithCurrentActor(any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
     void shouldReturnPagedAlertsWithFiltersAndSafeSort() {
         Alert alert = new Alert();
         alert.setId(50L);
@@ -280,5 +332,17 @@ class AlertServiceTest {
     @SuppressWarnings("unchecked")
     private Specification<Alert> anyAlertSpecification() {
         return any(Specification.class);
+    }
+
+    private Alert createPersistedAlert(AlertStatus status) {
+        Alert alert = new Alert();
+        alert.setId(1L);
+        alert.setType(AlertType.EXIT_GEOFENCE);
+        alert.setMessage("Alerta de prueba");
+        alert.setCreatedAt(LocalDateTime.now());
+        alert.setStatus(status);
+        alert.setCow(cow);
+        alert.setLocation(location);
+        return alert;
     }
 }
