@@ -8,6 +8,7 @@ import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.observability.RequestCorrelationFilter;
 import com.ganaderia4.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,6 +30,8 @@ import java.time.LocalDateTime;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final boolean apiDocsEnabled;
+    private final boolean swaggerUiEnabled;
 
     private final RequestCorrelationFilter requestCorrelationFilter = new RequestCorrelationFilter();
 
@@ -36,8 +39,12 @@ public class SecurityConfig {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          @Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled,
+                          @Value("${springdoc.swagger-ui.enabled:true}") boolean swaggerUiEnabled) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiDocsEnabled = apiDocsEnabled;
+        this.swaggerUiEnabled = swaggerUiEnabled;
     }
 
     @Bean
@@ -51,19 +58,31 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
+                .authorizeHttpRequests(auth -> {
+                        auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(
                                 "/api/auth/login",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/device/locations").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/device/locations").permitAll();
+
+                        if (apiDocsEnabled) {
+                            auth.requestMatchers("/v3/api-docs/**").permitAll();
+                        } else {
+                            auth.requestMatchers("/v3/api-docs/**").denyAll();
+                        }
+
+                        if (swaggerUiEnabled) {
+                            auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll();
+                        } else {
+                            auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html").denyAll();
+                        }
+
+                        auth
 
                         .requestMatchers("/api/auth/me").authenticated()
 
@@ -119,8 +138,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/locations/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated();
+                })
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->
                                 writeErrorResponse(
