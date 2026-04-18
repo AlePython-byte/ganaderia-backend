@@ -10,6 +10,7 @@ import com.ganaderia4.backend.service.AlertReportService;
 import com.ganaderia4.backend.service.CollarReportService;
 import com.ganaderia4.backend.service.CowIncidentReportService;
 import com.ganaderia4.backend.service.ReportCsvService;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -64,6 +65,43 @@ public class ReportController {
         filter.setStatus(status);
 
         return alertReportService.getAlertReport(filter);
+    }
+
+    @GetMapping("/alerts/page")
+    public Page<AlertResponseDTO> getAlertReportPage(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+
+            @RequestParam(required = false)
+            AlertType type,
+
+            @RequestParam(required = false)
+            AlertStatus status,
+
+            @RequestParam(defaultValue = "0")
+            int page,
+
+            @RequestParam(defaultValue = "20")
+            int size,
+
+            @RequestParam(defaultValue = "createdAt")
+            String sort,
+
+            @RequestParam(defaultValue = "DESC")
+            String direction
+    ) {
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setType(type);
+        filter.setStatus(status);
+
+        return alertReportService.getAlertReportPage(filter, page, size, sort, direction);
     }
 
     @GetMapping("/alerts/export.csv")

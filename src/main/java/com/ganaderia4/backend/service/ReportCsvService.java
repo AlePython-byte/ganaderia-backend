@@ -2,6 +2,8 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -14,12 +16,22 @@ public class ReportCsvService {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final AlertReportService alertReportService;
+    private final int maxRows;
 
-    public ReportCsvService(AlertReportService alertReportService) {
+    public ReportCsvService(AlertReportService alertReportService,
+                            @Value("${reports.alerts.csv-max-rows:5000}") int maxRows) {
         this.alertReportService = alertReportService;
+        this.maxRows = maxRows;
     }
 
     public byte[] exportAlertsReportCsv(AlertReportFilterDTO filter) {
+        long totalRows = alertReportService.countAlertReport(filter);
+        if (totalRows > maxRows) {
+            throw new BadRequestException(
+                    "El reporte supera el maximo de " + maxRows + " filas. Ajusta los filtros antes de exportar"
+            );
+        }
+
         List<AlertResponseDTO> alerts = alertReportService.getAlertReport(filter);
 
         StringBuilder csv = new StringBuilder();
