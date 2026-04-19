@@ -10,6 +10,9 @@ import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.model.Role;
 import com.ganaderia4.backend.model.User;
+import com.ganaderia4.backend.notification.NotificationChannel;
+import com.ganaderia4.backend.notification.NotificationMessage;
+import com.ganaderia4.backend.notification.NotificationService;
 import com.ganaderia4.backend.repository.AlertRepository;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -20,6 +23,9 @@ import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,7 +38,27 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@Import(DomainMetricsIntegrationTest.FailingNotificationConfig.class)
 class DomainMetricsIntegrationTest extends AbstractIntegrationTest {
+
+    @TestConfiguration
+    static class FailingNotificationConfig {
+
+        @Bean
+        NotificationService failingNotificationService() {
+            return new NotificationService() {
+                @Override
+                public NotificationChannel getChannel() {
+                    return NotificationChannel.LOG;
+                }
+
+                @Override
+                public void send(NotificationMessage notificationMessage) {
+                    throw new RuntimeException("fallo simulado de canal");
+                }
+            };
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -168,6 +194,30 @@ class DomainMetricsIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("ganaderia.notifications.sent"))
+                .andExpect(jsonPath("$.measurements[0].value", greaterThanOrEqualTo(1.0)));
+    }
+
+    @Test
+    void shouldExposeNotificationFailedMetricWhenNotificationChannelFails() throws Exception {
+        Cow cow = createCow("VACA-MET-005", "Nube");
+        Collar collar = createCollar(
+                "COLLAR-MET-005",
+                cow,
+                LocalDateTime.now().minusMinutes(35),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+
+        alertService.createCollarOfflineAlert(collar);
+
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/actuator/metrics/ganaderia.notifications.failed")
+                        .param("tag", "channel:LOG")
+                        .param("tag", "eventType:CRITICAL_ALERT_CREATED")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("ganaderia.notifications.failed"))
                 .andExpect(jsonPath("$.measurements[0].value", greaterThanOrEqualTo(1.0)));
     }
 

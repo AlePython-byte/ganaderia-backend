@@ -134,6 +134,25 @@ Permite consultar indicadores y exportar reportes operativos.
 ### 8. Observabilidad
 Permite revisar health, métricas y trazabilidad de requests.
 
+Métricas operativas principales:
+
+- `ganaderia.alerts.created` con tag `type`
+- `ganaderia.alerts.resolved` con tag `type`
+- `ganaderia.alerts.discarded` con tag `type`
+- `ganaderia.collars.marked_offline`
+- `ganaderia.device.requests.accepted`
+- `ganaderia.device.requests.rejected` con tag `reason`
+- `ganaderia.notifications.sent` con tags `channel` y `eventType`
+- `ganaderia.notifications.failed` con tags `channel` y `eventType`
+
+En `prod`, Actuator expone por defecto `health,info`. Para habilitar scraping operativo de métricas sin tocar código:
+
+```env
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+```
+
+Los endpoints `/actuator/metrics/**` y `/actuator/prometheus` requieren rol `ADMINISTRADOR`.
+
 ---
 
 ## Roles del sistema
@@ -184,14 +203,19 @@ APP_BOOTSTRAP_ADMIN_NAME=
 APP_BOOTSTRAP_ADMIN_EMAIL=
 APP_BOOTSTRAP_ADMIN_PASSWORD=
 
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+```
+
 ### Ejecutar con Docker
 
 Construir imagen:
 
 ```bash
 docker build -t ganaderia4backend .
+```
 
 ### Ejecutar el contenedor
+```bash
 docker run -p 10000:10000 ^
   -e SPRING_PROFILES_ACTIVE=dev ^
   -e DB_URL=jdbc:postgresql://host.docker.internal:5432/ganaderia4 ^
@@ -202,3 +226,4 @@ docker run -p 10000:10000 ^
   -e APP_BOOTSTRAP_ADMIN_EMAIL=admin@ganaderia.com ^
   -e APP_BOOTSTRAP_ADMIN_PASSWORD=TU_BOOTSTRAP_ADMIN_PASSWORD ^
   ganaderia4backend
+```
