@@ -147,6 +147,30 @@ class DomainMetricsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.measurements[0].value", greaterThanOrEqualTo(1.0)));
     }
 
+    @Test
+    void shouldExposeNotificationSentMetricWhenOfflineAlertIsCreated() throws Exception {
+        Cow cow = createCow("VACA-MET-004", "Aurora");
+        Collar collar = createCollar(
+                "COLLAR-MET-004",
+                cow,
+                LocalDateTime.now().minusMinutes(35),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+
+        alertService.createCollarOfflineAlert(collar);
+
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/actuator/metrics/ganaderia.notifications.sent")
+                        .param("tag", "channel:LOG")
+                        .param("tag", "eventType:CRITICAL_ALERT_CREATED")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("ganaderia.notifications.sent"))
+                .andExpect(jsonPath("$.measurements[0].value", greaterThanOrEqualTo(1.0)));
+    }
+
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
         User user = new User();
         user.setName(name);
