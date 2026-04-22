@@ -12,6 +12,10 @@ public record WebhookNotificationPayload(
         Map<String, String> metadata
 ) {
 
+    public WebhookNotificationPayload {
+        metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+    }
+
     public static WebhookNotificationPayload from(NotificationMessage notificationMessage) {
         return new WebhookNotificationPayload(
                 notificationMessage.getEventType(),

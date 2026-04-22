@@ -10,7 +10,7 @@ public class LocationValidationChain {
     private final List<LocationValidationHandler> handlers;
 
     public LocationValidationChain(List<LocationValidationHandler> handlers) {
-        this.handlers = handlers;
+        this.handlers = List.copyOf(handlers);
     }
 
     public void validate(LocationValidationContext context) {

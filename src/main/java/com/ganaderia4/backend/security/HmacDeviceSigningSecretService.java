@@ -9,6 +9,8 @@ import jakarta.annotation.PostConstruct;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -55,7 +57,7 @@ public class HmacDeviceSigningSecretService implements DeviceSigningSecretServic
             mac.init(new SecretKeySpec(masterKey.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
             byte[] secretBytes = mac.doFinal((deviceToken + "\n" + salt).getBytes(StandardCharsets.UTF_8));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(secretBytes);
-        } catch (Exception ex) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
             return "";
         }
     }

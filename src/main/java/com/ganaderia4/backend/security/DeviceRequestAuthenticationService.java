@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -152,7 +154,7 @@ public class DeviceRequestAuthenticationService {
             mac.init(new SecretKeySpec(signingSecret, HMAC_ALGORITHM));
             byte[] signatureBytes = mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(signatureBytes);
-        } catch (Exception ex) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
             throw unauthorized("signature_validation_error", "No fue posible validar la firma del dispositivo");
         }
     }

@@ -10,7 +10,7 @@ public class GeofenceExitNotifier {
     private final List<GeofenceExitObserver> observers;
 
     public GeofenceExitNotifier(List<GeofenceExitObserver> observers) {
-        this.observers = observers;
+        this.observers = List.copyOf(observers);
     }
 
     public void notifyExit(GeofenceExitEvent event) {

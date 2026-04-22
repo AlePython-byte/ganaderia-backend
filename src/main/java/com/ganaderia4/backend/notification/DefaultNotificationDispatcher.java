@@ -17,13 +17,13 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
 
     public DefaultNotificationDispatcher(List<NotificationService> notificationServices,
                                          DomainMetricsService domainMetricsService) {
-        this.notificationServices = notificationServices;
+        this.notificationServices = List.copyOf(notificationServices);
         this.domainMetricsService = domainMetricsService;
     }
 
     @Override
     public void dispatch(NotificationMessage notificationMessage) {
-        if (notificationMessage == null || notificationServices == null || notificationServices.isEmpty()) {
+        if (notificationMessage == null || notificationServices.isEmpty()) {
             return;
         }
 

@@ -11,7 +11,7 @@ public class GeofenceStrategyResolver {
     private final List<GeofenceEvaluationStrategy> strategies;
 
     public GeofenceStrategyResolver(List<GeofenceEvaluationStrategy> strategies) {
-        this.strategies = strategies;
+        this.strategies = List.copyOf(strategies);
     }
 
     public GeofenceEvaluationStrategy resolve(Geofence geofence) {
