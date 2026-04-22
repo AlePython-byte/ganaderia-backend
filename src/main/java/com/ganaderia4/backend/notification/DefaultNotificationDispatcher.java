@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.notification;
 
 import com.ganaderia4.backend.observability.DomainMetricsService;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -35,11 +36,12 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
             } catch (RuntimeException ex) {
                 domainMetricsService.incrementNotificationFailed(channel, notificationMessage.getEventType());
                 logger.error(
-                        "Error dispatching notification channel={} eventType={} severity={} error={}",
+                        "event=notification_dispatch_failed channel={} eventType={} severity={} errorType={} error={}",
                         channel,
-                        notificationMessage.getEventType(),
-                        notificationMessage.getSeverity(),
-                        ex.getMessage()
+                        OperationalLogSanitizer.safe(notificationMessage.getEventType()),
+                        OperationalLogSanitizer.safe(notificationMessage.getSeverity()),
+                        ex.getClass().getSimpleName(),
+                        OperationalLogSanitizer.safe(ex.getMessage())
                 );
             }
         }

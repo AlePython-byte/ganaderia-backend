@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.pattern.observer.geofence;
 
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,11 +13,9 @@ public class LogGeofenceExitObserver implements GeofenceExitObserver {
     @Override
     public void onGeofenceExit(GeofenceExitEvent event) {
         logger.warn(
-                "Evento de salida de geocerca: vaca={}, locationId={}, lat={}, lon={}",
-                event.getCow().getToken(),
-                event.getLocation().getId(),
-                event.getLocation().getLatitude(),
-                event.getLocation().getLongitude()
+                "event=geofence_exit_detected cow={} locationId={}",
+                OperationalLogSanitizer.maskToken(event.getCow().getToken()),
+                event.getLocation().getId()
         );
     }
 }

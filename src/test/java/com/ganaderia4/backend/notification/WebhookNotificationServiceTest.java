@@ -8,6 +8,10 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.MDC;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -22,6 +26,7 @@ import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class WebhookNotificationServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -30,13 +35,14 @@ class WebhookNotificationServiceTest {
 
     @AfterEach
     void tearDown() {
+        MDC.clear();
         if (server != null) {
             server.stop(0);
         }
     }
 
     @Test
-    void shouldPostNotificationPayloadToWebhook() throws Exception {
+    void shouldPostNotificationPayloadToWebhook(CapturedOutput output) throws Exception {
         AtomicReference<String> requestBody = new AtomicReference<>();
         AtomicReference<String> eventHeader = new AtomicReference<>();
         AtomicReference<String> signatureHeader = new AtomicReference<>();
@@ -50,6 +56,7 @@ class WebhookNotificationServiceTest {
 
         WebhookNotificationProperties properties = webhookProperties("webhook-secret");
         WebhookNotificationService service = new WebhookNotificationService(properties, objectMapper);
+        MDC.put("requestId", "req-webhook-001");
 
         NotificationMessage message = NotificationMessage.builder()
                 .eventType("CRITICAL_ALERT_CREATED")
@@ -70,10 +77,22 @@ class WebhookNotificationServiceTest {
         assertEquals("COLLAR_OFFLINE", payload.get("metadata").get("alertType").asText());
         assertEquals("CRITICAL_ALERT_CREATED", eventHeader.get());
         assertEquals("sha256=" + sign(requestBody.get(), "webhook-secret"), signatureHeader.get());
+
+        String logs = output.getOut();
+        assertTrue(logs.contains("event=notification_webhook_result"));
+        assertTrue(logs.contains("channel=WEBHOOK"));
+        assertTrue(logs.contains("result=success"));
+        assertTrue(logs.contains("requestId=req-webhook-001"));
+        assertTrue(logs.contains("destination=http://localhost:"));
+        assertTrue(logs.contains("status=202"));
+        assertTrue(logs.contains("durationMs="));
+        assertTrue(logs.contains("eventType=CRITICAL_ALERT_CREATED"));
+        assertFalse(logs.contains("webhook-secret"));
+        assertFalse(logs.contains(requestBody.get()));
     }
 
     @Test
-    void shouldThrowWhenWebhookReturnsErrorStatus() throws Exception {
+    void shouldThrowWhenWebhookReturnsErrorStatus(CapturedOutput output) throws Exception {
         startServer(exchange -> exchange.sendResponseHeaders(500, -1));
 
         WebhookNotificationProperties properties = webhookProperties("");
@@ -88,6 +107,12 @@ class WebhookNotificationServiceTest {
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.send(message));
         assertEquals("Webhook notification failed with status 500", ex.getMessage());
+
+        String logs = output.getOut();
+        assertTrue(logs.contains("event=notification_webhook_result"));
+        assertTrue(logs.contains("result=failure"));
+        assertTrue(logs.contains("status=500"));
+        assertTrue(logs.contains("destination=http://localhost:"));
     }
 
     @Test

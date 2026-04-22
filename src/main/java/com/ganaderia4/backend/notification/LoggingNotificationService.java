@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.notification;
 
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,14 +21,13 @@ public class LoggingNotificationService implements NotificationService {
             return;
         }
 
-        logger.warn(
-                "NOTIFICATION channel={} eventType={} severity={} title={} message={} metadata={}",
+        logger.info(
+                "event=notification_log channel={} eventType={} severity={} metadataKeys={} metadataSize={}",
                 getChannel().name(),
-                notificationMessage.getEventType(),
-                notificationMessage.getSeverity(),
-                notificationMessage.getTitle(),
-                notificationMessage.getMessage(),
-                notificationMessage.getMetadata()
+                OperationalLogSanitizer.safe(notificationMessage.getEventType()),
+                OperationalLogSanitizer.safe(notificationMessage.getSeverity()),
+                OperationalLogSanitizer.metadataKeys(notificationMessage.getMetadata()),
+                notificationMessage.getMetadata().size()
         );
     }
 }

@@ -7,6 +7,7 @@ import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactoryProvider;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
@@ -84,9 +85,10 @@ public class LocationService {
         LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
 
         log.info(
-                "Ubicación registrada desde dispositivo {} para vaca {} en {}",
-                maskToken(payloadDTO.getDeviceToken()),
-                response.getCowToken(),
+                "event=device_location_registered device={} cow={} locationId={} reportedAt={}",
+                OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken()),
+                OperationalLogSanitizer.maskToken(response.getCowToken()),
+                response.getId(),
                 response.getTimestamp()
         );
 
@@ -139,44 +141,51 @@ public class LocationService {
 
     private void validateDevicePayload(DeviceLocationPayloadDTO payloadDTO) {
         if (payloadDTO == null) {
-            log.warn("Se rechazó un payload de dispositivo nulo");
+            log.warn("event=device_location_rejected reason=null_payload device=UNKNOWN");
             throw new BadRequestException("Payload de dispositivo inválido");
         }
 
         if (payloadDTO.getDeviceToken() == null || payloadDTO.getDeviceToken().isBlank()) {
-            log.warn("Se rechazó un payload por token de dispositivo inválido");
+            log.warn("event=device_location_rejected reason=invalid_device_token device=UNKNOWN");
             throw new BadRequestException("Token de dispositivo inválido");
         }
 
         if (payloadDTO.getLat() == null) {
-            log.warn("Se rechazó payload del dispositivo {} por latitud nula", maskToken(payloadDTO.getDeviceToken()));
+            log.warn(
+                    "event=device_location_rejected reason=missing_latitude device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
+            );
             throw new BadRequestException("La latitud es obligatoria");
         }
 
         if (payloadDTO.getLon() == null) {
-            log.warn("Se rechazó payload del dispositivo {} por longitud nula", maskToken(payloadDTO.getDeviceToken()));
+            log.warn(
+                    "event=device_location_rejected reason=missing_longitude device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
+            );
             throw new BadRequestException("La longitud es obligatoria");
         }
 
         if (payloadDTO.getReportedAt() == null) {
-            log.warn("Se rechazó payload del dispositivo {} por timestamp nulo", maskToken(payloadDTO.getDeviceToken()));
+            log.warn(
+                    "event=device_location_rejected reason=missing_reported_at device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
+            );
             throw new BadRequestException("El timestamp reportado es obligatorio");
         }
 
         if (payloadDTO.getLat() < -90.0 || payloadDTO.getLat() > 90.0) {
             log.warn(
-                    "Se rechazó payload del dispositivo {} por latitud fuera de rango: {}",
-                    maskToken(payloadDTO.getDeviceToken()),
-                    payloadDTO.getLat()
+                    "event=device_location_rejected reason=latitude_out_of_range device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("La latitud está fuera de rango");
         }
 
         if (payloadDTO.getLon() < -180.0 || payloadDTO.getLon() > 180.0) {
             log.warn(
-                    "Se rechazó payload del dispositivo {} por longitud fuera de rango: {}",
-                    maskToken(payloadDTO.getDeviceToken()),
-                    payloadDTO.getLon()
+                    "event=device_location_rejected reason=longitude_out_of_range device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("La longitud está fuera de rango");
         }
@@ -185,34 +194,19 @@ public class LocationService {
 
         if (payloadDTO.getReportedAt().isAfter(now.plus(MAX_FUTURE_DRIFT))) {
             log.warn(
-                    "Se rechazó payload del dispositivo {} por timestamp futuro excesivo: {}",
-                    maskToken(payloadDTO.getDeviceToken()),
-                    payloadDTO.getReportedAt()
+                    "event=device_location_rejected reason=reported_at_too_new device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("El timestamp reportado no puede estar demasiado en el futuro");
         }
 
         if (payloadDTO.getReportedAt().isBefore(now.minus(MAX_PAST_AGE))) {
             log.warn(
-                    "Se rechazó payload del dispositivo {} por timestamp demasiado antiguo: {}",
-                    maskToken(payloadDTO.getDeviceToken()),
-                    payloadDTO.getReportedAt()
+                    "event=device_location_rejected reason=reported_at_too_old device={}",
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("El timestamp reportado es demasiado antiguo para ser procesado");
         }
-    }
-
-    private String maskToken(String token) {
-        if (token == null || token.isBlank()) {
-            return "UNKNOWN";
-        }
-
-        String trimmed = token.trim();
-        if (trimmed.length() <= 4) {
-            return "****";
-        }
-
-        return "****" + trimmed.substring(trimmed.length() - 4);
     }
 
     private LocationResponseDTO mapToResponseDTO(Location location) {

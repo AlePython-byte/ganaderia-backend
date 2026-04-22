@@ -7,6 +7,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
 import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
 import com.ganaderia4.backend.pattern.chain.location.LocationValidationChain;
@@ -72,11 +73,10 @@ public class MonitoringFacade {
 
         if (duplicatedLocation != null) {
             log.info(
-                    "Ubicación duplicada ignorada para collar {} en {} ({}, {})",
-                    collar.getToken(),
-                    command.getTimestamp(),
-                    command.getLatitude(),
-                    command.getLongitude()
+                    "event=location_duplicate_ignored collar={} locationId={} timestamp={}",
+                    OperationalLogSanitizer.maskToken(collar.getToken()),
+                    duplicatedLocation.getId(),
+                    command.getTimestamp()
             );
             return mapToResponseDTO(duplicatedLocation);
         }
