@@ -2,6 +2,7 @@ package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.CollarRequestDTO;
 import com.ganaderia4.backend.dto.CollarResponseDTO;
+import com.ganaderia4.backend.dto.DeviceSecretResponseDTO;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.service.CollarService;
 import jakarta.validation.Valid;
@@ -38,6 +39,11 @@ public class CollarController {
     @PatchMapping("/{id}/disable")
     public CollarResponseDTO disableCollar(@PathVariable Long id) {
         return collarService.disableCollar(id);
+    }
+
+    @PatchMapping("/{id}/rotate-secret")
+    public DeviceSecretResponseDTO rotateDeviceSecret(@PathVariable Long id) {
+        return collarService.rotateDeviceSecret(id);
     }
 
     @PatchMapping("/{id}/assign/{cowId}")

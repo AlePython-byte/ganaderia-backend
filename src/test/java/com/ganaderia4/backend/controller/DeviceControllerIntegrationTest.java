@@ -10,7 +10,9 @@ import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
+import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
+import com.ganaderia4.backend.security.DeviceSigningSecretService;
 import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,10 +54,17 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private LocationRepository locationRepository;
 
+    @Autowired
+    private DeviceReplayNonceRepository deviceReplayNonceRepository;
+
+    @Autowired
+    private DeviceSigningSecretService deviceSigningSecretService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
+        deviceReplayNonceRepository.deleteAll();
         locationRepository.deleteAll();
         collarRepository.deleteAll();
         cowRepository.deleteAll();
@@ -149,10 +158,10 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                 }
                 """.formatted(timestamp.withNano(0));
 
-        mockMvc.perform(signedDeviceLocationRequest("COLLAR-INEXISTENTE", body))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("Collar no registrado"))
+        mockMvc.perform(signedDeviceLocationRequest("COLLAR-INEXISTENTE", "SECRET-INEXISTENTE", body))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Dispositivo no autorizado"))
                 .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
     }
 
@@ -192,6 +201,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(signedDeviceLocationRequest(
                         "COLLAR-DEVICE-EXPIRED",
+                        "SECRET-EXPIRED",
                         body,
                         Instant.now().minusSeconds(301),
                         UUID.randomUUID().toString()
@@ -204,6 +214,9 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldRejectRequestWhenSignatureDoesNotMatchPayload() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-BAD-SIGNATURE", "Bad signature");
+        Collar collar = createCollar("COLLAR-DEVICE-BAD-SIGNATURE", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
         LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
 
         String body = """
@@ -215,7 +228,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                 """.formatted(timestamp.withNano(0));
 
         mockMvc.perform(post(DEVICE_LOCATION_PATH)
-                        .header("X-Device-Token", "COLLAR-DEVICE-BAD-SIGNATURE")
+                        .header("X-Device-Token", collar.getToken())
                         .header("X-Device-Timestamp", Instant.now().toString())
                         .header("X-Device-Nonce", UUID.randomUUID().toString())
                         .header("X-Device-Signature", "invalid-signature")
@@ -254,6 +267,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
 
         assertEquals(1, locationRepository.count());
+        assertEquals(1, deviceReplayNonceRepository.count());
     }
 
     @Test
@@ -294,11 +308,26 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token,
+                                                                      String secret,
+                                                                      String body) throws Exception {
+        return signedDeviceLocationRequest(token, secret, body, Instant.now(), UUID.randomUUID().toString());
+    }
+
+    private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token,
+                                                                      String body,
+                                                                      Instant timestamp,
+                                                                      String nonce) throws Exception {
+        String secret = deviceSigningSecretService.resolveSigningSecret(token).orElseThrow();
+        return signedDeviceLocationRequest(token, secret, body, timestamp, nonce);
+    }
+
+    private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token,
+                                                                      String secret,
                                                                       String body,
                                                                       Instant timestamp,
                                                                       String nonce) throws Exception {
         String timestampHeader = timestamp.toString();
-        String signature = sign(token, timestampHeader, nonce, body);
+        String signature = sign(secret, timestampHeader, nonce, body);
 
         return post(DEVICE_LOCATION_PATH)
                 .header("X-Device-Token", token)
@@ -309,7 +338,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                 .content(body);
     }
 
-    private String sign(String token, String timestamp, String nonce, String body) throws Exception {
+    private String sign(String secret, String timestamp, String nonce, String body) throws Exception {
         String canonicalRequest = "POST"
                 + "\n" + DEVICE_LOCATION_PATH
                 + "\n" + timestamp
@@ -317,7 +346,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                 + "\n" + body;
 
         Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return Base64.getEncoder().encodeToString(mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
     }
 

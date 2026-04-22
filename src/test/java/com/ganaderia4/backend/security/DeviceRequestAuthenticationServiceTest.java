@@ -10,7 +10,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -30,15 +34,18 @@ class DeviceRequestAuthenticationServiceTest {
     @Test
     void shouldAuthenticateSignedRequest() throws Exception {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        String token = "COLLAR-UNIT-001";
+        String secret = "SECRET-UNIT-001";
         DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
                 300,
                 "",
-                new DomainMetricsService(meterRegistry)
+                new DomainMetricsService(meterRegistry),
+                new InMemoryDeviceReplayProtectionStore(),
+                new FixedDeviceSigningSecretService(Map.of(token, secret))
         );
-        String token = "COLLAR-UNIT-001";
         String timestamp = Instant.now().toString();
         String nonce = UUID.randomUUID().toString();
-        String signature = sign(token, timestamp, nonce, BODY);
+        String signature = sign(secret, timestamp, nonce, BODY);
 
         String authenticatedToken = service.authenticate(token, timestamp, nonce, signature, METHOD, PATH, BODY);
 
@@ -52,7 +59,9 @@ class DeviceRequestAuthenticationServiceTest {
         DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
                 300,
                 "",
-                new DomainMetricsService(meterRegistry)
+                new DomainMetricsService(meterRegistry),
+                new InMemoryDeviceReplayProtectionStore(),
+                new FixedDeviceSigningSecretService(Map.of("COLLAR-UNIT-002", "SECRET-UNIT-002"))
         );
 
         assertThrows(DeviceUnauthorizedException.class, () -> service.authenticate(
@@ -75,15 +84,18 @@ class DeviceRequestAuthenticationServiceTest {
     @Test
     void shouldRejectExpiredTimestamp() throws Exception {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        String token = "COLLAR-UNIT-003";
+        String secret = "SECRET-UNIT-003";
         DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
                 300,
                 "",
-                new DomainMetricsService(meterRegistry)
+                new DomainMetricsService(meterRegistry),
+                new InMemoryDeviceReplayProtectionStore(),
+                new FixedDeviceSigningSecretService(Map.of(token, secret))
         );
-        String token = "COLLAR-UNIT-003";
         String timestamp = Instant.now().minusSeconds(301).toString();
         String nonce = UUID.randomUUID().toString();
-        String signature = sign(token, timestamp, nonce, BODY);
+        String signature = sign(secret, timestamp, nonce, BODY);
 
         assertThrows(DeviceUnauthorizedException.class, () -> service.authenticate(
                 token,
@@ -105,15 +117,18 @@ class DeviceRequestAuthenticationServiceTest {
     @Test
     void shouldRejectReusedNonce() throws Exception {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        String token = "COLLAR-UNIT-004";
+        String secret = "SECRET-UNIT-004";
         DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
                 300,
                 "",
-                new DomainMetricsService(meterRegistry)
+                new DomainMetricsService(meterRegistry),
+                new InMemoryDeviceReplayProtectionStore(),
+                new FixedDeviceSigningSecretService(Map.of(token, secret))
         );
-        String token = "COLLAR-UNIT-004";
         String timestamp = Instant.now().toString();
         String nonce = UUID.randomUUID().toString();
-        String signature = sign(token, timestamp, nonce, BODY);
+        String signature = sign(secret, timestamp, nonce, BODY);
 
         service.authenticate(token, timestamp, nonce, signature, METHOD, PATH, BODY);
 
@@ -134,7 +149,38 @@ class DeviceRequestAuthenticationServiceTest {
         ).count());
     }
 
-    private String sign(String token, String timestamp, String nonce, String body) throws Exception {
+    @Test
+    void shouldRejectUnknownDeviceBeforeRegisteringNonce() throws Exception {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
+                300,
+                "",
+                new DomainMetricsService(meterRegistry),
+                new InMemoryDeviceReplayProtectionStore(),
+                new FixedDeviceSigningSecretService(Map.of())
+        );
+        String timestamp = Instant.now().toString();
+        String nonce = UUID.randomUUID().toString();
+        String signature = sign("UNKNOWN-SECRET", timestamp, nonce, BODY);
+
+        assertThrows(DeviceUnauthorizedException.class, () -> service.authenticate(
+                "COLLAR-UNKNOWN",
+                timestamp,
+                nonce,
+                signature,
+                METHOD,
+                PATH,
+                BODY
+        ));
+
+        assertEquals(1.0, meterRegistry.counter(
+                "ganaderia.device.requests.rejected",
+                "reason",
+                "unknown_device"
+        ).count());
+    }
+
+    private String sign(String secret, String timestamp, String nonce, String body) throws Exception {
         String canonicalRequest = METHOD
                 + "\n" + PATH
                 + "\n" + timestamp
@@ -142,7 +188,35 @@ class DeviceRequestAuthenticationServiceTest {
                 + "\n" + body;
 
         Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return Base64.getEncoder().encodeToString(mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static class InMemoryDeviceReplayProtectionStore implements DeviceReplayProtectionStore {
+
+        private final Map<String, Instant> usedNonces = new ConcurrentHashMap<>();
+
+        @Override
+        public boolean registerNonce(String deviceToken, String nonce, Instant expiresAt) {
+            Instant now = Instant.now();
+            usedNonces.entrySet().removeIf(entry -> !entry.getValue().isAfter(now));
+
+            String nonceKey = deviceToken + ":" + nonce;
+            return usedNonces.putIfAbsent(nonceKey, expiresAt) == null;
+        }
+    }
+
+    private static class FixedDeviceSigningSecretService implements DeviceSigningSecretService {
+
+        private final Map<String, String> secrets;
+
+        private FixedDeviceSigningSecretService(Map<String, String> secrets) {
+            this.secrets = new HashMap<>(secrets);
+        }
+
+        @Override
+        public Optional<String> resolveSigningSecret(String deviceToken) {
+            return Optional.ofNullable(secrets.get(deviceToken));
+        }
     }
 }

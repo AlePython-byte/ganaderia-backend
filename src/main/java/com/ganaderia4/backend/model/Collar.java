@@ -2,11 +2,15 @@ package com.ganaderia4.backend.model;
 
 import jakarta.persistence.*;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 
 @Entity
 @Table(name = "collars")
 public class Collar {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,6 +49,9 @@ public class Collar {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "device_secret_salt", nullable = false, length = 100)
+    private String deviceSecretSalt;
+
     public Collar() {
     }
 
@@ -70,6 +77,13 @@ public class Collar {
         this.gpsAccuracy = gpsAccuracy;
         this.enabled = enabled;
         this.notes = notes;
+    }
+
+    @PrePersist
+    public void ensureDeviceSecretSalt() {
+        if (deviceSecretSalt == null || deviceSecretSalt.isBlank()) {
+            rotateDeviceSecretSalt();
+        }
     }
 
     public Long getId() {
@@ -158,5 +172,19 @@ public class Collar {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getDeviceSecretSalt() {
+        return deviceSecretSalt;
+    }
+
+    public void setDeviceSecretSalt(String deviceSecretSalt) {
+        this.deviceSecretSalt = deviceSecretSalt;
+    }
+
+    public void rotateDeviceSecretSalt() {
+        byte[] saltBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(saltBytes);
+        this.deviceSecretSalt = Base64.getUrlEncoder().withoutPadding().encodeToString(saltBytes);
     }
 }

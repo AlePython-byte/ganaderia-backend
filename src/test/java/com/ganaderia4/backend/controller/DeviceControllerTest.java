@@ -4,7 +4,9 @@ import com.ganaderia4.backend.dto.DeviceLocationPayloadDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.exception.GlobalExceptionHandler;
 import com.ganaderia4.backend.observability.DomainMetricsService;
+import com.ganaderia4.backend.security.DeviceReplayProtectionStore;
 import com.ganaderia4.backend.security.DeviceRequestAuthenticationService;
+import com.ganaderia4.backend.security.DeviceSigningSecretService;
 import com.ganaderia4.backend.service.LocationService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.validation.Validation;
@@ -23,7 +25,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DeviceControllerTest {
 
     private static final String DEVICE_LOCATION_PATH = "/api/device/locations";
+    private static final String DEVICE_TOKEN = "COLLAR-001";
+    private static final String DEVICE_SECRET = "SECRET-COLLAR-001";
 
     private MockMvc mockMvc;
     private LocationService locationService;
@@ -51,7 +59,9 @@ class DeviceControllerTest {
                 new DeviceRequestAuthenticationService(
                         300,
                         "",
-                        new DomainMetricsService(new SimpleMeterRegistry())
+                        new DomainMetricsService(new SimpleMeterRegistry()),
+                        new InMemoryDeviceReplayProtectionStore(),
+                        new FixedDeviceSigningSecretService(Map.of(DEVICE_TOKEN, DEVICE_SECRET))
                 ),
                 validator
         );
@@ -82,7 +92,7 @@ class DeviceControllerTest {
                 }
                 """;
 
-        mockMvc.perform(signedDeviceLocationRequest("COLLAR-001", body))
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(10))
                 .andExpect(jsonPath("$.cowToken").value("VACA-001"))
@@ -92,7 +102,7 @@ class DeviceControllerTest {
         verify(locationService).registerLocationFromDevice(captor.capture());
 
         DeviceLocationPayloadDTO payload = captor.getValue();
-        assertEquals("COLLAR-001", payload.getDeviceToken());
+        assertEquals(DEVICE_TOKEN, payload.getDeviceToken());
         assertEquals(1.214, payload.getLat());
         assertEquals(-77.281, payload.getLon());
         assertEquals(LocalDateTime.of(2026, 4, 18, 10, 0), payload.getReportedAt());
@@ -135,25 +145,26 @@ class DeviceControllerTest {
         Instant timestamp = Instant.now();
         String nonce = UUID.randomUUID().toString();
 
-        mockMvc.perform(signedDeviceLocationRequest("COLLAR-001", body, timestamp, nonce))
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body, timestamp, nonce))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(signedDeviceLocationRequest("COLLAR-001", body, timestamp, nonce))
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body, timestamp, nonce))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message").value("Nonce de dispositivo ya utilizado"));
     }
 
-    private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token, String body) throws Exception {
-        return signedDeviceLocationRequest(token, body, Instant.now(), UUID.randomUUID().toString());
+    private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token, String secret, String body) throws Exception {
+        return signedDeviceLocationRequest(token, secret, body, Instant.now(), UUID.randomUUID().toString());
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token,
+                                                                      String secret,
                                                                       String body,
                                                                       Instant timestamp,
                                                                       String nonce) throws Exception {
         String timestampHeader = timestamp.toString();
-        String signature = sign(token, timestampHeader, nonce, body);
+        String signature = sign(secret, timestampHeader, nonce, body);
 
         return post(DEVICE_LOCATION_PATH)
                 .header("X-Device-Token", token)
@@ -164,7 +175,7 @@ class DeviceControllerTest {
                 .content(body);
     }
 
-    private String sign(String token, String timestamp, String nonce, String body) throws Exception {
+    private String sign(String secret, String timestamp, String nonce, String body) throws Exception {
         String canonicalRequest = "POST"
                 + "\n" + DEVICE_LOCATION_PATH
                 + "\n" + timestamp
@@ -172,7 +183,35 @@ class DeviceControllerTest {
                 + "\n" + body;
 
         Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return Base64.getEncoder().encodeToString(mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static class InMemoryDeviceReplayProtectionStore implements DeviceReplayProtectionStore {
+
+        private final Map<String, Instant> usedNonces = new ConcurrentHashMap<>();
+
+        @Override
+        public boolean registerNonce(String deviceToken, String nonce, Instant expiresAt) {
+            Instant now = Instant.now();
+            usedNonces.entrySet().removeIf(entry -> !entry.getValue().isAfter(now));
+
+            String nonceKey = deviceToken + ":" + nonce;
+            return usedNonces.putIfAbsent(nonceKey, expiresAt) == null;
+        }
+    }
+
+    private static class FixedDeviceSigningSecretService implements DeviceSigningSecretService {
+
+        private final Map<String, String> secrets;
+
+        private FixedDeviceSigningSecretService(Map<String, String> secrets) {
+            this.secrets = new HashMap<>(secrets);
+        }
+
+        @Override
+        public Optional<String> resolveSigningSecret(String deviceToken) {
+            return Optional.ofNullable(secrets.get(deviceToken));
+        }
     }
 }

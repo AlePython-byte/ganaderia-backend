@@ -2,6 +2,7 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.CollarRequestDTO;
 import com.ganaderia4.backend.dto.CollarResponseDTO;
+import com.ganaderia4.backend.dto.DeviceSecretResponseDTO;
 import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
@@ -10,6 +11,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
+import com.ganaderia4.backend.security.DeviceSigningSecretService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +24,16 @@ public class CollarService {
     private final CollarRepository collarRepository;
     private final CowRepository cowRepository;
     private final AuditLogService auditLogService;
+    private final DeviceSigningSecretService deviceSigningSecretService;
 
     public CollarService(CollarRepository collarRepository,
                          CowRepository cowRepository,
-                         AuditLogService auditLogService) {
+                         AuditLogService auditLogService,
+                         DeviceSigningSecretService deviceSigningSecretService) {
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
         this.auditLogService = auditLogService;
+        this.deviceSigningSecretService = deviceSigningSecretService;
     }
 
     @Transactional
@@ -170,6 +175,29 @@ public class CollarService {
         );
 
         return mapToResponseDTO(updatedCollar);
+    }
+
+    @Transactional
+    public DeviceSecretResponseDTO rotateDeviceSecret(Long id) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        collar.rotateDeviceSecretSalt();
+        Collar updatedCollar = collarRepository.save(collar);
+
+        auditLogService.logWithCurrentActor(
+                "ROTATE_COLLAR_DEVICE_SECRET",
+                "COLLAR",
+                updatedCollar.getId(),
+                "API",
+                "Rotacion de secreto HMAC de collar " + updatedCollar.getToken(),
+                true
+        );
+
+        String deviceSecret = deviceSigningSecretService.resolveSigningSecret(updatedCollar.getToken())
+                .orElseThrow(() -> new IllegalStateException("No fue posible derivar el secreto del dispositivo"));
+
+        return new DeviceSecretResponseDTO(updatedCollar.getToken(), deviceSecret);
     }
 
     @Transactional

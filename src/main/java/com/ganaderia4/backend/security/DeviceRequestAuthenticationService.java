@@ -13,8 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class DeviceRequestAuthenticationService {
@@ -27,16 +25,21 @@ public class DeviceRequestAuthenticationService {
     private final Duration validityWindow;
     private final String hmacPepper;
     private final DomainMetricsService domainMetricsService;
-    private final Map<String, Instant> usedNonces = new ConcurrentHashMap<>();
+    private final DeviceReplayProtectionStore replayProtectionStore;
+    private final DeviceSigningSecretService deviceSigningSecretService;
 
     public DeviceRequestAuthenticationService(
             @Value("${device.auth.window-seconds:300}") long windowSeconds,
             @Value("${device.auth.hmac-pepper:}") String hmacPepper,
-            DomainMetricsService domainMetricsService
+            DomainMetricsService domainMetricsService,
+            DeviceReplayProtectionStore replayProtectionStore,
+            DeviceSigningSecretService deviceSigningSecretService
     ) {
         this.validityWindow = Duration.ofSeconds(windowSeconds);
         this.hmacPepper = hmacPepper == null ? "" : hmacPepper;
         this.domainMetricsService = domainMetricsService;
+        this.replayProtectionStore = replayProtectionStore;
+        this.deviceSigningSecretService = deviceSigningSecretService;
     }
 
     public String authenticate(String deviceToken,
@@ -142,9 +145,11 @@ public class DeviceRequestAuthenticationService {
     }
 
     private String calculateSignature(String deviceToken, String canonicalRequest) {
+        byte[] signingSecret = resolveSigningSecret(deviceToken);
+
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(new SecretKeySpec(resolveSigningSecret(deviceToken), HMAC_ALGORITHM));
+            mac.init(new SecretKeySpec(signingSecret, HMAC_ALGORITHM));
             byte[] signatureBytes = mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(signatureBytes);
         } catch (Exception ex) {
@@ -153,7 +158,11 @@ public class DeviceRequestAuthenticationService {
     }
 
     private byte[] resolveSigningSecret(String deviceToken) {
-        String secret = hmacPepper.isBlank() ? deviceToken : deviceToken + ":" + hmacPepper;
+        String deviceSecret = deviceSigningSecretService.resolveSigningSecret(deviceToken)
+                .filter(secret -> !secret.isBlank())
+                .orElseThrow(() -> unauthorized("unknown_device", "Dispositivo no autorizado"));
+
+        String secret = hmacPepper.isBlank() ? deviceSecret : deviceSecret + ":" + hmacPepper;
         return secret.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -165,27 +174,10 @@ public class DeviceRequestAuthenticationService {
     }
 
     private void registerNonce(String deviceToken, String nonce, Instant requestTimestamp) {
-        purgeExpiredNonces();
-
-        String nonceKey = deviceToken + ":" + nonce;
         Instant expiresAt = requestTimestamp.plus(validityWindow);
-        Instant previous = usedNonces.putIfAbsent(nonceKey, expiresAt);
 
-        if (previous != null && previous.isAfter(Instant.now())) {
+        if (!replayProtectionStore.registerNonce(deviceToken, nonce, expiresAt)) {
             throw unauthorized("replayed_nonce", "Nonce de dispositivo ya utilizado");
-        }
-
-        if (previous != null) {
-            usedNonces.put(nonceKey, expiresAt);
-        }
-    }
-
-    private void purgeExpiredNonces() {
-        Instant now = Instant.now();
-        for (Map.Entry<String, Instant> entry : usedNonces.entrySet()) {
-            if (!entry.getValue().isAfter(now)) {
-                usedNonces.remove(entry.getKey(), entry.getValue());
-            }
         }
     }
 
