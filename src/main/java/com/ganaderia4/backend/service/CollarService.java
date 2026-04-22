@@ -12,28 +12,38 @@ import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.security.DeviceSigningSecretService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class CollarService {
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "token", "status", "batteryLevel", "lastSeenAt", "signalStatus", "enabled"
+    );
+
     private final CollarRepository collarRepository;
     private final CowRepository cowRepository;
     private final AuditLogService auditLogService;
     private final DeviceSigningSecretService deviceSigningSecretService;
+    private final PaginationService paginationService;
 
     public CollarService(CollarRepository collarRepository,
                          CowRepository cowRepository,
                          AuditLogService auditLogService,
-                         DeviceSigningSecretService deviceSigningSecretService) {
+                         DeviceSigningSecretService deviceSigningSecretService,
+                         PaginationService paginationService) {
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
         this.auditLogService = auditLogService;
         this.deviceSigningSecretService = deviceSigningSecretService;
+        this.paginationService = paginationService;
     }
 
     @Transactional
@@ -242,6 +252,16 @@ public class CollarService {
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    public Page<CollarResponseDTO> getCollarsPage(CollarStatus status, int page, int size, String sort, String direction) {
+        PageRequest pageable = paginationService.createPageRequest(page, size, sort, direction, ALLOWED_SORT_FIELDS);
+
+        Page<Collar> collars = status != null
+                ? collarRepository.findByStatus(status, pageable)
+                : collarRepository.findAll(pageable);
+
+        return collars.map(this::mapToResponseDTO);
     }
 
     public CollarResponseDTO getCollarById(Long id) {

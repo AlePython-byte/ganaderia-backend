@@ -2,6 +2,7 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertResponseDTO;
 import com.ganaderia4.backend.dto.AlertUpdateRequestDTO;
+import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -51,6 +53,9 @@ class AlertServiceTest {
 
     @Mock
     private NotificationDispatcher notificationDispatcher;
+
+    @Spy
+    private PaginationService paginationService = new PaginationService(new PaginationProperties());
 
     @InjectMocks
     private AlertService alertService;

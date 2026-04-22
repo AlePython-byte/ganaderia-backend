@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Service
 public class LocationService {
@@ -31,23 +32,27 @@ public class LocationService {
 
     private static final Duration MAX_FUTURE_DRIFT = Duration.ofMinutes(5);
     private static final Duration MAX_PAST_AGE = Duration.ofDays(7);
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("timestamp");
 
     private final LocationRepository locationRepository;
     private final CowRepository cowRepository;
     private final MonitoringFacade monitoringFacade;
     private final LocationProcessingFactoryProvider locationProcessingFactoryProvider;
     private final AuditLogService auditLogService;
+    private final PaginationService paginationService;
 
     public LocationService(LocationRepository locationRepository,
                            CowRepository cowRepository,
                            MonitoringFacade monitoringFacade,
                            LocationProcessingFactoryProvider locationProcessingFactoryProvider,
-                           AuditLogService auditLogService) {
+                           AuditLogService auditLogService,
+                           PaginationService paginationService) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
         this.monitoringFacade = monitoringFacade;
         this.locationProcessingFactoryProvider = locationProcessingFactoryProvider;
         this.auditLogService = auditLogService;
+        this.paginationService = paginationService;
     }
 
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
@@ -102,7 +107,7 @@ public class LocationService {
         Cow cow = cowRepository.findById(cowId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
+        PageRequest pageable = paginationService.createPageRequest(page, size, "timestamp", "DESC", ALLOWED_SORT_FIELDS);
 
         return locationRepository.findByCowOrderByTimestampDesc(cow, pageable)
                 .map(this::mapToResponseDTO);
@@ -116,7 +121,7 @@ public class LocationService {
         Cow cow = cowRepository.findById(cowId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "timestamp"));
+        PageRequest pageable = paginationService.createPageRequest(page, size, "timestamp", "DESC", ALLOWED_SORT_FIELDS);
 
         return locationRepository.findByCowAndTimestampBetweenOrderByTimestampDesc(cow, start, end, pageable)
                 .map(this::mapToResponseDTO);

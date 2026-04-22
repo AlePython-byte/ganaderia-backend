@@ -6,6 +6,7 @@ import com.ganaderia4.backend.dto.DeviceSecretResponseDTO;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.service.CollarService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -55,6 +56,17 @@ public class CollarController {
     @GetMapping
     public List<CollarResponseDTO> getAllCollars() {
         return collarService.getAllCollars();
+    }
+
+    @GetMapping("/page")
+    public Page<CollarResponseDTO> getCollarsPage(
+            @RequestParam(required = false) CollarStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "${app.pagination.default-size:20}") int size,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "ASC") String direction
+    ) {
+        return collarService.getCollarsPage(status, page, size, sort, direction);
     }
 
     @GetMapping("/{id}")

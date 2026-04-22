@@ -21,13 +21,16 @@ import java.util.Map;
 public class CowIncidentReportService {
 
     private final AlertRepository alertRepository;
+    private final PaginationService paginationService;
 
-    public CowIncidentReportService(AlertRepository alertRepository) {
+    public CowIncidentReportService(AlertRepository alertRepository,
+                                    PaginationService paginationService) {
         this.alertRepository = alertRepository;
+        this.paginationService = paginationService;
     }
 
     public List<CowIncidentReportDTO> getCowsMostIncidentsReport(AlertReportFilterDTO filter, Integer limit) {
-        int effectiveLimit = (limit != null && limit > 0) ? limit : 10;
+        int effectiveLimit = paginationService.validateLimit(limit, 10);
 
         List<Alert> alerts = alertRepository.findAll(
                 buildSpecification(filter),

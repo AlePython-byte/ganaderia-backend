@@ -2,6 +2,7 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -35,9 +36,11 @@ class AlertReportServiceTest {
     @Mock
     private AlertRepository alertRepository;
 
+    private final PaginationService paginationService = new PaginationService(new PaginationProperties());
+
     @Test
     void shouldReturnPagedAlertReportWithSafeSort() {
-        AlertReportService service = new AlertReportService(alertRepository);
+        AlertReportService service = new AlertReportService(alertRepository, paginationService);
         Alert alert = createAlert();
 
         when(alertRepository.findAll(anyAlertSpecification(), any(Pageable.class)))
@@ -65,7 +68,7 @@ class AlertReportServiceTest {
 
     @Test
     void shouldRejectPageSizeGreaterThanMaximum() {
-        AlertReportService service = new AlertReportService(alertRepository);
+        AlertReportService service = new AlertReportService(alertRepository, paginationService);
 
         assertThrows(BadRequestException.class, () -> service.getAlertReportPage(
                 new AlertReportFilterDTO(),
@@ -78,7 +81,7 @@ class AlertReportServiceTest {
 
     @Test
     void shouldRejectUnknownSortField() {
-        AlertReportService service = new AlertReportService(alertRepository);
+        AlertReportService service = new AlertReportService(alertRepository, paginationService);
 
         assertThrows(BadRequestException.class, () -> service.getAlertReportPage(
                 new AlertReportFilterDTO(),

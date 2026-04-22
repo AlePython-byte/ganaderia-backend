@@ -75,6 +75,32 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldAllowAdminToGetUsersPage() throws Exception {
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/api/users/page")
+                        .param("size", "2")
+                        .param("sort", "id")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
+    void shouldRejectUsersPageWhenSizeExceedsGlobalMaximum() throws Exception {
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/api/users/page")
+                        .param("size", "101")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El tamano de pagina debe estar entre 1 y 100"))
+                .andExpect(jsonPath("$.path").value("/api/users/page"));
+    }
+
+    @Test
     void shouldDenyOperatorAccessToUsers() throws Exception {
         String token = loginAndGetToken("operador@test.com", "12345678");
 

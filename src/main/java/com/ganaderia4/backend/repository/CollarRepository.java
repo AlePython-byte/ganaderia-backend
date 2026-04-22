@@ -4,6 +4,8 @@ import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 
@@ -16,6 +18,8 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
     Optional<Collar> findByToken(String token);
 
     List<Collar> findByStatus(CollarStatus status);
+
+    Page<Collar> findByStatus(CollarStatus status, Pageable pageable);
 
     List<Collar> findByEnabledTrueAndSignalStatusOrderByLastSeenAtAsc(DeviceSignalStatus signalStatus);
 

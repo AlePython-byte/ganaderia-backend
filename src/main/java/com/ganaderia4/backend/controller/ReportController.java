@@ -86,7 +86,7 @@ public class ReportController {
             @RequestParam(defaultValue = "0")
             int page,
 
-            @RequestParam(defaultValue = "20")
+            @RequestParam(defaultValue = "${app.pagination.default-size:20}")
             int size,
 
             @RequestParam(defaultValue = "createdAt")

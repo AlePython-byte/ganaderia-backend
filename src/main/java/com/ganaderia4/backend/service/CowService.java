@@ -7,21 +7,30 @@ import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.CowRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class CowService {
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "token", "internalCode", "name", "status");
+
     private final CowRepository cowRepository;
     private final AuditLogService auditLogService;
+    private final PaginationService paginationService;
 
-    public CowService(CowRepository cowRepository, AuditLogService auditLogService) {
+    public CowService(CowRepository cowRepository,
+                      AuditLogService auditLogService,
+                      PaginationService paginationService) {
         this.cowRepository = cowRepository;
         this.auditLogService = auditLogService;
+        this.paginationService = paginationService;
     }
 
     @Transactional
@@ -104,6 +113,16 @@ public class CowService {
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    public Page<CowResponseDTO> getCowsPage(CowStatus status, int page, int size, String sort, String direction) {
+        PageRequest pageable = paginationService.createPageRequest(page, size, sort, direction, ALLOWED_SORT_FIELDS);
+
+        Page<Cow> cows = status != null
+                ? cowRepository.findByStatus(status, pageable)
+                : cowRepository.findAll(pageable);
+
+        return cows.map(this::mapToResponseDTO);
     }
 
     public CowResponseDTO getCowById(Long id) {

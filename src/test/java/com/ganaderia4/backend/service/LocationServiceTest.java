@@ -2,6 +2,9 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.LocationRequestDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
+import com.ganaderia4.backend.config.PaginationProperties;
+import com.ganaderia4.backend.exception.BadRequestException;
+import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactoryProvider;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
@@ -13,14 +16,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class LocationServiceTest {
@@ -45,6 +51,9 @@ class LocationServiceTest {
 
     @Mock
     private AuditLogService auditLogService;
+
+    @Spy
+    private PaginationService paginationService = new PaginationService(new PaginationProperties());
 
     @InjectMocks
     private LocationService locationService;
@@ -111,5 +120,17 @@ class LocationServiceTest {
         verify(apiLocationProcessingFactory).createCommand(request);
         verify(apiLocationProcessingFactory).getValidationChain();
         verify(monitoringFacade).processLocation(command, locationValidationChain);
+    }
+
+    @Test
+    void shouldRejectLocationHistoryPageSizeGreaterThanMaximum() {
+        Cow cow = new Cow();
+        cow.setId(1L);
+
+        when(cowRepository.findById(1L)).thenReturn(Optional.of(cow));
+
+        assertThrows(BadRequestException.class, () -> locationService.getLocationHistoryByCow(1L, 0, 101));
+
+        verify(locationRepository, never()).findByCowOrderByTimestampDesc(any(), any());
     }
 }

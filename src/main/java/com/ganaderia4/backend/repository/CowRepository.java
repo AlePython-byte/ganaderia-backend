@@ -2,6 +2,8 @@ package com.ganaderia4.backend.repository;
 
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -14,6 +16,8 @@ public interface CowRepository extends JpaRepository<Cow, Long> {
     Optional<Cow> findByInternalCode(String internalCode);
 
     List<Cow> findByStatus(CowStatus status);
+
+    Page<Cow> findByStatus(CowStatus status, Pageable pageable);
 
     long countByStatus(CowStatus status);
 }

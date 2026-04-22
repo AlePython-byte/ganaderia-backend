@@ -20,13 +20,15 @@ import java.util.stream.Collectors;
 @Service
 public class AlertReportService {
 
-    private static final int MAX_PAGE_SIZE = 100;
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "type", "status");
 
     private final AlertRepository alertRepository;
+    private final PaginationService paginationService;
 
-    public AlertReportService(AlertRepository alertRepository) {
+    public AlertReportService(AlertRepository alertRepository,
+                              PaginationService paginationService) {
         this.alertRepository = alertRepository;
+        this.paginationService = paginationService;
     }
 
     public List<AlertResponseDTO> getAlertReport(AlertReportFilterDTO filter) {
@@ -46,13 +48,7 @@ public class AlertReportService {
                                                      int size,
                                                      String sort,
                                                      String direction) {
-        validatePageRequest(page, size, sort);
-
-        Sort.Direction sortDirection = "ASC".equalsIgnoreCase(direction)
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+        PageRequest pageable = paginationService.createPageRequest(page, size, sort, direction, ALLOWED_SORT_FIELDS);
 
         return alertRepository.findAll(buildSpecification(filter), pageable)
                 .map(this::mapToResponseDTO);
@@ -60,20 +56,6 @@ public class AlertReportService {
 
     public long countAlertReport(AlertReportFilterDTO filter) {
         return alertRepository.count(buildSpecification(filter));
-    }
-
-    private void validatePageRequest(int page, int size, String sort) {
-        if (page < 0) {
-            throw new BadRequestException("El numero de pagina no puede ser negativo");
-        }
-
-        if (size < 1 || size > MAX_PAGE_SIZE) {
-            throw new BadRequestException("El tamano de pagina debe estar entre 1 y " + MAX_PAGE_SIZE);
-        }
-
-        if (sort == null || !ALLOWED_SORT_FIELDS.contains(sort)) {
-            throw new BadRequestException("Campo de ordenamiento no permitido");
-        }
     }
 
     private Specification<Alert> buildSpecification(AlertReportFilterDTO filter) {

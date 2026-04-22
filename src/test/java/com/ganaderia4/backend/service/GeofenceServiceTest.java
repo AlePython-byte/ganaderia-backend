@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.model.Geofence;
+import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.pattern.strategy.geofence.GeofenceEvaluationStrategy;
 import com.ganaderia4.backend.pattern.strategy.geofence.GeofenceStrategyResolver;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -25,7 +26,8 @@ class GeofenceServiceTest {
         geofenceService = new GeofenceService(
                 null,
                 null,
-                resolver
+                resolver,
+                new PaginationService(new PaginationProperties())
         );
     }
 

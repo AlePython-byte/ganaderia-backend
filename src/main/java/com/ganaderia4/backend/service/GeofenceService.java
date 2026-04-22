@@ -9,25 +9,35 @@ import com.ganaderia4.backend.model.Geofence;
 import com.ganaderia4.backend.pattern.strategy.geofence.GeofenceStrategyResolver;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.GeofenceRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class GeofenceService {
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "name", "active", "radiusMeters", "centerLatitude", "centerLongitude"
+    );
+
     private final GeofenceRepository geofenceRepository;
     private final CowRepository cowRepository;
     private final GeofenceStrategyResolver geofenceStrategyResolver;
+    private final PaginationService paginationService;
 
     public GeofenceService(GeofenceRepository geofenceRepository,
                            CowRepository cowRepository,
-                           GeofenceStrategyResolver geofenceStrategyResolver) {
+                           GeofenceStrategyResolver geofenceStrategyResolver,
+                           PaginationService paginationService) {
         this.geofenceRepository = geofenceRepository;
         this.cowRepository = cowRepository;
         this.geofenceStrategyResolver = geofenceStrategyResolver;
+        this.paginationService = paginationService;
     }
 
     @Transactional
@@ -60,6 +70,16 @@ public class GeofenceService {
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    public Page<GeofenceResponseDTO> getGeofencesPage(Boolean active, int page, int size, String sort, String direction) {
+        PageRequest pageable = paginationService.createPageRequest(page, size, sort, direction, ALLOWED_SORT_FIELDS);
+
+        Page<Geofence> geofences = active != null
+                ? geofenceRepository.findByActive(active, pageable)
+                : geofenceRepository.findAll(pageable);
+
+        return geofences.map(this::mapToResponseDTO);
     }
 
     public List<GeofenceResponseDTO> getGeofencesByActive(Boolean active) {

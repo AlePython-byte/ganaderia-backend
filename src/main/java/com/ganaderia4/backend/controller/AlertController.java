@@ -32,7 +32,7 @@ public class AlertController {
             @RequestParam(required = false) AlertStatus status,
             @RequestParam(required = false) AlertType type,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "${app.pagination.default-size:20}") int size,
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "DESC") String direction
     ) {

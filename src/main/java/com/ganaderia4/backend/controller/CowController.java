@@ -5,6 +5,7 @@ import com.ganaderia4.backend.dto.CowResponseDTO;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.service.CowService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,6 +34,17 @@ public class CowController {
     @GetMapping
     public List<CowResponseDTO> getAllCows() {
         return cowService.getAllCows();
+    }
+
+    @GetMapping("/page")
+    public Page<CowResponseDTO> getCowsPage(
+            @RequestParam(required = false) CowStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "${app.pagination.default-size:20}") int size,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "ASC") String direction
+    ) {
+        return cowService.getCowsPage(status, page, size, sort, direction);
     }
 
     @GetMapping("/{id}")

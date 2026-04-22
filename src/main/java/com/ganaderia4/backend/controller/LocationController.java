@@ -28,7 +28,7 @@ public class LocationController {
     @GetMapping("/cow/{cowId}")
     public Page<LocationResponseDTO> getLocationHistoryByCow(@PathVariable Long cowId,
                                                              @RequestParam(defaultValue = "0") int page,
-                                                             @RequestParam(defaultValue = "10") int size) {
+                                                             @RequestParam(defaultValue = "${app.pagination.default-size:20}") int size) {
         return locationService.getLocationHistoryByCow(cowId, page, size);
     }
 
@@ -38,7 +38,7 @@ public class LocationController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "${app.pagination.default-size:20}") int size) {
         return locationService.getLocationHistoryByCowAndDates(cowId, start, end, page, size);
     }
 
