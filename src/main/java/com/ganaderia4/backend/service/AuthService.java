@@ -7,6 +7,7 @@ import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.User;
 import com.ganaderia4.backend.security.JwtService;
+import com.ganaderia4.backend.security.LoginAbuseProtectionService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -17,18 +18,23 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuditLogService auditLogService;
+    private final LoginAbuseProtectionService loginAbuseProtectionService;
 
     public AuthService(UserService userService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       AuditLogService auditLogService) {
+                       AuditLogService auditLogService,
+                       LoginAbuseProtectionService loginAbuseProtectionService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.auditLogService = auditLogService;
+        this.loginAbuseProtectionService = loginAbuseProtectionService;
     }
 
-    public LoginResponseDTO login(LoginRequestDTO requestDTO) {
+    public LoginResponseDTO login(LoginRequestDTO requestDTO, String clientIp) {
+        loginAbuseProtectionService.assertLoginAllowed(clientIp, requestDTO.getEmail());
+
         User user;
 
         try {
@@ -40,26 +46,30 @@ public class AuthService {
                     null,
                     requestDTO.getEmail(),
                     "AUTH",
-                    "Intento de inicio de sesión con correo no registrado",
+                    "Intento de inicio de sesi\u00f3n con correo no registrado",
                     false
             );
-            throw new BadRequestException("Credenciales inválidas");
+            loginAbuseProtectionService.recordLoginFailure(clientIp, requestDTO.getEmail());
+            throw new BadRequestException("Credenciales inv\u00e1lidas");
         }
 
-        if (!Boolean.TRUE.equals(user.getActive()) || !passwordEncoder.matches(requestDTO.getPassword(), user.getPassword())) {
+        if (!Boolean.TRUE.equals(user.getActive())
+                || !passwordEncoder.matches(requestDTO.getPassword(), user.getPassword())) {
             auditLogService.log(
                     "LOGIN_FAILED",
                     "USER",
                     user.getId(),
                     user.getEmail(),
                     "AUTH",
-                    "Credenciales inválidas o usuario inactivo",
+                    "Credenciales inv\u00e1lidas o usuario inactivo",
                     false
             );
-            throw new BadRequestException("Credenciales inválidas");
+            loginAbuseProtectionService.recordLoginFailure(clientIp, requestDTO.getEmail());
+            throw new BadRequestException("Credenciales inv\u00e1lidas");
         }
 
         String token = jwtService.generateToken(user);
+        loginAbuseProtectionService.recordLoginSuccess(clientIp, requestDTO.getEmail());
 
         auditLogService.log(
                 "LOGIN_SUCCESS",
@@ -67,7 +77,7 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 "AUTH",
-                "Inicio de sesión exitoso",
+                "Inicio de sesi\u00f3n exitoso",
                 true
         );
 
@@ -79,7 +89,7 @@ public class AuthService {
                 token,
                 "Bearer",
                 jwtService.getExpirationMs(),
-                "Inicio de sesión exitoso"
+                "Inicio de sesi\u00f3n exitoso"
         );
     }
 

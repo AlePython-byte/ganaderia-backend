@@ -8,5 +8,6 @@ public enum ApiErrorCode {
     DEVICE_UNAUTHORIZED,
     UNAUTHORIZED,
     FORBIDDEN,
+    TOO_MANY_REQUESTS,
     INTERNAL_ERROR
 }

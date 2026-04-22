@@ -62,6 +62,19 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTooManyRequestsException(TooManyRequestsException ex,
+                                                                           HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(buildError(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        ApiErrorCode.TOO_MANY_REQUESTS,
+                        ex.getMessage(),
+                        request.getRequestURI()
+                ));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDTO> handleValidationException(MethodArgumentNotValidException ex,
                                                                       HttpServletRequest request) {
@@ -94,7 +107,14 @@ public class GlobalExceptionHandler {
                                                                 ApiErrorCode code,
                                                                 String message,
                                                                 String path) {
-        ErrorResponseDTO error = new ErrorResponseDTO(
+        return new ResponseEntity<>(buildError(status, code, message, path), status);
+    }
+
+    private ErrorResponseDTO buildError(HttpStatus status,
+                                        ApiErrorCode code,
+                                        String message,
+                                        String path) {
+        return new ErrorResponseDTO(
                 status.value(),
                 status.getReasonPhrase(),
                 code.name(),
@@ -102,8 +122,6 @@ public class GlobalExceptionHandler {
                 path,
                 LocalDateTime.now()
         );
-
-        return new ResponseEntity<>(error, status);
     }
 
     @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
