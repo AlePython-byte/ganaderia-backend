@@ -29,6 +29,12 @@ public class JpaAbuseProtectionService implements AbuseProtectionService {
     @Override
     @Transactional
     public AbuseProtectionDecision recordFailure(String scope, String key, AbuseProtectionPolicy policy) {
+        return recordAttempt(scope, key, policy);
+    }
+
+    @Override
+    @Transactional
+    public AbuseProtectionDecision recordAttempt(String scope, String key, AbuseProtectionPolicy policy) {
         Instant now = Instant.now();
         abuseRateLimitRepository.insertIfMissing(scope, key, now);
 

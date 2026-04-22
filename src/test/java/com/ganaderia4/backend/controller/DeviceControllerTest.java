@@ -4,6 +4,8 @@ import com.ganaderia4.backend.dto.DeviceLocationPayloadDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.exception.GlobalExceptionHandler;
 import com.ganaderia4.backend.observability.DomainMetricsService;
+import com.ganaderia4.backend.security.ClientIpResolver;
+import com.ganaderia4.backend.security.DeviceAbuseProtectionService;
 import com.ganaderia4.backend.security.DeviceReplayProtectionStore;
 import com.ganaderia4.backend.security.DeviceRequestAuthenticationService;
 import com.ganaderia4.backend.security.DeviceSigningSecretService;
@@ -53,6 +55,9 @@ class DeviceControllerTest {
     void setUp() {
         locationService = mock(LocationService.class);
         Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        DeviceAbuseProtectionService deviceAbuseProtectionService = mock(DeviceAbuseProtectionService.class);
+        ClientIpResolver clientIpResolver = mock(ClientIpResolver.class);
+        when(clientIpResolver.resolve(any())).thenReturn("127.0.0.1");
 
         DeviceController controller = new DeviceController(
                 locationService,
@@ -63,6 +68,8 @@ class DeviceControllerTest {
                         new InMemoryDeviceReplayProtectionStore(),
                         new FixedDeviceSigningSecretService(Map.of(DEVICE_TOKEN, DEVICE_SECRET))
                 ),
+                deviceAbuseProtectionService,
+                clientIpResolver,
                 validator
         );
 

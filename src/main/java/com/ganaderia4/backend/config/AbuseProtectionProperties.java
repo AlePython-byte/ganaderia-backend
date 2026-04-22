@@ -12,6 +12,7 @@ public class AbuseProtectionProperties {
     private boolean enabled = true;
     private ClientIp clientIp = new ClientIp();
     private Login login = new Login();
+    private Device device = new Device();
 
     public boolean isEnabled() {
         return enabled;
@@ -37,6 +38,14 @@ public class AbuseProtectionProperties {
         this.login = login;
     }
 
+    public Device getDevice() {
+        return device;
+    }
+
+    public void setDevice(Device device) {
+        this.device = device;
+    }
+
     public static class ClientIp {
         private boolean trustForwardedHeaders = false;
 
@@ -54,6 +63,45 @@ public class AbuseProtectionProperties {
         private Duration window = Duration.ofMinutes(15);
         private int maxAttempts = 5;
         private Duration blockDuration = Duration.ofMinutes(15);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
+        }
+
+        public int getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public void setMaxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
+
+        public Duration getBlockDuration() {
+            return blockDuration;
+        }
+
+        public void setBlockDuration(Duration blockDuration) {
+            this.blockDuration = blockDuration;
+        }
+    }
+
+    public static class Device {
+        private boolean enabled = true;
+        private Duration window = Duration.ofMinutes(1);
+        private int maxAttempts = 300;
+        private Duration blockDuration = Duration.ofMinutes(5);
 
         public boolean isEnabled() {
             return enabled;

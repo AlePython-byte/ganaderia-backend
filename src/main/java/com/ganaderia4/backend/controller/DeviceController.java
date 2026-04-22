@@ -7,6 +7,8 @@ import com.ganaderia4.backend.dto.DeviceLocationPayloadDTO;
 import com.ganaderia4.backend.dto.DeviceLocationRequestDTO;
 import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
+import com.ganaderia4.backend.security.ClientIpResolver;
+import com.ganaderia4.backend.security.DeviceAbuseProtectionService;
 import com.ganaderia4.backend.security.DeviceRequestAuthenticationService;
 import com.ganaderia4.backend.service.LocationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,15 +35,21 @@ public class DeviceController {
 
     private final LocationService locationService;
     private final DeviceRequestAuthenticationService deviceRequestAuthenticationService;
+    private final DeviceAbuseProtectionService deviceAbuseProtectionService;
+    private final ClientIpResolver clientIpResolver;
     private final Validator validator;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Autowired
     public DeviceController(LocationService locationService,
                             DeviceRequestAuthenticationService deviceRequestAuthenticationService,
+                            DeviceAbuseProtectionService deviceAbuseProtectionService,
+                            ClientIpResolver clientIpResolver,
                             Validator validator) {
         this.locationService = locationService;
         this.deviceRequestAuthenticationService = deviceRequestAuthenticationService;
+        this.deviceAbuseProtectionService = deviceAbuseProtectionService;
+        this.clientIpResolver = clientIpResolver;
         this.validator = validator;
     }
 
@@ -59,6 +67,12 @@ public class DeviceController {
             HttpServletRequest httpServletRequest,
             @RequestBody String rawBody
     ) {
+        deviceAbuseProtectionService.recordDeviceRequest(
+                clientIpResolver.resolve(httpServletRequest),
+                deviceToken,
+                httpServletRequest.getRequestURI()
+        );
+
         String sanitizedDeviceToken = deviceRequestAuthenticationService.authenticate(
                 deviceToken,
                 deviceTimestamp,

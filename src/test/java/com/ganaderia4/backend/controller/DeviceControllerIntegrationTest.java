@@ -8,6 +8,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.repository.AbuseRateLimitRepository;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -35,9 +37,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@TestPropertySource(properties = {
+        "app.abuse-protection.device.max-attempts=2",
+        "app.abuse-protection.device.window=10m",
+        "app.abuse-protection.device.block-duration=5m"
+})
 class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
     private static final String DEVICE_LOCATION_PATH = "/api/device/locations";
@@ -58,12 +66,16 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     private DeviceReplayNonceRepository deviceReplayNonceRepository;
 
     @Autowired
+    private AbuseRateLimitRepository abuseRateLimitRepository;
+
+    @Autowired
     private DeviceSigningSecretService deviceSigningSecretService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
+        abuseRateLimitRepository.deleteAll();
         deviceReplayNonceRepository.deleteAll();
         locationRepository.deleteAll();
         collarRepository.deleteAll();
@@ -301,6 +313,34 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
         Optional<Location> saved = locationRepository.findById(firstJson.get("id").asLong());
         assertTrue(saved.isPresent());
+    }
+
+    @Test
+    void shouldRateLimitDeviceLocationRequests() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-RATE-LIMIT", "Rate limit");
+        Collar collar = createCollar("COLLAR-DEVICE-RATE-LIMIT", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
+        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1).withNano(0);
+        String body = """
+                {
+                  "latitude": 1.510,
+                  "longitude": -77.510,
+                  "timestamp": "%s"
+                }
+                """.formatted(timestamp);
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.message").value("Demasiadas solicitudes. Intenta nuevamente mas tarde"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token, String body) throws Exception {
