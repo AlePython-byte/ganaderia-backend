@@ -4,6 +4,9 @@ import com.ganaderia4.backend.exception.DeviceUnauthorizedException;
 import com.ganaderia4.backend.observability.DomainMetricsService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,8 +20,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@ExtendWith(OutputCaptureExtension.class)
 class DeviceRequestAuthenticationServiceTest {
 
     private static final String METHOD = "POST";
@@ -54,8 +60,9 @@ class DeviceRequestAuthenticationServiceTest {
     }
 
     @Test
-    void shouldRejectInvalidSignature() {
+    void shouldRejectInvalidSignature(CapturedOutput output) {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        String signature = "invalid-signature";
         DeviceRequestAuthenticationService service = new DeviceRequestAuthenticationService(
                 300,
                 "",
@@ -68,7 +75,7 @@ class DeviceRequestAuthenticationServiceTest {
                 "COLLAR-UNIT-002",
                 Instant.now().toString(),
                 UUID.randomUUID().toString(),
-                "invalid-signature",
+                signature,
                 METHOD,
                 PATH,
                 BODY
@@ -79,6 +86,15 @@ class DeviceRequestAuthenticationServiceTest {
                 "reason",
                 "invalid_signature"
         ).count());
+
+        String logs = output.getOut();
+        assertTrue(logs.contains("event=security_auth_failed"));
+        assertTrue(logs.contains("reason=invalid_signature"));
+        assertTrue(logs.contains("path=" + PATH));
+        assertTrue(logs.contains("device=****-002"));
+        assertTrue(logs.contains("status=401"));
+        assertFalse(logs.contains("COLLAR-UNIT-002"));
+        assertFalse(logs.contains(signature));
     }
 
     @Test

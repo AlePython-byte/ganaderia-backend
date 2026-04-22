@@ -1,10 +1,13 @@
 package com.ganaderia4.backend.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,6 +19,11 @@ import java.io.IOException;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+    private static final String UNKNOWN_USER = "UNKNOWN";
+    public static final String SECURITY_FAILURE_LOGGED_ATTRIBUTE =
+            "com.ganaderia4.backend.security.failureLogged";
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
@@ -57,9 +65,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
+        } catch (ExpiredJwtException ex) {
+            logAuthenticationFailure("expired_jwt", request, UNKNOWN_USER);
         } catch (JwtException | IllegalArgumentException ignored) {
+            logAuthenticationFailure("invalid_jwt", request, UNKNOWN_USER);
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void logAuthenticationFailure(String reason,
+                                          HttpServletRequest request,
+                                          String user) {
+        request.setAttribute(SECURITY_FAILURE_LOGGED_ATTRIBUTE, Boolean.TRUE);
+        log.warn(
+                "event=security_auth_failed reason={} path={} user={} status={}",
+                reason,
+                safeLogValue(request.getRequestURI()),
+                safeLogValue(user),
+                HttpServletResponse.SC_UNAUTHORIZED
+        );
+    }
+
+    private String safeLogValue(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+
+        return value.replaceAll("[\\r\\n\\t ]+", "_");
     }
 }

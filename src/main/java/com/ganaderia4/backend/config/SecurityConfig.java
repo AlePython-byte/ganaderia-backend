@@ -8,6 +8,8 @@ import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.observability.RequestCorrelationFilter;
 import com.ganaderia4.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +30,8 @@ import java.time.LocalDateTime;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final boolean apiDocsEnabled;
@@ -139,24 +143,39 @@ public class SecurityConfig {
                         .anyRequest().authenticated();
                 })
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) ->
+                        .authenticationEntryPoint((request, response, authException) -> {
+                                if (!Boolean.TRUE.equals(request.getAttribute(
+                                        JwtAuthenticationFilter.SECURITY_FAILURE_LOGGED_ATTRIBUTE))) {
+                                    logSecurityResponse(
+                                            "unauthorized",
+                                            request.getRequestURI(),
+                                            null,
+                                            HttpStatus.UNAUTHORIZED
+                                    );
+                                }
                                 writeErrorResponse(
                                         response,
                                         HttpStatus.UNAUTHORIZED,
                                         ApiErrorCode.UNAUTHORIZED,
                                         "No autorizado",
                                         request.getRequestURI()
-                                )
-                        )
-                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                );
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                                logSecurityResponse(
+                                        "forbidden",
+                                        request.getRequestURI(),
+                                        request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : null,
+                                        HttpStatus.FORBIDDEN
+                                );
                                 writeErrorResponse(
                                         response,
                                         HttpStatus.FORBIDDEN,
                                         ApiErrorCode.FORBIDDEN,
                                         "Acceso denegado",
                                         request.getRequestURI()
-                                )
-                        )
+                                );
+                        })
                 )
                 .addFilterBefore(requestCorrelationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -181,5 +200,26 @@ public class SecurityConfig {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
         response.getWriter().write(objectMapper.writeValueAsString(error));
+    }
+
+    private void logSecurityResponse(String reason,
+                                     String path,
+                                     String user,
+                                     HttpStatus status) {
+        log.warn(
+                "event=security_auth_failed reason={} path={} user={} status={}",
+                reason,
+                safeLogValue(path),
+                safeLogValue(user != null ? user : "ANONYMOUS"),
+                status.value()
+        );
+    }
+
+    private String safeLogValue(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+
+        return value.replaceAll("[\\r\\n\\t ]+", "_");
     }
 }
