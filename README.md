@@ -50,7 +50,8 @@ El objetivo principal es detectar eventos relevantes del negocio, como:
 ### Notificaciones
 - arquitectura desacoplada de notificaciones
 - dispatcher central
-- canal inicial por logs
+- canal por logs para local/test
+- canal webhook saliente configurable
 - disparo para alertas críticas
 
 ### Reportes
@@ -195,15 +196,51 @@ DB_PASSWORD=tu_password
 JWT_SECRET=tu_clave_jwt_super_segura
 JWT_EXPIRATION_MS=86400000
 
+DEVICE_SECRET_MASTER_KEY=tu_clave_maestra_dispositivos
+
 APP_CORS_ALLOWED_ORIGINS=http://localhost:5173
 APP_DEVICE_MONITOR_OFFLINE_THRESHOLD_MINUTES=15
 APP_DEVICE_MONITOR_OFFLINE_CHECK_MS=60000
+
+APP_PAGINATION_DEFAULT_SIZE=20
+APP_PAGINATION_MAX_SIZE=100
+
+APP_NOTIFICATIONS_WEBHOOK_ENABLED=false
+APP_NOTIFICATIONS_WEBHOOK_URL=
+APP_NOTIFICATIONS_WEBHOOK_CONNECT_TIMEOUT=5s
+APP_NOTIFICATIONS_WEBHOOK_READ_TIMEOUT=5s
+APP_NOTIFICATIONS_WEBHOOK_SECRET=
 
 APP_BOOTSTRAP_ADMIN_NAME=
 APP_BOOTSTRAP_ADMIN_EMAIL=
 APP_BOOTSTRAP_ADMIN_PASSWORD=
 
 MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+```
+
+### Perfiles de Spring
+
+- `local`: perfil por defecto para desarrollo local. Usa PostgreSQL local en `localhost:5432/ganaderia4`, Swagger habilitado y secretos locales no aptos para produccion.
+- `dev`: perfil para entornos de desarrollo compartidos. Requiere `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY`.
+- `prod`: perfil de produccion. Requiere secretos por variables de entorno, mantiene Swagger apagado y expone por defecto solo `health,info` en Actuator.
+- `test`: perfil usado por las pruebas con Testcontainers.
+
+En `dev` y `prod`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY` deben tener al menos 32 bytes. Si faltan o son demasiado cortos, la aplicacion falla al iniciar.
+
+### Ejecutar localmente
+
+Levantar PostgreSQL local con una base `ganaderia4` y credenciales por defecto `postgres/postgres`, o definir `DB_URL`, `DB_USERNAME` y `DB_PASSWORD`.
+
+```bash
+./mvnw spring-boot:run
+```
+
+Para crear un administrador inicial en una base vacia, definir `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes de iniciar.
+
+El perfil local queda activo por defecto. Para usar otro perfil:
+
+```bash
+SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 ```
 
 ### Ejecutar con Docker
@@ -217,11 +254,12 @@ docker build -t ganaderia4backend .
 ### Ejecutar el contenedor
 ```bash
 docker run -p 10000:10000 ^
-  -e SPRING_PROFILES_ACTIVE=dev ^
+  -e SPRING_PROFILES_ACTIVE=prod ^
   -e DB_URL=jdbc:postgresql://host.docker.internal:5432/ganaderia4 ^
   -e DB_USERNAME=postgres ^
   -e DB_PASSWORD=TU_DB_PASSWORD ^
   -e JWT_SECRET=TU_JWT_SECRET ^
+  -e DEVICE_SECRET_MASTER_KEY=TU_DEVICE_SECRET_MASTER_KEY ^
   -e APP_BOOTSTRAP_ADMIN_NAME=GanaderoPro ^
   -e APP_BOOTSTRAP_ADMIN_EMAIL=admin@ganaderia.com ^
   -e APP_BOOTSTRAP_ADMIN_PASSWORD=TU_BOOTSTRAP_ADMIN_PASSWORD ^

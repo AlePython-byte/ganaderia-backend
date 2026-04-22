@@ -100,8 +100,6 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
-                        .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
-
                         .requestMatchers(HttpMethod.GET, "/api/alerts/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 

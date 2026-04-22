@@ -9,6 +9,9 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre
 
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV PORT=10000
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \

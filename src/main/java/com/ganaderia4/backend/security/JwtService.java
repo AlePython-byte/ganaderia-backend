@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -21,6 +22,21 @@ public class JwtService {
 
     @Value("${jwt.expiration-ms}")
     private long jwtExpirationMs;
+
+    @PostConstruct
+    void validateConfiguration() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException("jwt.secret must be configured");
+        }
+
+        if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("jwt.secret must be at least 32 bytes");
+        }
+
+        if (jwtExpirationMs <= 0) {
+            throw new IllegalStateException("jwt.expiration-ms must be greater than zero");
+        }
+    }
 
     public String generateToken(User user) {
         Instant now = Instant.now();

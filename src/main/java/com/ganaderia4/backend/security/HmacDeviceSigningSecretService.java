@@ -5,6 +5,7 @@ import com.ganaderia4.backend.repository.CollarRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +24,17 @@ public class HmacDeviceSigningSecretService implements DeviceSigningSecretServic
                                           @Value("${device.auth.secret-master-key:}") String masterKey) {
         this.collarRepository = collarRepository;
         this.masterKey = masterKey == null ? "" : masterKey;
+    }
+
+    @PostConstruct
+    void validateConfiguration() {
+        if (masterKey.isBlank()) {
+            throw new IllegalStateException("device.auth.secret-master-key must be configured");
+        }
+
+        if (masterKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("device.auth.secret-master-key must be at least 32 bytes");
+        }
     }
 
     @Override

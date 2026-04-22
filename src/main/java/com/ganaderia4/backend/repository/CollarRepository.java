@@ -7,7 +7,6 @@ import com.ganaderia4.backend.model.DeviceSignalStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import com.ganaderia4.backend.model.DeviceSignalStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
