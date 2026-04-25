@@ -24,10 +24,7 @@ public class PaginationService {
                                          Set<String> allowedSortFields) {
         validatePageRequest(page, size);
         validateSort(sort, allowedSortFields);
-
-        Sort.Direction sortDirection = "ASC".equalsIgnoreCase(direction)
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
+        Sort.Direction sortDirection = validateDirection(direction);
 
         return PageRequest.of(page, size, Sort.by(sortDirection, sort));
     }
@@ -56,5 +53,21 @@ public class PaginationService {
         if (sort == null || !allowedSortFields.contains(sort)) {
             throw new BadRequestException("Campo de ordenamiento no permitido");
         }
+    }
+
+    private Sort.Direction validateDirection(String direction) {
+        if (direction == null || direction.isBlank()) {
+            throw new BadRequestException("La direccion de ordenamiento debe ser ASC o DESC");
+        }
+
+        if ("ASC".equalsIgnoreCase(direction.trim())) {
+            return Sort.Direction.ASC;
+        }
+
+        if ("DESC".equalsIgnoreCase(direction.trim())) {
+            return Sort.Direction.DESC;
+        }
+
+        throw new BadRequestException("La direccion de ordenamiento debe ser ASC o DESC");
     }
 }

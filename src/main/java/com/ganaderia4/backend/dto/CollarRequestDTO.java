@@ -11,6 +11,10 @@ public class CollarRequestDTO {
 
     @NotBlank(message = "El token del collar es obligatorio")
     @Size(max = 50, message = "El token del collar no puede superar 50 caracteres")
+    @Pattern(
+            regexp = "^[A-Za-z0-9._-]+$",
+            message = "El token del collar solo puede contener letras, numeros, punto, guion y guion bajo"
+    )
     private String token;
 
     @NotNull(message = "El estado del collar es obligatorio")

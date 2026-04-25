@@ -54,6 +54,7 @@ public class CollarController {
     }
 
     @GetMapping
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<CollarResponseDTO> getAllCollars() {
         return collarService.getAllCollars();
     }
@@ -75,6 +76,7 @@ public class CollarController {
     }
 
     @GetMapping("/status/{status}")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<CollarResponseDTO> getCollarsByStatus(@PathVariable CollarStatus status) {
         return collarService.getCollarsByStatus(status);
     }

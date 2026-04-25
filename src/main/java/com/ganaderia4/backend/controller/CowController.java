@@ -32,6 +32,7 @@ public class CowController {
     }
 
     @GetMapping
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<CowResponseDTO> getAllCows() {
         return cowService.getAllCows();
     }
@@ -53,6 +54,7 @@ public class CowController {
     }
 
     @GetMapping("/status/{status}")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<CowResponseDTO> getCowsByStatus(@PathVariable CowStatus status) {
         return cowService.getCowsByStatus(status);
     }

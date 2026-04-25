@@ -43,6 +43,7 @@ public class ReportController {
     }
 
     @GetMapping("/alerts")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAlertReport(
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)

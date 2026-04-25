@@ -27,6 +27,7 @@ public class UserController {
     }
 
     @GetMapping
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<UserResponseDTO> getAllUsers() {
         return userService.getAllUsers();
     }
@@ -48,6 +49,7 @@ public class UserController {
     }
 
     @GetMapping("/active/{active}")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<UserResponseDTO> getUsersByActive(@PathVariable Boolean active) {
         return userService.getUsersByActive(active);
     }

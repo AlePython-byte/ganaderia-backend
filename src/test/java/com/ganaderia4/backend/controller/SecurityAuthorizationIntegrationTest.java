@@ -101,6 +101,19 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectUsersPageWhenDirectionIsInvalid() throws Exception {
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/api/users/page")
+                        .param("direction", "DOWN")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("La direccion de ordenamiento debe ser ASC o DESC"))
+                .andExpect(jsonPath("$.path").value("/api/users/page"));
+    }
+
+    @Test
     void shouldDenyOperatorAccessToUsers() throws Exception {
         String token = loginAndGetToken("operador@test.com", "12345678");
 

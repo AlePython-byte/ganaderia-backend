@@ -23,6 +23,7 @@ public class AlertController {
     }
 
     @GetMapping
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAllAlerts() {
         return alertService.getAllAlerts();
     }
@@ -45,11 +46,13 @@ public class AlertController {
     }
 
     @GetMapping("/status/{status}")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAlertsByStatus(@PathVariable AlertStatus status) {
         return alertService.getAlertsByStatus(status);
     }
 
     @GetMapping("/type/{type}")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAlertsByType(@PathVariable AlertType type) {
         return alertService.getAlertsByType(type);
     }

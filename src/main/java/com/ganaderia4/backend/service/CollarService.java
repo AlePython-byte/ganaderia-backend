@@ -3,6 +3,7 @@ package com.ganaderia4.backend.service;
 import com.ganaderia4.backend.dto.CollarRequestDTO;
 import com.ganaderia4.backend.dto.CollarResponseDTO;
 import com.ganaderia4.backend.dto.DeviceSecretResponseDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
@@ -95,12 +96,9 @@ public class CollarService {
                 .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
 
         String newToken = requestDTO.getToken().trim();
-
-        collarRepository.findByToken(newToken)
-                .filter(existingCollar -> !existingCollar.getId().equals(collar.getId()))
-                .ifPresent(existingCollar -> {
-                    throw new ConflictException("Ya existe otro collar con ese token");
-                });
+        if (!collar.getToken().equals(newToken)) {
+            throw new BadRequestException("El token del collar es un identificador publico estable y no puede modificarse");
+        }
 
         Cow cow = null;
         if (requestDTO.getCowId() != null) {

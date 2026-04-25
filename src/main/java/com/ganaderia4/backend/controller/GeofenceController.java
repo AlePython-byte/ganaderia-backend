@@ -25,6 +25,7 @@ public class GeofenceController {
     }
 
     @GetMapping
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<GeofenceResponseDTO> getAllGeofences() {
         return geofenceService.getAllGeofences();
     }
@@ -46,6 +47,7 @@ public class GeofenceController {
     }
 
     @GetMapping("/active/{active}")
+    @Deprecated(since = "2.5", forRemoval = false)
     public List<GeofenceResponseDTO> getGeofencesByActive(@PathVariable Boolean active) {
         return geofenceService.getGeofencesByActive(active);
     }
