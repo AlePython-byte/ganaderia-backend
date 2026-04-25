@@ -19,6 +19,8 @@ public class DomainMetricsService {
     private static final String DEVICE_REQUESTS_REJECTED = "ganaderia.device.requests.rejected";
     private static final String NOTIFICATIONS_SENT = "ganaderia.notifications.sent";
     private static final String NOTIFICATIONS_FAILED = "ganaderia.notifications.failed";
+    private static final String NOTIFICATIONS_QUEUED = "ganaderia.notifications.queued";
+    private static final String NOTIFICATIONS_RETRIED = "ganaderia.notifications.retried";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -65,6 +67,14 @@ public class DomainMetricsService {
 
     public void incrementNotificationFailed(String channel, String eventType) {
         counterWithNotificationTags(NOTIFICATIONS_FAILED, channel, eventType).increment();
+    }
+
+    public void incrementNotificationQueued(String channel, String eventType) {
+        counterWithNotificationTags(NOTIFICATIONS_QUEUED, channel, eventType).increment();
+    }
+
+    public void incrementNotificationRetried(String channel, String eventType) {
+        counterWithNotificationTags(NOTIFICATIONS_RETRIED, channel, eventType).increment();
     }
 
     private Counter counterWithAlertType(String metricName, AlertType type) {

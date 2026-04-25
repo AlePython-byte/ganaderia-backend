@@ -14,6 +14,11 @@ public class WebhookNotificationProperties {
     private Duration connectTimeout = Duration.ofSeconds(5);
     private Duration readTimeout = Duration.ofSeconds(5);
     private String secret = "";
+    private boolean processorEnabled = true;
+    private Duration processorFixedDelay = Duration.ofSeconds(15);
+    private int processorBatchSize = 20;
+    private int maxAttempts = 3;
+    private Duration retryBackoff = Duration.ofSeconds(30);
 
     public boolean isEnabled() {
         return enabled;
@@ -53,5 +58,45 @@ public class WebhookNotificationProperties {
 
     public void setSecret(String secret) {
         this.secret = secret;
+    }
+
+    public boolean isProcessorEnabled() {
+        return processorEnabled;
+    }
+
+    public void setProcessorEnabled(boolean processorEnabled) {
+        this.processorEnabled = processorEnabled;
+    }
+
+    public Duration getProcessorFixedDelay() {
+        return processorFixedDelay;
+    }
+
+    public void setProcessorFixedDelay(Duration processorFixedDelay) {
+        this.processorFixedDelay = processorFixedDelay;
+    }
+
+    public int getProcessorBatchSize() {
+        return processorBatchSize;
+    }
+
+    public void setProcessorBatchSize(int processorBatchSize) {
+        this.processorBatchSize = processorBatchSize;
+    }
+
+    public int getMaxAttempts() {
+        return maxAttempts;
+    }
+
+    public void setMaxAttempts(int maxAttempts) {
+        this.maxAttempts = maxAttempts;
+    }
+
+    public Duration getRetryBackoff() {
+        return retryBackoff;
+    }
+
+    public void setRetryBackoff(Duration retryBackoff) {
+        this.retryBackoff = retryBackoff;
     }
 }

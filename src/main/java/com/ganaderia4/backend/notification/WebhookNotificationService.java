@@ -3,25 +3,17 @@ package com.ganaderia4.backend.notification;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ganaderia4.backend.config.WebhookNotificationProperties;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import com.ganaderia4.backend.repository.WebhookNotificationDeliveryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.HexFormat;
 
 @Service
 @ConditionalOnProperty(name = "app.notifications.webhook.enabled", havingValue = "true")
@@ -29,24 +21,22 @@ public class WebhookNotificationService implements NotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(WebhookNotificationService.class);
 
-    private static final String HMAC_SHA256 = "HmacSHA256";
-    private static final String SIGNATURE_PREFIX = "sha256=";
-    private static final String UNKNOWN_STATUS = "N/A";
-
-    private final WebhookNotificationProperties properties;
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    private final WebhookNotificationDeliveryRepository webhookNotificationDeliveryRepository;
+    private final DomainMetricsService domainMetricsService;
     private final URI webhookUri;
+    private final Duration readTimeout;
 
     public WebhookNotificationService(WebhookNotificationProperties properties,
-                                      ObjectMapper objectMapper) {
-        this.properties = properties;
+                                      ObjectMapper objectMapper,
+                                      WebhookNotificationDeliveryRepository webhookNotificationDeliveryRepository,
+                                      DomainMetricsService domainMetricsService) {
         this.objectMapper = objectMapper;
+        this.webhookNotificationDeliveryRepository = webhookNotificationDeliveryRepository;
+        this.domainMetricsService = domainMetricsService;
         this.webhookUri = validateWebhookUri(properties.getUrl());
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(validateTimeout(properties.getConnectTimeout(), "connect-timeout"))
-                .build();
-        validateTimeout(properties.getReadTimeout(), "read-timeout");
+        validateTimeout(properties.getConnectTimeout(), "connect-timeout");
+        this.readTimeout = validateTimeout(properties.getReadTimeout(), "read-timeout");
     }
 
     @Override
@@ -60,62 +50,31 @@ public class WebhookNotificationService implements NotificationService {
             return;
         }
 
-        String requestBody = serialize(notificationMessage);
-        HttpRequest request = buildRequest(notificationMessage, requestBody);
-        long startedAt = System.nanoTime();
-
         try {
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            long durationMs = elapsedMs(startedAt);
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                logResult("failure", response.statusCode(), durationMs, notificationMessage);
-                throw new IllegalStateException("Webhook notification failed with status " + response.statusCode());
-            }
+            String requestBody = serialize(notificationMessage);
+            WebhookNotificationDelivery delivery = WebhookNotificationDelivery.pending(
+                    notificationMessage.getEventType(),
+                    requestBody,
+                    webhookUri.toString()
+            );
 
-            logResult("success", response.statusCode(), durationMs, notificationMessage);
-        } catch (IOException ex) {
-            logException("failure", UNKNOWN_STATUS, elapsedMs(startedAt), notificationMessage, ex);
-            throw new IllegalStateException("Webhook notification request failed", ex);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            logException("failure", UNKNOWN_STATUS, elapsedMs(startedAt), notificationMessage, ex);
-            throw new IllegalStateException("Webhook notification request was interrupted", ex);
+            WebhookNotificationDelivery savedDelivery = webhookNotificationDeliveryRepository.save(delivery);
+            domainMetricsService.incrementNotificationQueued(getChannel().name(), notificationMessage.getEventType());
+            logQueued(savedDelivery, notificationMessage);
+        } catch (NotificationPersistenceException ex) {
+            logPersistenceFailure(notificationMessage, ex);
+            throw ex;
+        } catch (RuntimeException ex) {
+            logPersistenceFailure(notificationMessage, ex);
+            throw new NotificationPersistenceException("Webhook notification delivery could not be persisted", ex);
         }
-    }
-
-    private HttpRequest buildRequest(NotificationMessage notificationMessage, String requestBody) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(webhookUri)
-                .timeout(properties.getReadTimeout())
-                .header("Content-Type", "application/json")
-                .header("Accept", "application/json")
-                .header("User-Agent", "ganaderia4backend-notifications")
-                .header("X-Ganaderia4-Event-Type", nullSafe(notificationMessage.getEventType()))
-                .header("X-Ganaderia4-Timestamp", notificationMessage.getCreatedAt().toString())
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8));
-
-        String secret = properties.getSecret();
-        if (secret != null && !secret.isBlank()) {
-            builder.header("X-Ganaderia4-Signature", SIGNATURE_PREFIX + sign(requestBody, secret));
-        }
-
-        return builder.build();
     }
 
     private String serialize(NotificationMessage notificationMessage) {
         try {
             return objectMapper.writeValueAsString(WebhookNotificationPayload.from(notificationMessage));
         } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Webhook notification payload could not be serialized", ex);
-        }
-    }
-
-    private String sign(String requestBody, String secret) {
-        try {
-            Mac mac = Mac.getInstance(HMAC_SHA256);
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_SHA256));
-            return HexFormat.of().formatHex(mac.doFinal(requestBody.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
-            throw new IllegalStateException("Webhook notification signature could not be created", ex);
+            throw new NotificationPersistenceException("Webhook notification payload could not be serialized", ex);
         }
     }
 
@@ -145,63 +104,35 @@ public class WebhookNotificationService implements NotificationService {
         return timeout;
     }
 
-    private String nullSafe(String value) {
-        return value != null ? value : "";
-    }
-
-    private void logResult(String result,
-                           int status,
-                           long durationMs,
+    private void logQueued(WebhookNotificationDelivery delivery,
                            NotificationMessage notificationMessage) {
-        String message = "event=notification_webhook_result channel={} result={} requestId={} destination={} "
-                + "status={} durationMs={} eventType={}";
-
-        if ("success".equals(result)) {
-            logger.info(
-                    message,
-                    getChannel().name(),
-                    result,
-                    requestId(),
-                    OperationalLogSanitizer.destination(webhookUri),
-                    status,
-                    durationMs,
-                    OperationalLogSanitizer.safe(notificationMessage.getEventType())
-            );
-            return;
-        }
-
-        logger.warn(
-                message,
+        logger.info(
+                "event=notification_webhook_enqueued channel={} result={} requestId={} notificationId={} destination={} status={} attempts={} nextAttemptAt={} readTimeoutMs={} eventType={}",
                 getChannel().name(),
-                result,
+                "queued",
                 requestId(),
+                OperationalLogSanitizer.safe(delivery.getNotificationId()),
                 OperationalLogSanitizer.destination(webhookUri),
-                status,
-                durationMs,
+                delivery.getStatus().name(),
+                delivery.getAttempts(),
+                delivery.getNextAttemptAt(),
+                readTimeout.toMillis(),
                 OperationalLogSanitizer.safe(notificationMessage.getEventType())
         );
     }
 
-    private void logException(String result,
-                              String status,
-                              long durationMs,
-                              NotificationMessage notificationMessage,
-                              Exception exception) {
-        logger.warn(
-                "event=notification_webhook_result channel={} result={} requestId={} destination={} status={} durationMs={} eventType={} errorType={}",
+    private void logPersistenceFailure(NotificationMessage notificationMessage,
+                                       RuntimeException exception) {
+        logger.error(
+                "event=notification_webhook_enqueue_failed channel={} result={} requestId={} destination={} eventType={} errorType={} error={}",
                 getChannel().name(),
-                result,
+                "failure",
                 requestId(),
                 OperationalLogSanitizer.destination(webhookUri),
-                status,
-                durationMs,
                 OperationalLogSanitizer.safe(notificationMessage.getEventType()),
-                exception.getClass().getSimpleName()
+                exception.getClass().getSimpleName(),
+                OperationalLogSanitizer.safe(exception.getMessage())
         );
-    }
-
-    private long elapsedMs(long startedAt) {
-        return Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
     }
 
     private String requestId() {

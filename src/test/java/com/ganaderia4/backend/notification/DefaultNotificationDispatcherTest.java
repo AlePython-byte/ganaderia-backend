@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class DefaultNotificationDispatcherTest {
@@ -92,6 +93,47 @@ class DefaultNotificationDispatcherTest {
                 meterRegistry.counter(
                         "ganaderia.notifications.sent",
                         "channel", "LOG",
+                        "eventType", "CRITICAL_ALERT_CREATED"
+                ).count()
+        );
+    }
+
+    @Test
+    void shouldRethrowAndStopDispatchingWhenWebhookPersistenceFails() {
+        NotificationService loggingService = mock(NotificationService.class);
+        NotificationService webhookService = mock(NotificationService.class);
+
+        when(loggingService.getChannel()).thenReturn(NotificationChannel.LOG);
+        when(webhookService.getChannel()).thenReturn(NotificationChannel.WEBHOOK);
+        doThrow(new NotificationPersistenceException("persistencia webhook fallida"))
+                .when(webhookService)
+                .send(any(NotificationMessage.class));
+
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+        DefaultNotificationDispatcher dispatcher =
+                new DefaultNotificationDispatcher(
+                        List.of(loggingService, webhookService),
+                        new DomainMetricsService(meterRegistry)
+                );
+
+        NotificationMessage message = NotificationMessage.builder()
+                .eventType("CRITICAL_ALERT_CREATED")
+                .title("Nueva alerta critica")
+                .message("Mensaje de prueba")
+                .severity("HIGH")
+                .build();
+
+        NotificationPersistenceException ex =
+                assertThrows(NotificationPersistenceException.class, () -> dispatcher.dispatch(message));
+        assertEquals("persistencia webhook fallida", ex.getMessage());
+        verify(webhookService).send(message);
+        verify(loggingService, never()).send(any());
+        assertEquals(
+                1.0,
+                meterRegistry.counter(
+                        "ganaderia.notifications.failed",
+                        "channel", "WEBHOOK",
                         "eventType", "CRITICAL_ALERT_CREATED"
                 ).count()
         );

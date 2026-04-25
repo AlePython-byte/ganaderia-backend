@@ -1,61 +1,50 @@
 package com.ganaderia4.backend.notification;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.ganaderia4.backend.config.WebhookNotificationProperties;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import com.ganaderia4.backend.observability.DomainMetricsService;
+import com.ganaderia4.backend.repository.WebhookNotificationDeliveryRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.MDC;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(OutputCaptureExtension.class)
 class WebhookNotificationServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-    private HttpServer server;
-
     @AfterEach
     void tearDown() {
         MDC.clear();
-        if (server != null) {
-            server.stop(0);
-        }
     }
 
     @Test
-    void shouldPostNotificationPayloadToWebhook(CapturedOutput output) throws Exception {
-        AtomicReference<String> requestBody = new AtomicReference<>();
-        AtomicReference<String> eventHeader = new AtomicReference<>();
-        AtomicReference<String> signatureHeader = new AtomicReference<>();
+    void shouldPersistPendingWebhookDelivery(CapturedOutput output) throws Exception {
+        WebhookNotificationDeliveryRepository repository = mock(WebhookNotificationDeliveryRepository.class);
+        when(repository.save(any(WebhookNotificationDelivery.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        startServer(exchange -> {
-            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            eventHeader.set(exchange.getRequestHeaders().getFirst("X-Ganaderia4-Event-Type"));
-            signatureHeader.set(exchange.getRequestHeaders().getFirst("X-Ganaderia4-Signature"));
-            exchange.sendResponseHeaders(202, -1);
-        });
-
-        WebhookNotificationProperties properties = webhookProperties("webhook-secret");
-        WebhookNotificationService service = new WebhookNotificationService(properties, objectMapper);
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        WebhookNotificationService service = new WebhookNotificationService(
+                webhookProperties(),
+                objectMapper,
+                repository,
+                new DomainMetricsService(meterRegistry)
+        );
         MDC.put("requestId", "req-webhook-001");
 
         NotificationMessage message = NotificationMessage.builder()
@@ -70,33 +59,59 @@ class WebhookNotificationServiceTest {
 
         service.send(message);
 
-        JsonNode payload = objectMapper.readTree(requestBody.get());
+        ArgumentCaptor<WebhookNotificationDelivery> captor = ArgumentCaptor.forClass(WebhookNotificationDelivery.class);
+        verify(repository).save(captor.capture());
+
+        WebhookNotificationDelivery delivery = captor.getValue();
+        assertNotNull(delivery.getNotificationId());
+        assertEquals("CRITICAL_ALERT_CREATED", delivery.getEventType());
+        assertEquals("https://example.com/notifications", delivery.getDestination());
+        assertEquals(WebhookNotificationDeliveryStatus.PENDING, delivery.getStatus());
+        assertEquals(0, delivery.getAttempts());
+        assertNull(delivery.getLastError());
+        assertNotNull(delivery.getNextAttemptAt());
+        assertNotNull(delivery.getCreatedAt());
+        assertNotNull(delivery.getUpdatedAt());
+
+        JsonNode payload = objectMapper.readTree(delivery.getPayload());
         assertEquals("CRITICAL_ALERT_CREATED", payload.get("eventType").asText());
         assertEquals("Nueva alerta critica", payload.get("title").asText());
         assertEquals("HIGH", payload.get("severity").asText());
         assertEquals("COLLAR_OFFLINE", payload.get("metadata").get("alertType").asText());
-        assertEquals("CRITICAL_ALERT_CREATED", eventHeader.get());
-        assertEquals("sha256=" + sign(requestBody.get(), "webhook-secret"), signatureHeader.get());
+
+        assertEquals(
+                1.0,
+                meterRegistry.counter(
+                        "ganaderia.notifications.queued",
+                        "channel", "WEBHOOK",
+                        "eventType", "CRITICAL_ALERT_CREATED"
+                ).count()
+        );
 
         String logs = output.getOut();
-        assertTrue(logs.contains("event=notification_webhook_result"));
+        assertTrue(logs.contains("event=notification_webhook_enqueued"));
         assertTrue(logs.contains("channel=WEBHOOK"));
-        assertTrue(logs.contains("result=success"));
+        assertTrue(logs.contains("result=queued"));
         assertTrue(logs.contains("requestId=req-webhook-001"));
-        assertTrue(logs.contains("destination=http://localhost:"));
-        assertTrue(logs.contains("status=202"));
-        assertTrue(logs.contains("durationMs="));
+        assertTrue(logs.contains("destination=https://example.com"));
+        assertTrue(logs.contains("status=PENDING"));
         assertTrue(logs.contains("eventType=CRITICAL_ALERT_CREATED"));
-        assertFalse(logs.contains("webhook-secret"));
-        assertFalse(logs.contains(requestBody.get()));
+        assertFalse(logs.contains(delivery.getPayload()));
     }
 
     @Test
-    void shouldThrowWhenWebhookReturnsErrorStatus(CapturedOutput output) throws Exception {
-        startServer(exchange -> exchange.sendResponseHeaders(500, -1));
+    void shouldThrowWhenPayloadCannotBeSerialized() throws Exception {
+        ObjectMapper failingObjectMapper = mock(ObjectMapper.class);
+        when(failingObjectMapper.writeValueAsString(any()))
+                .thenThrow(new JsonProcessingException("payload invalid") { });
 
-        WebhookNotificationProperties properties = webhookProperties("");
-        WebhookNotificationService service = new WebhookNotificationService(properties, objectMapper);
+        WebhookNotificationDeliveryRepository repository = mock(WebhookNotificationDeliveryRepository.class);
+        WebhookNotificationService service = new WebhookNotificationService(
+                webhookProperties(),
+                failingObjectMapper,
+                repository,
+                new DomainMetricsService(new SimpleMeterRegistry())
+        );
 
         NotificationMessage message = NotificationMessage.builder()
                 .eventType("CRITICAL_ALERT_CREATED")
@@ -105,30 +120,25 @@ class WebhookNotificationServiceTest {
                 .severity("HIGH")
                 .build();
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> service.send(message));
-        assertEquals("Webhook notification failed with status 500", ex.getMessage());
-
-        String logs = output.getOut();
-        assertTrue(logs.contains("event=notification_webhook_result"));
-        assertTrue(logs.contains("result=failure"));
-        assertTrue(logs.contains("status=500"));
-        assertTrue(logs.contains("destination=http://localhost:"));
+        NotificationPersistenceException ex =
+                assertThrows(NotificationPersistenceException.class, () -> service.send(message));
+        assertEquals("Webhook notification payload could not be serialized", ex.getMessage());
+        verify(repository, never()).save(any());
     }
 
     @Test
-    void shouldIgnoreNullMessage() throws Exception {
-        AtomicInteger requestCount = new AtomicInteger();
-        startServer(exchange -> {
-            requestCount.incrementAndGet();
-            exchange.sendResponseHeaders(202, -1);
-        });
-
-        WebhookNotificationProperties properties = webhookProperties("");
-        WebhookNotificationService service = new WebhookNotificationService(properties, objectMapper);
+    void shouldIgnoreNullMessage() {
+        WebhookNotificationDeliveryRepository repository = mock(WebhookNotificationDeliveryRepository.class);
+        WebhookNotificationService service = new WebhookNotificationService(
+                webhookProperties(),
+                objectMapper,
+                repository,
+                new DomainMetricsService(new SimpleMeterRegistry())
+        );
 
         service.send(null);
 
-        assertEquals(0, requestCount.get());
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -138,42 +148,24 @@ class WebhookNotificationServiceTest {
 
         IllegalStateException ex = assertThrows(
                 IllegalStateException.class,
-                () -> new WebhookNotificationService(properties, objectMapper)
+                () -> new WebhookNotificationService(
+                        properties,
+                        objectMapper,
+                        mock(WebhookNotificationDeliveryRepository.class),
+                        new DomainMetricsService(new SimpleMeterRegistry())
+                )
         );
 
         assertEquals("Webhook notification URL must be configured when webhook channel is enabled", ex.getMessage());
     }
 
-    private void startServer(ExchangeHandler handler) throws IOException {
-        server = HttpServer.create(new InetSocketAddress(0), 0);
-        server.createContext("/notifications", exchange -> {
-            try {
-                handler.handle(exchange);
-            } finally {
-                exchange.close();
-            }
-        });
-        server.start();
-    }
-
-    private WebhookNotificationProperties webhookProperties(String secret) {
+    private WebhookNotificationProperties webhookProperties() {
         WebhookNotificationProperties properties = new WebhookNotificationProperties();
         properties.setEnabled(true);
-        properties.setUrl("http://localhost:" + server.getAddress().getPort() + "/notifications");
+        properties.setUrl("https://example.com/notifications");
         properties.setConnectTimeout(Duration.ofSeconds(2));
         properties.setReadTimeout(Duration.ofSeconds(2));
-        properties.setSecret(secret);
+        properties.setSecret("webhook-secret");
         return properties;
-    }
-
-    private String sign(String requestBody, String secret) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        return HexFormat.of().formatHex(mac.doFinal(requestBody.getBytes(StandardCharsets.UTF_8)));
-    }
-
-    @FunctionalInterface
-    private interface ExchangeHandler {
-        void handle(HttpExchange exchange) throws IOException;
     }
 }

@@ -6,7 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class DefaultNotificationDispatcher implements NotificationDispatcher {
@@ -18,7 +20,10 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
 
     public DefaultNotificationDispatcher(List<NotificationService> notificationServices,
                                          DomainMetricsService domainMetricsService) {
-        this.notificationServices = List.copyOf(notificationServices);
+        this.notificationServices = notificationServices.stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingInt(this::priority))
+                .toList();
         this.domainMetricsService = domainMetricsService;
     }
 
@@ -32,19 +37,29 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
             String channel = resolveChannel(notificationService);
             try {
                 notificationService.send(notificationMessage);
-                domainMetricsService.incrementNotificationSent(channel, notificationMessage.getEventType());
+                if (notificationService.getChannel() != NotificationChannel.WEBHOOK) {
+                    domainMetricsService.incrementNotificationSent(channel, notificationMessage.getEventType());
+                }
+            } catch (NotificationPersistenceException ex) {
+                domainMetricsService.incrementNotificationFailed(channel, notificationMessage.getEventType());
+                logFailure(channel, notificationMessage, ex);
+                throw ex;
             } catch (RuntimeException ex) {
                 domainMetricsService.incrementNotificationFailed(channel, notificationMessage.getEventType());
-                logger.error(
-                        "event=notification_dispatch_failed channel={} eventType={} severity={} errorType={} error={}",
-                        channel,
-                        OperationalLogSanitizer.safe(notificationMessage.getEventType()),
-                        OperationalLogSanitizer.safe(notificationMessage.getSeverity()),
-                        ex.getClass().getSimpleName(),
-                        OperationalLogSanitizer.safe(ex.getMessage())
-                );
+                logFailure(channel, notificationMessage, ex);
             }
         }
+    }
+
+    private void logFailure(String channel, NotificationMessage notificationMessage, RuntimeException ex) {
+        logger.error(
+                "event=notification_dispatch_failed channel={} eventType={} severity={} errorType={} error={}",
+                channel,
+                OperationalLogSanitizer.safe(notificationMessage.getEventType()),
+                OperationalLogSanitizer.safe(notificationMessage.getSeverity()),
+                ex.getClass().getSimpleName(),
+                OperationalLogSanitizer.safe(ex.getMessage())
+        );
     }
 
     private String resolveChannel(NotificationService notificationService) {
@@ -53,5 +68,17 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
         }
 
         return notificationService.getChannel().name();
+    }
+
+    private int priority(NotificationService notificationService) {
+        if (notificationService == null || notificationService.getChannel() == null) {
+            return 2;
+        }
+
+        if (notificationService.getChannel() == NotificationChannel.WEBHOOK) {
+            return 0;
+        }
+
+        return 1;
     }
 }
