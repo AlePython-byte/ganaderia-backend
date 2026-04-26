@@ -72,10 +72,25 @@ El objetivo principal es detectar eventos relevantes del negocio, como:
 
 ---
 
+## Plataforma técnica
+
+- Java 17
+- Spring Boot 4.0.3
+- Maven Wrapper
+- PostgreSQL
+- Flyway
+- JWT
+- Docker
+- GitHub Actions
+
+El proyecto se mantiene en Java 17 porque es compatible con Spring Boot 4 y permite estabilidad en CI/CD y despliegue.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
-- **Spring Boot**
+- **Spring Boot 4.0.3**
 - **Spring Security**
 - **JWT**
 - **Spring Data JPA**
@@ -104,8 +119,9 @@ El proyecto sigue una arquitectura en capas:
 - **model**: entidades del dominio
 - **dto**: contratos de entrada y salida
 - **config**: seguridad, CORS y configuración general
-- **observability**: métricas, correlation id, health
+- **observability**: métricas, correlation id y health
 - **notification**: servicios de notificación desacoplados
+- **pattern**: implementación de patrones de diseño usados por el flujo de monitoreo
 
 ---
 
@@ -220,14 +236,16 @@ MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
 
 ### Perfiles de Spring
 
-- `local`: perfil por defecto para desarrollo local. Usa PostgreSQL local en `localhost:5432/ganaderia4`, Swagger habilitado y secretos locales no aptos para produccion.
+- `local`: perfil por defecto para desarrollo local. Usa PostgreSQL local en `localhost:5432/ganaderia4`, Swagger habilitado y secretos locales no aptos para producción.
 - `dev`: perfil para entornos de desarrollo compartidos. Requiere `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY`.
-- `prod`: perfil de produccion. Requiere secretos por variables de entorno, mantiene Swagger apagado y expone por defecto solo `health,info` en Actuator.
+- `prod`: perfil de producción. Requiere secretos por variables de entorno, mantiene Swagger apagado y expone por defecto solo `health,info` en Actuator.
 - `test`: perfil usado por las pruebas con Testcontainers.
 
-En `dev` y `prod`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY` deben tener al menos 32 bytes. Si faltan o son demasiado cortos, la aplicacion falla al iniciar.
+En `dev` y `prod`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY` deben tener al menos 32 bytes. Si faltan o son demasiado cortos, la aplicación falla al iniciar.
 
-### Ejecutar localmente
+---
+
+## Ejecución local
 
 Levantar PostgreSQL local con una base `ganaderia4` y credenciales por defecto `postgres/postgres`, o definir `DB_URL`, `DB_USERNAME` y `DB_PASSWORD`.
 
@@ -235,15 +253,23 @@ Levantar PostgreSQL local con una base `ganaderia4` y credenciales por defecto `
 ./mvnw spring-boot:run
 ```
 
-Para crear un administrador inicial en una base vacia, definir `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes de iniciar.
+Para crear un administrador inicial en una base vacía, definir `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes de iniciar.
 
-El perfil local queda activo por defecto. Para usar otro perfil:
+El perfil `local` queda activo por defecto. Para usar otro perfil:
 
 ```bash
 SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 ```
 
-### Ejecutar con Docker
+La validación de CI usa Java 17 y ejecuta:
+
+```bash
+./mvnw clean verify
+```
+
+---
+
+## Docker
 
 Construir imagen:
 
@@ -251,7 +277,8 @@ Construir imagen:
 docker build -t ganaderia4backend .
 ```
 
-### Ejecutar el contenedor
+Ejecutar el contenedor:
+
 ```bash
 docker run -p 10000:10000 ^
   -e SPRING_PROFILES_ACTIVE=prod ^
