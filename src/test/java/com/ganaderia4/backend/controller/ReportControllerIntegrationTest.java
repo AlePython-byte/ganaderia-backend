@@ -159,6 +159,54 @@ class ReportControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/reports/alerts"));
     }
 
+    @Test
+    void shouldReturnDailyAlertTrendForFilteredRange() throws Exception {
+        Cow cow = createCow("VACA-REP-003", "Brisa");
+
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "d1", LocalDateTime.of(2026, 4, 10, 8, 0));
+        createAlert(cow, AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, "d2", LocalDateTime.of(2026, 4, 10, 15, 0));
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.DESCARTADA, "d3", LocalDateTime.of(2026, 4, 11, 9, 0));
+
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/alerts/trend")
+                        .param("from", "2026-04-10T00:00:00")
+                        .param("to", "2026-04-11T23:59:59")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].date").value("2026-04-10"))
+                .andExpect(jsonPath("$[0].totalAlerts").value(2))
+                .andExpect(jsonPath("$[0].pendingAlerts").value(1))
+                .andExpect(jsonPath("$[0].resolvedAlerts").value(1))
+                .andExpect(jsonPath("$[1].date").value("2026-04-11"))
+                .andExpect(jsonPath("$[1].discardedAlerts").value(1));
+    }
+
+    @Test
+    void shouldReturnAlertTypeRecurrenceOrderedByTotalAlerts() throws Exception {
+        Cow cow = createCow("VACA-REP-004", "Nube");
+
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "t1", LocalDateTime.of(2026, 4, 12, 8, 0));
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, "t2", LocalDateTime.of(2026, 4, 12, 9, 0));
+        createAlert(cow, AlertType.EXIT_GEOFENCE, AlertStatus.DESCARTADA, "t3", LocalDateTime.of(2026, 4, 12, 10, 0));
+
+        String token = loginAndGetToken("supervisor@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/alerts/type-recurrence")
+                        .param("from", "2026-04-12T00:00:00")
+                        .param("to", "2026-04-12T23:59:59")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].type").value("COLLAR_OFFLINE"))
+                .andExpect(jsonPath("$[0].totalAlerts").value(2))
+                .andExpect(jsonPath("$[0].pendingAlerts").value(1))
+                .andExpect(jsonPath("$[0].resolvedAlerts").value(1))
+                .andExpect(jsonPath("$[1].type").value("EXIT_GEOFENCE"))
+                .andExpect(jsonPath("$[1].discardedAlerts").value(1));
+    }
+
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
         User user = new User();
         user.setName(name);

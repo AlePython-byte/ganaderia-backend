@@ -2,6 +2,8 @@ package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.dto.AlertTrendPointDTO;
+import com.ganaderia4.backend.dto.AlertTypeRecurrenceDTO;
 import com.ganaderia4.backend.dto.CowIncidentReportDTO;
 import com.ganaderia4.backend.dto.OfflineCollarReportDTO;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -105,6 +107,56 @@ public class ReportController {
         return alertReportService.getAlertReportPage(filter, page, size, sort, direction);
     }
 
+    @GetMapping("/alerts/trend")
+    public List<AlertTrendPointDTO> getAlertTrendReport(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+
+            @RequestParam(required = false)
+            AlertType type,
+
+            @RequestParam(required = false)
+            AlertStatus status
+    ) {
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setType(type);
+        filter.setStatus(status);
+
+        return alertReportService.getAlertTrendReport(filter);
+    }
+
+    @GetMapping("/alerts/type-recurrence")
+    public List<AlertTypeRecurrenceDTO> getAlertTypeRecurrenceReport(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+
+            @RequestParam(required = false)
+            AlertType type,
+
+            @RequestParam(required = false)
+            AlertStatus status
+    ) {
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setType(type);
+        filter.setStatus(status);
+
+        return alertReportService.getAlertTypeRecurrenceReport(filter);
+    }
+
     @GetMapping("/alerts/export.csv")
     public ResponseEntity<byte[]> exportAlertReportCsv(
             @RequestParam(required = false)
@@ -140,6 +192,11 @@ public class ReportController {
         return collarReportService.getOfflineCollarsReport();
     }
 
+    @GetMapping("/offline-collars/staleness")
+    public List<OfflineCollarReportDTO> getOfflineCollarsStalenessReport() {
+        return collarReportService.getOfflineCollarsStalenessReport();
+    }
+
     @GetMapping("/cows-most-incidents")
     public List<CowIncidentReportDTO> getCowsMostIncidentsReport(
             @RequestParam(required = false)
@@ -166,5 +223,33 @@ public class ReportController {
         filter.setStatus(status);
 
         return cowIncidentReportService.getCowsMostIncidentsReport(filter, limit);
+    }
+
+    @GetMapping("/cows-incident-recurrence")
+    public List<CowIncidentReportDTO> getCowIncidentRecurrenceReport(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+
+            @RequestParam(required = false)
+            AlertType type,
+
+            @RequestParam(required = false)
+            AlertStatus status,
+
+            @RequestParam(required = false)
+            Integer limit
+    ) {
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(from);
+        filter.setTo(to);
+        filter.setType(type);
+        filter.setStatus(status);
+
+        return cowIncidentReportService.getCowIncidentRecurrenceReport(filter, limit);
     }
 }

@@ -2,6 +2,8 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
+import com.ganaderia4.backend.dto.AlertTrendPointDTO;
+import com.ganaderia4.backend.dto.AlertTypeRecurrenceDTO;
 import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
@@ -92,7 +94,58 @@ class AlertReportServiceTest {
         ));
     }
 
+    @Test
+    void shouldAggregateAlertTrendByDay() {
+        AlertReportService service = new AlertReportService(alertRepository, paginationService);
+
+        when(alertRepository.findAll(anyAlertSpecification(), any(Sort.class)))
+                .thenReturn(List.of(
+                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 20, 8, 0)),
+                        createAlert(AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, LocalDateTime.of(2026, 4, 20, 11, 0)),
+                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.DESCARTADA, LocalDateTime.of(2026, 4, 21, 9, 30))
+                ));
+
+        List<AlertTrendPointDTO> trend = service.getAlertTrendReport(new AlertReportFilterDTO());
+
+        assertEquals(2, trend.size());
+        assertEquals(java.time.LocalDate.of(2026, 4, 20), trend.get(0).getDate());
+        assertEquals(2, trend.get(0).getTotalAlerts());
+        assertEquals(1, trend.get(0).getPendingAlerts());
+        assertEquals(1, trend.get(0).getResolvedAlerts());
+        assertEquals(0, trend.get(0).getDiscardedAlerts());
+        assertEquals(java.time.LocalDate.of(2026, 4, 21), trend.get(1).getDate());
+        assertEquals(1, trend.get(1).getDiscardedAlerts());
+    }
+
+    @Test
+    void shouldAggregateAlertRecurrenceByType() {
+        AlertReportService service = new AlertReportService(alertRepository, paginationService);
+
+        when(alertRepository.findAll(anyAlertSpecification(), any(Sort.class)))
+                .thenReturn(List.of(
+                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 21, 10, 0)),
+                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, LocalDateTime.of(2026, 4, 20, 10, 0)),
+                        createAlert(AlertType.EXIT_GEOFENCE, AlertStatus.DESCARTADA, LocalDateTime.of(2026, 4, 19, 10, 0))
+                ));
+
+        List<AlertTypeRecurrenceDTO> recurrence = service.getAlertTypeRecurrenceReport(new AlertReportFilterDTO());
+
+        assertEquals(2, recurrence.size());
+        assertEquals("COLLAR_OFFLINE", recurrence.get(0).getType());
+        assertEquals(2, recurrence.get(0).getTotalAlerts());
+        assertEquals(1, recurrence.get(0).getPendingAlerts());
+        assertEquals(1, recurrence.get(0).getResolvedAlerts());
+        assertEquals(0, recurrence.get(0).getDiscardedAlerts());
+        assertEquals(LocalDateTime.of(2026, 4, 21, 10, 0), recurrence.get(0).getLastAlertAt());
+        assertEquals("EXIT_GEOFENCE", recurrence.get(1).getType());
+        assertEquals(1, recurrence.get(1).getDiscardedAlerts());
+    }
+
     private Alert createAlert() {
+        return createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.now());
+    }
+
+    private Alert createAlert(AlertType type, AlertStatus status, LocalDateTime createdAt) {
         Cow cow = new Cow();
         cow.setId(1L);
         cow.setToken("VACA-001");
@@ -103,10 +156,10 @@ class AlertReportServiceTest {
         Alert alert = new Alert();
         alert.setId(10L);
         alert.setCow(cow);
-        alert.setType(AlertType.COLLAR_OFFLINE);
-        alert.setStatus(AlertStatus.PENDIENTE);
+        alert.setType(type);
+        alert.setStatus(status);
         alert.setMessage("Collar sin senal");
-        alert.setCreatedAt(LocalDateTime.now());
+        alert.setCreatedAt(createdAt);
         return alert;
     }
 

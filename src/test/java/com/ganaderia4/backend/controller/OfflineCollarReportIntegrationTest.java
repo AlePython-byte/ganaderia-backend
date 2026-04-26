@@ -106,6 +106,30 @@ class OfflineCollarReportIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/reports/offline-collars"));
     }
 
+    @Test
+    void shouldReturnOfflineCollarsStalenessReportOrderedByOperationalSeverity() throws Exception {
+        Cow cow1 = createCow("VACA-OFFREP-005", "Nube");
+        Cow cow2 = createCow("VACA-OFFREP-006", "Brisa");
+        Cow cow3 = createCow("VACA-OFFREP-007", "Sol");
+
+        createCollar("COLLAR-OFFREP-005", cow1, true, DeviceSignalStatus.SIN_SENAL, 55, null);
+        createCollar("COLLAR-OFFREP-006", cow2, true, DeviceSignalStatus.SIN_SENAL, 60, LocalDateTime.now().minusHours(7));
+        createCollar("COLLAR-OFFREP-007", cow3, true, DeviceSignalStatus.SIN_SENAL, 65, LocalDateTime.now().minusMinutes(35));
+
+        String token = loginAndGetToken("supervisor@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/offline-collars/staleness")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[0].collarToken").value("COLLAR-OFFREP-005"))
+                .andExpect(jsonPath("$[0].stalenessBucket").value("NEVER_REPORTED"))
+                .andExpect(jsonPath("$[1].collarToken").value("COLLAR-OFFREP-006"))
+                .andExpect(jsonPath("$[1].stalenessBucket").value("OFFLINE_GT_6H"))
+                .andExpect(jsonPath("$[2].collarToken").value("COLLAR-OFFREP-007"))
+                .andExpect(jsonPath("$[2].stalenessBucket").value("OFFLINE_GT_THRESHOLD"));
+    }
+
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
         User user = new User();
         user.setName(name);

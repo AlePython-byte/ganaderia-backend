@@ -127,6 +127,33 @@ class CowIncidentReportIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/reports/cows-most-incidents"));
     }
 
+    @Test
+    void shouldReturnOperationalCowIncidentRecurrenceOrderedByPendingAndRecency() throws Exception {
+        Cow cow1 = createCow("VACA-REC-001", "Luna", CowStatus.FUERA);
+        Cow cow2 = createCow("VACA-REC-002", "Canela", CowStatus.DENTRO);
+
+        createAlert(cow1, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "a1", LocalDateTime.of(2026, 4, 12, 10, 0));
+        createAlert(cow1, AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, "a2", LocalDateTime.of(2026, 4, 11, 10, 0));
+        createAlert(cow2, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "b1", LocalDateTime.of(2026, 4, 12, 12, 0));
+        createAlert(cow2, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "b2", LocalDateTime.of(2026, 4, 12, 13, 0));
+
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/cows-incident-recurrence")
+                        .param("from", "2026-04-10T00:00:00")
+                        .param("to", "2026-04-13T00:00:00")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].cowToken").value("VACA-REC-002"))
+                .andExpect(jsonPath("$[0].pendingIncidents").value(2))
+                .andExpect(jsonPath("$[0].cowStatus").value("DENTRO"))
+                .andExpect(jsonPath("$[0].lastIncidentType").value("EXIT_GEOFENCE"))
+                .andExpect(jsonPath("$[1].cowToken").value("VACA-REC-001"))
+                .andExpect(jsonPath("$[1].pendingIncidents").value(1))
+                .andExpect(jsonPath("$[1].cowStatus").value("FUERA"));
+    }
+
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
         User user = new User();
         user.setName(name);
@@ -138,11 +165,15 @@ class CowIncidentReportIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Cow createCow(String token, String name) {
+        return createCow(token, name, CowStatus.DENTRO);
+    }
+
+    private Cow createCow(String token, String name, CowStatus status) {
         Cow cow = new Cow();
         cow.setToken(token);
         cow.setInternalCode("INT-" + token);
         cow.setName(name);
-        cow.setStatus(CowStatus.DENTRO);
+        cow.setStatus(status);
         return cowRepository.save(cow);
     }
 

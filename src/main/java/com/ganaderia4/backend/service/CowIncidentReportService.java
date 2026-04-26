@@ -30,6 +30,16 @@ public class CowIncidentReportService {
     }
 
     public List<CowIncidentReportDTO> getCowsMostIncidentsReport(AlertReportFilterDTO filter, Integer limit) {
+        return buildCowIncidentReport(filter, limit, SortMode.BY_TOTAL_INCIDENTS);
+    }
+
+    public List<CowIncidentReportDTO> getCowIncidentRecurrenceReport(AlertReportFilterDTO filter, Integer limit) {
+        return buildCowIncidentReport(filter, limit, SortMode.BY_OPERATIONAL_RECURRENCE);
+    }
+
+    private List<CowIncidentReportDTO> buildCowIncidentReport(AlertReportFilterDTO filter,
+                                                              Integer limit,
+                                                              SortMode sortMode) {
         int effectiveLimit = paginationService.validateLimit(limit, 10);
 
         List<Alert> alerts = alertRepository.findAll(
@@ -51,7 +61,8 @@ public class CowIncidentReportService {
                     ignored -> new CowIncidentAccumulator(
                             cowId,
                             alert.getCow().getToken(),
-                            alert.getCow().getName()
+                            alert.getCow().getName(),
+                            alert.getCow().getStatus() != null ? alert.getCow().getStatus().name() : null
                     )
             );
 
@@ -66,20 +77,34 @@ public class CowIncidentReportService {
             }
 
             LocalDateTime createdAt = alert.getCreatedAt();
+            if (createdAt != null && (accumulator.firstIncidentAt == null || createdAt.isBefore(accumulator.firstIncidentAt))) {
+                accumulator.firstIncidentAt = createdAt;
+            }
+
             if (createdAt != null && (accumulator.lastIncidentAt == null || createdAt.isAfter(accumulator.lastIncidentAt))) {
                 accumulator.lastIncidentAt = createdAt;
+                accumulator.lastIncidentType = alert.getType() != null ? alert.getType().name() : null;
             }
         }
 
+        Comparator<CowIncidentAccumulator> comparator = sortMode == SortMode.BY_OPERATIONAL_RECURRENCE
+                ? Comparator.comparingLong(CowIncidentAccumulator::getPendingIncidents).reversed()
+                .thenComparing(
+                        CowIncidentAccumulator::getLastIncidentAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                )
+                .thenComparing(
+                        Comparator.comparingLong(CowIncidentAccumulator::getTotalIncidents).reversed()
+                )
+                : Comparator.comparingLong(CowIncidentAccumulator::getTotalIncidents).reversed()
+                .thenComparing(
+                        CowIncidentAccumulator::getLastIncidentAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                );
+
         return grouped.values()
                 .stream()
-                .sorted(
-                        Comparator.comparingLong(CowIncidentAccumulator::getTotalIncidents).reversed()
-                                .thenComparing(
-                                        CowIncidentAccumulator::getLastIncidentAt,
-                                        Comparator.nullsLast(Comparator.reverseOrder())
-                                )
-                )
+                .sorted(comparator)
                 .limit(effectiveLimit)
                 .map(acc -> new CowIncidentReportDTO(
                         acc.cowId,
@@ -89,7 +114,10 @@ public class CowIncidentReportService {
                         acc.pendingIncidents,
                         acc.resolvedIncidents,
                         acc.discardedIncidents,
-                        acc.lastIncidentAt
+                        acc.firstIncidentAt,
+                        acc.lastIncidentAt,
+                        acc.cowStatus,
+                        acc.lastIncidentType
                 ))
                 .toList();
     }
@@ -124,24 +152,37 @@ public class CowIncidentReportService {
         private final Long cowId;
         private final String cowToken;
         private final String cowName;
+        private final String cowStatus;
         private long totalIncidents;
         private long pendingIncidents;
         private long resolvedIncidents;
         private long discardedIncidents;
+        private LocalDateTime firstIncidentAt;
         private LocalDateTime lastIncidentAt;
+        private String lastIncidentType;
 
-        private CowIncidentAccumulator(Long cowId, String cowToken, String cowName) {
+        private CowIncidentAccumulator(Long cowId, String cowToken, String cowName, String cowStatus) {
             this.cowId = cowId;
             this.cowToken = cowToken;
             this.cowName = cowName;
+            this.cowStatus = cowStatus;
         }
 
         public long getTotalIncidents() {
             return totalIncidents;
         }
 
+        public long getPendingIncidents() {
+            return pendingIncidents;
+        }
+
         public LocalDateTime getLastIncidentAt() {
             return lastIncidentAt;
         }
+    }
+
+    private enum SortMode {
+        BY_TOTAL_INCIDENTS,
+        BY_OPERATIONAL_RECURRENCE
     }
 }

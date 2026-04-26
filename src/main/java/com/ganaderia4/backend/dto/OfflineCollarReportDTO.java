@@ -14,6 +14,8 @@ public class OfflineCollarReportDTO {
     private Long cowId;
     private String cowToken;
     private String cowName;
+    private Long stalenessMinutes;
+    private String stalenessBucket;
 
     public OfflineCollarReportDTO(Long collarId,
                                   String collarToken,
@@ -25,6 +27,34 @@ public class OfflineCollarReportDTO {
                                   Long cowId,
                                   String cowToken,
                                   String cowName) {
+        this(
+                collarId,
+                collarToken,
+                collarStatus,
+                enabled,
+                batteryLevel,
+                signalStatus,
+                lastSeenAt,
+                cowId,
+                cowToken,
+                cowName,
+                null,
+                null
+        );
+    }
+
+    public OfflineCollarReportDTO(Long collarId,
+                                  String collarToken,
+                                  String collarStatus,
+                                  Boolean enabled,
+                                  Integer batteryLevel,
+                                  String signalStatus,
+                                  LocalDateTime lastSeenAt,
+                                  Long cowId,
+                                  String cowToken,
+                                  String cowName,
+                                  Long stalenessMinutes,
+                                  String stalenessBucket) {
         this.collarId = collarId;
         this.collarToken = collarToken;
         this.collarStatus = collarStatus;
@@ -35,6 +65,8 @@ public class OfflineCollarReportDTO {
         this.cowId = cowId;
         this.cowToken = cowToken;
         this.cowName = cowName;
+        this.stalenessMinutes = stalenessMinutes;
+        this.stalenessBucket = stalenessBucket;
     }
 
     public Long getCollarId() {
@@ -75,5 +107,13 @@ public class OfflineCollarReportDTO {
 
     public String getCowName() {
         return cowName;
+    }
+
+    public Long getStalenessMinutes() {
+        return stalenessMinutes;
+    }
+
+    public String getStalenessBucket() {
+        return stalenessBucket;
     }
 }

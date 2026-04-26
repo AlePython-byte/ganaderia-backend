@@ -11,7 +11,10 @@ public class CowIncidentReportDTO {
     private long pendingIncidents;
     private long resolvedIncidents;
     private long discardedIncidents;
+    private LocalDateTime firstIncidentAt;
     private LocalDateTime lastIncidentAt;
+    private String cowStatus;
+    private String lastIncidentType;
 
     public CowIncidentReportDTO(Long cowId,
                                 String cowToken,
@@ -21,6 +24,32 @@ public class CowIncidentReportDTO {
                                 long resolvedIncidents,
                                 long discardedIncidents,
                                 LocalDateTime lastIncidentAt) {
+        this(
+                cowId,
+                cowToken,
+                cowName,
+                totalIncidents,
+                pendingIncidents,
+                resolvedIncidents,
+                discardedIncidents,
+                null,
+                lastIncidentAt,
+                null,
+                null
+        );
+    }
+
+    public CowIncidentReportDTO(Long cowId,
+                                String cowToken,
+                                String cowName,
+                                long totalIncidents,
+                                long pendingIncidents,
+                                long resolvedIncidents,
+                                long discardedIncidents,
+                                LocalDateTime firstIncidentAt,
+                                LocalDateTime lastIncidentAt,
+                                String cowStatus,
+                                String lastIncidentType) {
         this.cowId = cowId;
         this.cowToken = cowToken;
         this.cowName = cowName;
@@ -28,7 +57,10 @@ public class CowIncidentReportDTO {
         this.pendingIncidents = pendingIncidents;
         this.resolvedIncidents = resolvedIncidents;
         this.discardedIncidents = discardedIncidents;
+        this.firstIncidentAt = firstIncidentAt;
         this.lastIncidentAt = lastIncidentAt;
+        this.cowStatus = cowStatus;
+        this.lastIncidentType = lastIncidentType;
     }
 
     public Long getCowId() {
@@ -59,7 +91,19 @@ public class CowIncidentReportDTO {
         return discardedIncidents;
     }
 
+    public LocalDateTime getFirstIncidentAt() {
+        return firstIncidentAt;
+    }
+
     public LocalDateTime getLastIncidentAt() {
         return lastIncidentAt;
+    }
+
+    public String getCowStatus() {
+        return cowStatus;
+    }
+
+    public String getLastIncidentType() {
+        return lastIncidentType;
     }
 }
