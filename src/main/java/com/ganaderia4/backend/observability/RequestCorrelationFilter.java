@@ -119,7 +119,9 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
     }
 
     private boolean isHealthEndpoint(String path) {
-        return "/actuator/health".equals(path) || path.startsWith("/actuator/health/");
+        return "/healthz".equals(path)
+                || "/actuator/health".equals(path)
+                || path.startsWith("/actuator/health/");
     }
 
     private String safe(String value) {

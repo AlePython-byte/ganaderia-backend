@@ -114,6 +114,26 @@ class RequestCorrelationFilterTest {
         assertFalse(output.getOut().contains("event=http_request"));
     }
 
+    @Test
+    void shouldNotWriteInfoAccessLogForHealthzEndpoint(CapturedOutput output) throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/healthz");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, emptyChain());
+
+        assertFalse(output.getOut().contains("event=http_request"));
+    }
+
+    @Test
+    void shouldNotWriteInfoAccessLogForActuatorHealthSubpath(CapturedOutput output) throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health/liveness");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, emptyChain());
+
+        assertFalse(output.getOut().contains("event=http_request"));
+    }
+
     private FilterChain emptyChain() {
         return (request, response) -> {
         };
