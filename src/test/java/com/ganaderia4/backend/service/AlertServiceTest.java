@@ -388,6 +388,38 @@ class AlertServiceTest {
     }
 
     @Test
+    void shouldRejectLegacyAllAlertsWhenResultExceedsMaximum() {
+        when(alertRepository.count()).thenReturn(101L);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertService.getAllAlertsLegacy()
+        );
+
+        assertEquals(
+                "La consulta legacy de alertas supera el maximo de 100 resultados. Usa /api/alerts/page para paginar.",
+                exception.getMessage()
+        );
+        verify(alertRepository, never()).findAll();
+    }
+
+    @Test
+    void shouldRejectLegacyAlertsByTypeWhenResultExceedsMaximum() {
+        when(alertRepository.countByType(AlertType.COLLAR_OFFLINE)).thenReturn(101L);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertService.getAlertsByTypeLegacy(AlertType.COLLAR_OFFLINE)
+        );
+
+        assertEquals(
+                "La consulta legacy de alertas por tipo supera el maximo de 100 resultados. Usa /api/alerts/page para paginar.",
+                exception.getMessage()
+        );
+        verify(alertRepository, never()).findByType(AlertType.COLLAR_OFFLINE);
+    }
+
+    @Test
     void shouldRejectPendingPriorityQueueWhenLimitIsInvalid() {
         assertThrows(BadRequestException.class, () -> alertService.getPendingAlertPriorityQueue(0));
     }

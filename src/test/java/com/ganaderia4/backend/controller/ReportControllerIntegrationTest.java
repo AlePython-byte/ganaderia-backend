@@ -139,6 +139,33 @@ class ReportControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectLegacyAlertReportWhenResultExceedsMaximum() throws Exception {
+        Cow cow = createCow("VACA-REP-LIMIT", "Canela");
+        for (int i = 0; i < 101; i++) {
+            createAlert(
+                    cow,
+                    AlertType.COLLAR_OFFLINE,
+                    AlertStatus.RESUELTA,
+                    "legacy-report-" + i,
+                    LocalDateTime.of(2026, 4, 15, 10, 0).plusMinutes(i)
+            );
+        }
+
+        String token = loginAndGetToken("supervisor@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/alerts")
+                        .param("from", "2026-04-15T00:00:00")
+                        .param("to", "2026-04-16T23:59:59")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(
+                        "La consulta legacy del reporte de alertas supera el maximo de 100 resultados. Usa /api/reports/alerts/page para paginar o ajusta los filtros."
+                ))
+                .andExpect(jsonPath("$.path").value("/api/reports/alerts"));
+    }
+
+    @Test
     void shouldDenyOperatorAccessToReports() throws Exception {
         String token = loginAndGetToken("operador@test.com", "12345678");
 

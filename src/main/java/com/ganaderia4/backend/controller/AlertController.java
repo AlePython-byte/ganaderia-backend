@@ -25,7 +25,7 @@ public class AlertController {
     @GetMapping
     @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAllAlerts() {
-        return alertService.getAllAlerts();
+        return alertService.getAllAlertsLegacy();
     }
 
     @GetMapping("/page")
@@ -48,7 +48,7 @@ public class AlertController {
     @GetMapping("/status/{status}")
     @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAlertsByStatus(@PathVariable AlertStatus status) {
-        return alertService.getAlertsByStatus(status);
+        return alertService.getAlertsByStatusLegacy(status);
     }
 
     @GetMapping("/pending/priority-queue")
@@ -61,7 +61,7 @@ public class AlertController {
     @GetMapping("/type/{type}")
     @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAlertsByType(@PathVariable AlertType type) {
-        return alertService.getAlertsByType(type);
+        return alertService.getAlertsByTypeLegacy(type);
     }
 
     @PutMapping("/{id}")

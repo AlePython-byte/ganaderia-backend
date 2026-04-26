@@ -168,6 +168,63 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/alerts/99999/resolve"));
     }
 
+    @Test
+    void shouldRejectLegacyAllAlertsWhenResultExceedsMaximum() throws Exception {
+        Cow cow = createCow("VACA-100", "Luna");
+        for (int i = 0; i < 101; i++) {
+            createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, "legacy-all-" + i, null);
+        }
+
+        String token = loginAndGetToken("operador@test.com", "12345678");
+
+        mockMvc.perform(get("/api/alerts")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(
+                        "La consulta legacy de alertas supera el maximo de 100 resultados. Usa /api/alerts/page para paginar."
+                ))
+                .andExpect(jsonPath("$.path").value("/api/alerts"));
+    }
+
+    @Test
+    void shouldRejectLegacyAlertsByTypeWhenResultExceedsMaximum() throws Exception {
+        Cow cow = createCow("VACA-101", "Brisa");
+        for (int i = 0; i < 101; i++) {
+            createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, "legacy-type-" + i, null);
+        }
+
+        String token = loginAndGetToken("operador@test.com", "12345678");
+
+        mockMvc.perform(get("/api/alerts/type/COLLAR_OFFLINE")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(
+                        "La consulta legacy de alertas por tipo supera el maximo de 100 resultados. Usa /api/alerts/page para paginar."
+                ))
+                .andExpect(jsonPath("$.path").value("/api/alerts/type/COLLAR_OFFLINE"));
+    }
+
+    @Test
+    void shouldRejectLegacyPendingAlertsByStatusWhenResultExceedsMaximum() throws Exception {
+        for (int i = 0; i < 101; i++) {
+            Cow cow = createCow("VACA-PEND-" + i, "Cow " + i);
+            createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "legacy-status-" + i, null);
+        }
+
+        String token = loginAndGetToken("operador@test.com", "12345678");
+
+        mockMvc.perform(get("/api/alerts/status/PENDIENTE")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(
+                        "La consulta legacy de alertas por estado supera el maximo de 100 resultados. Usa /api/alerts/page o /api/alerts/pending/priority-queue para un acceso controlado."
+                ))
+                .andExpect(jsonPath("$.path").value("/api/alerts/status/PENDIENTE"));
+    }
+
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
         User user = new User();
         user.setName(name);

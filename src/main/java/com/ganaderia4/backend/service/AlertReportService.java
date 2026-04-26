@@ -44,6 +44,18 @@ public class AlertReportService {
                 .collect(Collectors.toList());
     }
 
+    public List<AlertResponseDTO> getAlertReportLegacy(AlertReportFilterDTO filter) {
+        long totalResults = countAlertReport(filter);
+        if (totalResults > paginationService.getMaxSize()) {
+            throw new com.ganaderia4.backend.exception.BadRequestException(
+                    "La consulta legacy del reporte de alertas supera el maximo de " + paginationService.getMaxSize()
+                            + " resultados. Usa /api/reports/alerts/page para paginar o ajusta los filtros."
+            );
+        }
+
+        return getAlertReport(filter);
+    }
+
     public Page<AlertResponseDTO> getAlertReportPage(AlertReportFilterDTO filter,
                                                      int page,
                                                      int size,

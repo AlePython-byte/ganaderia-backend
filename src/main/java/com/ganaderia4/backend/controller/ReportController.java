@@ -67,7 +67,7 @@ public class ReportController {
         filter.setType(type);
         filter.setStatus(status);
 
-        return alertReportService.getAlertReport(filter);
+        return alertReportService.getAlertReportLegacy(filter);
     }
 
     @GetMapping("/alerts/page")

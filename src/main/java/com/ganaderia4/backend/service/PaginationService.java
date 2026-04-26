@@ -49,6 +49,10 @@ public class PaginationService {
         return effectiveLimit;
     }
 
+    public int getMaxSize() {
+        return paginationProperties.getMaxSize();
+    }
+
     private void validateSort(String sort, Set<String> allowedSortFields) {
         if (sort == null || !allowedSortFields.contains(sort)) {
             throw new BadRequestException("Campo de ordenamiento no permitido");

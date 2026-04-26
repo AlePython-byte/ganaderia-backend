@@ -31,6 +31,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -172,6 +173,24 @@ class AlertReportServiceTest {
         assertEquals(LocalDateTime.of(2026, 4, 21, 10, 0), recurrence.get(0).getLastAlertAt());
         assertEquals("EXIT_GEOFENCE", recurrence.get(1).getType());
         assertEquals(1, recurrence.get(1).getDiscardedAlerts());
+    }
+
+    @Test
+    void shouldRejectLegacyAlertReportWhenResultExceedsMaximum() {
+        AlertReportService service = new AlertReportService(alertRepository, paginationService);
+
+        when(alertRepository.count(anyAlertSpecification())).thenReturn(101L);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> service.getAlertReportLegacy(new AlertReportFilterDTO())
+        );
+
+        assertEquals(
+                "La consulta legacy del reporte de alertas supera el maximo de 100 resultados. Usa /api/reports/alerts/page para paginar o ajusta los filtros.",
+                exception.getMessage()
+        );
+        verify(alertRepository, never()).findAll(anyAlertSpecification(), any(Sort.class));
     }
 
     private Alert createAlert() {

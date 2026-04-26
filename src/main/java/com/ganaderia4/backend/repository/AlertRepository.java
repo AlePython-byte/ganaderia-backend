@@ -26,6 +26,8 @@ public interface AlertRepository extends JpaRepository<Alert, Long>, JpaSpecific
 
     long countByStatus(AlertStatus status);
 
+    long countByType(AlertType type);
+
     long countByStatusAndCreatedAtBefore(AlertStatus status, java.time.LocalDateTime createdAt);
 
     long countByTypeAndStatus(AlertType type, AlertStatus status);

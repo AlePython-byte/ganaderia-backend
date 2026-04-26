@@ -134,6 +134,16 @@ public class AlertService {
         return mapToResponseDTOs(alertRepository.findAll());
     }
 
+    public List<AlertResponseDTO> getAllAlertsLegacy() {
+        validateLegacyListSize(
+                alertRepository.count(),
+                "La consulta legacy de alertas supera el maximo de " + paginationService.getMaxSize()
+                        + " resultados. Usa /api/alerts/page para paginar."
+        );
+
+        return getAllAlerts();
+    }
+
     public Page<AlertResponseDTO> getAlertsPage(AlertStatus status,
                                                 AlertType type,
                                                 int page,
@@ -157,6 +167,20 @@ public class AlertService {
                 .collect(Collectors.toList());
     }
 
+    public List<AlertResponseDTO> getAlertsByStatusLegacy(AlertStatus status) {
+        String recommendation = status == AlertStatus.PENDIENTE
+                ? "Usa /api/alerts/page o /api/alerts/pending/priority-queue para un acceso controlado."
+                : "Usa /api/alerts/page para paginar.";
+
+        validateLegacyListSize(
+                alertRepository.countByStatus(status),
+                "La consulta legacy de alertas por estado supera el maximo de " + paginationService.getMaxSize()
+                        + " resultados. " + recommendation
+        );
+
+        return getAlertsByStatus(status);
+    }
+
     public List<AlertResponseDTO> getPendingAlertPriorityQueue(Integer limit) {
         return buildPrioritizedPendingAlerts(
                 alertRepository.findByStatus(AlertStatus.PENDIENTE),
@@ -169,6 +193,16 @@ public class AlertService {
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    public List<AlertResponseDTO> getAlertsByTypeLegacy(AlertType type) {
+        validateLegacyListSize(
+                alertRepository.countByType(type),
+                "La consulta legacy de alertas por tipo supera el maximo de " + paginationService.getMaxSize()
+                        + " resultados. Usa /api/alerts/page para paginar."
+        );
+
+        return getAlertsByType(type);
     }
 
     public AlertResponseDTO getAlertById(Long id) {
@@ -482,5 +516,11 @@ public class AlertService {
         return alerts.stream()
                 .map(alert -> mapToResponseDTO(alert, scoringContext))
                 .collect(Collectors.toList());
+    }
+
+    private void validateLegacyListSize(long totalResults, String message) {
+        if (totalResults > paginationService.getMaxSize()) {
+            throw new BadRequestException(message);
+        }
     }
 }
