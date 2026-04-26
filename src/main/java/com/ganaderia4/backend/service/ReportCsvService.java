@@ -14,6 +14,7 @@ import java.util.List;
 public class ReportCsvService {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    private static final String DANGEROUS_CSV_PREFIXES = "=+-@";
 
     private final AlertReportService alertReportService;
     private final int maxRows;
@@ -71,9 +72,27 @@ public class ReportCsvService {
             return "";
         }
 
-        String text = String.valueOf(rawValue);
+        String text = neutralizePotentialFormula(String.valueOf(rawValue));
         String escaped = text.replace("\"", "\"\"");
 
         return "\"" + escaped + "\"";
+    }
+
+    private String neutralizePotentialFormula(String text) {
+        if (text.isEmpty()) {
+            return text;
+        }
+
+        String trimmed = text.stripLeading();
+        if (trimmed.isEmpty()) {
+            return text;
+        }
+
+        char firstCharacter = trimmed.charAt(0);
+        if (DANGEROUS_CSV_PREFIXES.indexOf(firstCharacter) >= 0) {
+            return "'" + text;
+        }
+
+        return text;
     }
 }

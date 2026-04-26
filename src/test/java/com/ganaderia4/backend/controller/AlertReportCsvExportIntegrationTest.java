@@ -119,6 +119,37 @@ class AlertReportCsvExportIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldNeutralizeDangerousFormulaValuesInExportedCsv() throws Exception {
+        Cow cow = createCow("VACA-CSV-003", "=@Nombre");
+
+        Alert alert = createAlert(
+                cow,
+                AlertType.COLLAR_OFFLINE,
+                AlertStatus.PENDIENTE,
+                " =SUM(1,1)",
+                LocalDateTime.of(2026, 4, 14, 8, 0)
+        );
+        alert.setObservations("+cmd");
+        alertRepository.save(alert);
+
+        alertRepository.flush();
+
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        MvcResult result = mockMvc.perform(get("/api/reports/alerts/export.csv")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/csv"))
+                .andReturn();
+
+        String body = result.getResponse().getContentAsString();
+
+        assertTrue(body.contains("\"' =SUM(1,1)\""));
+        assertTrue(body.contains("\"'+cmd\""));
+        assertTrue(body.contains("\"'=@Nombre\""));
+    }
+
+    @Test
     void shouldDenyOperatorAccessToCsvExport() throws Exception {
         String token = loginAndGetToken("operador@test.com", "12345678");
 
