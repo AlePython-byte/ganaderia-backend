@@ -33,6 +33,23 @@ public class DashboardController {
         return dashboardService.getPrioritizedAlertQueue(limit);
     }
 
+    @GetMapping("/pending-alert-aging")
+    public PendingAlertAgingDTO getPendingAlertAging() {
+        return dashboardService.getPendingAlertAging();
+    }
+
+    @GetMapping("/telemetry-freshness")
+    public TelemetryFreshnessDTO getTelemetryFreshness() {
+        return dashboardService.getTelemetryFreshness();
+    }
+
+    @GetMapping("/top-problematic-cows")
+    public List<CowIncidentReportDTO> getTopProblematicCows(
+            @RequestParam(required = false) Integer limit
+    ) {
+        return dashboardService.getTopProblematicCows(limit);
+    }
+
     @GetMapping("/collars-offline")
     public List<CollarResponseDTO> getOfflineCollars() {
         return dashboardService.getOfflineCollars();

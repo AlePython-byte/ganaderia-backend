@@ -4,6 +4,7 @@ import com.ganaderia4.backend.dto.*;
 import com.ganaderia4.backend.model.*;
 import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
 import com.ganaderia4.backend.repository.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,17 +19,23 @@ public class DashboardService {
     private final CollarRepository collarRepository;
     private final LocationRepository locationRepository;
     private final AlertService alertService;
+    private final CowIncidentReportService cowIncidentReportService;
+
+    @Value("${app.device-monitor.offline-threshold-minutes:15}")
+    private long offlineThresholdMinutes;
 
     public DashboardService(AlertRepository alertRepository,
                             CowRepository cowRepository,
                             CollarRepository collarRepository,
                             LocationRepository locationRepository,
-                            AlertService alertService) {
+                            AlertService alertService,
+                            CowIncidentReportService cowIncidentReportService) {
         this.alertRepository = alertRepository;
         this.cowRepository = cowRepository;
         this.collarRepository = collarRepository;
         this.locationRepository = locationRepository;
         this.alertService = alertService;
+        this.cowIncidentReportService = cowIncidentReportService;
     }
 
     public DashboardSummaryDTO getSummary() {
@@ -56,6 +63,36 @@ public class DashboardService {
 
     public List<AlertResponseDTO> getPrioritizedAlertQueue(Integer limit) {
         return alertService.getPendingAlertPriorityQueue(limit);
+    }
+
+    public PendingAlertAgingDTO getPendingAlertAging() {
+        LocalDateTime now = LocalDateTime.now();
+
+        return new PendingAlertAgingDTO(
+                alertRepository.countByStatus(AlertStatus.PENDIENTE),
+                alertRepository.countByStatusAndCreatedAtBefore(AlertStatus.PENDIENTE, now.minusMinutes(15)),
+                alertRepository.countByStatusAndCreatedAtBefore(AlertStatus.PENDIENTE, now.minusHours(1)),
+                alertRepository.countByStatusAndCreatedAtBefore(AlertStatus.PENDIENTE, now.minusHours(6))
+        );
+    }
+
+    public TelemetryFreshnessDTO getTelemetryFreshness() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime threshold = now.minusMinutes(offlineThresholdMinutes);
+
+        return new TelemetryFreshnessDTO(
+                collarRepository.countByEnabledTrue(),
+                collarRepository.countByEnabledTrueAndLastSeenAtIsNull(),
+                collarRepository.countByEnabledTrueAndLastSeenAtGreaterThanEqual(threshold),
+                collarRepository.countByEnabledTrueAndLastSeenAtBefore(threshold),
+                collarRepository.countByEnabledTrueAndLastSeenAtBefore(now.minusHours(1)),
+                collarRepository.countByEnabledTrueAndLastSeenAtBefore(now.minusHours(6)),
+                offlineThresholdMinutes
+        );
+    }
+
+    public List<CowIncidentReportDTO> getTopProblematicCows(Integer limit) {
+        return cowIncidentReportService.getCowsMostIncidentsReport(null, limit);
     }
 
     public List<CollarResponseDTO> getOfflineCollars() {

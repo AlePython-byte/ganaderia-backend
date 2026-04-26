@@ -28,6 +28,14 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
 
     List<Collar> findByEnabledTrueAndSignalStatus(DeviceSignalStatus signalStatus);
 
+    long countByEnabledTrue();
+
+    long countByEnabledTrueAndLastSeenAtIsNull();
+
+    long countByEnabledTrueAndLastSeenAtBefore(LocalDateTime threshold);
+
+    long countByEnabledTrueAndLastSeenAtGreaterThanEqual(LocalDateTime threshold);
+
     long countByStatus(CollarStatus status);
 
     long countByEnabledTrueAndSignalStatus(DeviceSignalStatus signalStatus);
