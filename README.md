@@ -112,6 +112,18 @@ El workflow de GitHub Actions usa el mismo comando para que el quality gate se a
 
 ---
 
+## Mantenimiento de dependencias
+
+Dependabot revisa semanalmente dependencias de Maven, GitHub Actions y Docker.
+
+Dependabot abre pull requests automáticos con labels de dependencias y seguridad para mantener el proyecto actualizado sin intervenir manualmente en cada revisión.
+
+Cada pull request de actualización debe pasar `./mvnw clean verify` antes de fusionarse.
+
+Las actualizaciones mayores no deben aceptarse sin revisar changelog, notas de compatibilidad e impacto sobre CI, build y despliegue.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
