@@ -54,6 +54,9 @@ class AlertServiceTest {
     @Mock
     private NotificationDispatcher notificationDispatcher;
 
+    @Mock
+    private AlertPriorityScorer alertPriorityScorer;
+
     @Spy
     private PaginationService paginationService = new PaginationService(new PaginationProperties());
 
@@ -287,6 +290,7 @@ class AlertServiceTest {
 
         when(alertRepository.findAll(anyAlertSpecification(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(alert)));
+        when(alertPriorityScorer.score(alert)).thenReturn(new AlertPriorityAssessment(75, "HIGH"));
 
         Page<AlertResponseDTO> response = alertService.getAlertsPage(
                 AlertStatus.PENDIENTE,
@@ -300,6 +304,8 @@ class AlertServiceTest {
         assertEquals(1, response.getTotalElements());
         assertEquals("COLLAR_OFFLINE", response.getContent().get(0).getType());
         assertEquals("PENDIENTE", response.getContent().get(0).getStatus());
+        assertEquals(75, response.getContent().get(0).getPriorityScore());
+        assertEquals("HIGH", response.getContent().get(0).getPriority());
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(alertRepository).findAll(anyAlertSpecification(), pageableCaptor.capture());
@@ -332,6 +338,54 @@ class AlertServiceTest {
                 "cow.password",
                 "DESC"
         ));
+    }
+
+    @Test
+    void shouldSortPendingAlertsByPriorityScoreWhenListingByStatus() {
+        Alert lowerPriority = createPersistedAlert(AlertStatus.PENDIENTE);
+        lowerPriority.setId(2L);
+        lowerPriority.setCreatedAt(LocalDateTime.now().minusMinutes(5));
+
+        Alert higherPriority = createPersistedAlert(AlertStatus.PENDIENTE);
+        higherPriority.setId(3L);
+        higherPriority.setCreatedAt(LocalDateTime.now().minusMinutes(20));
+
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of(lowerPriority, higherPriority));
+        when(alertPriorityScorer.score(lowerPriority)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
+        when(alertPriorityScorer.score(higherPriority)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
+
+        List<AlertResponseDTO> response = alertService.getAlertsByStatus(AlertStatus.PENDIENTE);
+
+        assertEquals(2, response.size());
+        assertEquals(3L, response.get(0).getId());
+        assertEquals("HIGH", response.get(0).getPriority());
+        assertEquals(2L, response.get(1).getId());
+    }
+
+    @Test
+    void shouldReturnPendingPriorityQueueOrderedAndLimited() {
+        Alert lowerPriority = createPersistedAlert(AlertStatus.PENDIENTE);
+        lowerPriority.setId(4L);
+        lowerPriority.setCreatedAt(LocalDateTime.now().minusMinutes(5));
+
+        Alert higherPriority = createPersistedAlert(AlertStatus.PENDIENTE);
+        higherPriority.setId(5L);
+        higherPriority.setCreatedAt(LocalDateTime.now().minusHours(2));
+
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of(lowerPriority, higherPriority));
+        when(alertPriorityScorer.score(lowerPriority)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
+        when(alertPriorityScorer.score(higherPriority)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
+
+        List<AlertResponseDTO> response = alertService.getPendingAlertPriorityQueue(1);
+
+        assertEquals(1, response.size());
+        assertEquals(5L, response.get(0).getId());
+        assertEquals("HIGH", response.get(0).getPriority());
+    }
+
+    @Test
+    void shouldRejectPendingPriorityQueueWhenLimitIsInvalid() {
+        assertThrows(BadRequestException.class, () -> alertService.getPendingAlertPriorityQueue(0));
     }
 
     @SuppressWarnings("unchecked")

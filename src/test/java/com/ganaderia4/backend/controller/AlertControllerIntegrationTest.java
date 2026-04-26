@@ -75,6 +75,8 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].type").value("EXIT_GEOFENCE"))
                 .andExpect(jsonPath("$[0].status").value("PENDIENTE"))
+                .andExpect(jsonPath("$[0].priority").value("MEDIUM"))
+                .andExpect(jsonPath("$[0].priorityScore").isNumber())
                 .andExpect(jsonPath("$[0].cowToken").value("VACA-001"))
                 .andExpect(jsonPath("$[0].cowName").value("Luna"));
     }
@@ -97,6 +99,41 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
         Alert updated = alertRepository.findById(alert.getId()).orElseThrow();
         assertEquals(AlertStatus.RESUELTA, updated.getStatus());
         assertEquals("Caso atendido", updated.getObservations());
+    }
+
+    @Test
+    void shouldExposePendingPriorityQueueOrderedForOperators() throws Exception {
+        Cow highPriorityCow = createCow("VACA-010", "Brisa", CowStatus.FUERA);
+        Cow lowerPriorityCow = createCow("VACA-011", "Nube", CowStatus.DENTRO);
+
+        createAlert(
+                highPriorityCow,
+                AlertType.EXIT_GEOFENCE,
+                AlertStatus.PENDIENTE,
+                "La vaca sigue fuera de la geocerca",
+                null,
+                LocalDateTime.now().minusHours(2)
+        );
+        createAlert(
+                lowerPriorityCow,
+                AlertType.COLLAR_OFFLINE,
+                AlertStatus.PENDIENTE,
+                "Collar sin reporte reciente",
+                null,
+                LocalDateTime.now().minusMinutes(5)
+        );
+
+        String token = loginAndGetToken("operador@test.com", "12345678");
+
+        mockMvc.perform(get("/api/alerts/pending/priority-queue")
+                        .param("limit", "1")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].type").value("EXIT_GEOFENCE"))
+                .andExpect(jsonPath("$[0].priority").value("HIGH"))
+                .andExpect(jsonPath("$[0].priorityScore").value(80))
+                .andExpect(jsonPath("$[0].cowToken").value("VACA-010"));
     }
 
     @Test
@@ -142,11 +179,15 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Cow createCow(String token, String name) {
+        return createCow(token, name, CowStatus.DENTRO);
+    }
+
+    private Cow createCow(String token, String name, CowStatus status) {
         Cow cow = new Cow();
         cow.setToken(token);
         cow.setInternalCode("INT-" + token);
         cow.setName(name);
-        cow.setStatus(CowStatus.DENTRO);
+        cow.setStatus(status);
         return cowRepository.save(cow);
     }
 
@@ -155,13 +196,22 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
                               AlertStatus status,
                               String message,
                               String observations) {
+        return createAlert(cow, type, status, message, observations, LocalDateTime.now().minusMinutes(5));
+    }
+
+    private Alert createAlert(Cow cow,
+                              AlertType type,
+                              AlertStatus status,
+                              String message,
+                              String observations,
+                              LocalDateTime createdAt) {
         Alert alert = new Alert();
         alert.setCow(cow);
         alert.setType(type);
         alert.setStatus(status);
         alert.setMessage(message);
         alert.setObservations(observations);
-        alert.setCreatedAt(LocalDateTime.now().minusMinutes(5));
+        alert.setCreatedAt(createdAt);
         return alertRepository.save(alert);
     }
 

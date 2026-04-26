@@ -26,6 +26,13 @@ public class DashboardController {
         return dashboardService.getCriticalAlerts();
     }
 
+    @GetMapping("/prioritized-alert-queue")
+    public List<AlertResponseDTO> getPrioritizedAlertQueue(
+            @RequestParam(required = false) Integer limit
+    ) {
+        return dashboardService.getPrioritizedAlertQueue(limit);
+    }
+
     @GetMapping("/collars-offline")
     public List<CollarResponseDTO> getOfflineCollars() {
         return dashboardService.getOfflineCollars();

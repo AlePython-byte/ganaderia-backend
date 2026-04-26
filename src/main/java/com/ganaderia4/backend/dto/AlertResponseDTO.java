@@ -14,6 +14,8 @@ public class AlertResponseDTO {
     private String cowToken;
     private String cowName;
     private Long locationId;
+    private Integer priorityScore;
+    private String priority;
 
     public AlertResponseDTO() {
     }
@@ -21,6 +23,13 @@ public class AlertResponseDTO {
     public AlertResponseDTO(Long id, String type, String message, LocalDateTime createdAt,
                             String status, String observations, Long cowId,
                             String cowToken, String cowName, Long locationId) {
+        this(id, type, message, createdAt, status, observations, cowId, cowToken, cowName, locationId, null, null);
+    }
+
+    public AlertResponseDTO(Long id, String type, String message, LocalDateTime createdAt,
+                            String status, String observations, Long cowId,
+                            String cowToken, String cowName, Long locationId,
+                            Integer priorityScore, String priority) {
         this.id = id;
         this.type = type;
         this.message = message;
@@ -31,6 +40,8 @@ public class AlertResponseDTO {
         this.cowToken = cowToken;
         this.cowName = cowName;
         this.locationId = locationId;
+        this.priorityScore = priorityScore;
+        this.priority = priority;
     }
 
     public Long getId() {
@@ -111,5 +122,21 @@ public class AlertResponseDTO {
 
     public void setLocationId(Long locationId) {
         this.locationId = locationId;
+    }
+
+    public Integer getPriorityScore() {
+        return priorityScore;
+    }
+
+    public void setPriorityScore(Integer priorityScore) {
+        this.priorityScore = priorityScore;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
     }
 }

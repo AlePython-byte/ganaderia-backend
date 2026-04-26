@@ -17,15 +17,18 @@ public class DashboardService {
     private final CowRepository cowRepository;
     private final CollarRepository collarRepository;
     private final LocationRepository locationRepository;
+    private final AlertService alertService;
 
     public DashboardService(AlertRepository alertRepository,
                             CowRepository cowRepository,
                             CollarRepository collarRepository,
-                            LocationRepository locationRepository) {
+                            LocationRepository locationRepository,
+                            AlertService alertService) {
         this.alertRepository = alertRepository;
         this.cowRepository = cowRepository;
         this.collarRepository = collarRepository;
         this.locationRepository = locationRepository;
+        this.alertService = alertService;
     }
 
     public DashboardSummaryDTO getSummary() {
@@ -48,10 +51,11 @@ public class DashboardService {
     }
 
     public List<AlertResponseDTO> getCriticalAlerts() {
-        return alertRepository.findTop10ByStatusOrderByCreatedAtDesc(AlertStatus.PENDIENTE)
-                .stream()
-                .map(this::mapAlertToResponseDTO)
-                .collect(Collectors.toList());
+        return getPrioritizedAlertQueue(10);
+    }
+
+    public List<AlertResponseDTO> getPrioritizedAlertQueue(Integer limit) {
+        return alertService.getPendingAlertPriorityQueue(limit);
     }
 
     public List<CollarResponseDTO> getOfflineCollars() {
@@ -73,23 +77,6 @@ public class DashboardService {
                 .stream()
                 .map(this::mapLocationToResponseDTO)
                 .collect(Collectors.toList());
-    }
-
-    private AlertResponseDTO mapAlertToResponseDTO(Alert alert) {
-        Long locationId = alert.getLocation() != null ? alert.getLocation().getId() : null;
-
-        return new AlertResponseDTO(
-                alert.getId(),
-                alert.getType().name(),
-                alert.getMessage(),
-                alert.getCreatedAt(),
-                alert.getStatus().name(),
-                alert.getObservations(),
-                alert.getCow().getId(),
-                alert.getCow().getToken(),
-                alert.getCow().getName(),
-                locationId
-        );
     }
 
     private CollarResponseDTO mapCollarToResponseDTO(Collar collar) {

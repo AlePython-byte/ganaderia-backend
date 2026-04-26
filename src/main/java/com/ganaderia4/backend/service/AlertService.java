@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 public class AlertService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "status", "type", "id");
+    private static final int DEFAULT_PRIORITY_QUEUE_LIMIT = 20;
 
     private final AlertRepository alertRepository;
     private final AlertFactory alertFactory;
@@ -40,19 +42,22 @@ public class AlertService {
     private final DomainMetricsService domainMetricsService;
     private final NotificationDispatcher notificationDispatcher;
     private final PaginationService paginationService;
+    private final AlertPriorityScorer alertPriorityScorer;
 
     public AlertService(AlertRepository alertRepository,
                         AlertFactory alertFactory,
                         AuditLogService auditLogService,
                         DomainMetricsService domainMetricsService,
                         NotificationDispatcher notificationDispatcher,
-                        PaginationService paginationService) {
+                        PaginationService paginationService,
+                        AlertPriorityScorer alertPriorityScorer) {
         this.alertRepository = alertRepository;
         this.alertFactory = alertFactory;
         this.auditLogService = auditLogService;
         this.domainMetricsService = domainMetricsService;
         this.notificationDispatcher = notificationDispatcher;
         this.paginationService = paginationService;
+        this.alertPriorityScorer = alertPriorityScorer;
     }
 
     @Transactional
@@ -144,10 +149,21 @@ public class AlertService {
     }
 
     public List<AlertResponseDTO> getAlertsByStatus(AlertStatus status) {
+        if (status == AlertStatus.PENDIENTE) {
+            return buildPrioritizedPendingAlerts(alertRepository.findByStatus(status), null);
+        }
+
         return alertRepository.findByStatus(status)
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    public List<AlertResponseDTO> getPendingAlertPriorityQueue(Integer limit) {
+        return buildPrioritizedPendingAlerts(
+                alertRepository.findByStatus(AlertStatus.PENDIENTE),
+                paginationService.validateLimit(limit, DEFAULT_PRIORITY_QUEUE_LIMIT)
+        );
     }
 
     public List<AlertResponseDTO> getAlertsByType(AlertType type) {
@@ -413,6 +429,8 @@ public class AlertService {
             locationId = alert.getLocation().getId();
         }
 
+        AlertPriorityAssessment priorityAssessment = safePriorityAssessment(alert);
+
         return new AlertResponseDTO(
                 alert.getId(),
                 alert.getType().name(),
@@ -423,7 +441,30 @@ public class AlertService {
                 alert.getCow().getId(),
                 alert.getCow().getToken(),
                 alert.getCow().getName(),
-                locationId
+                locationId,
+                priorityAssessment.priorityScore(),
+                priorityAssessment.priority()
         );
+    }
+
+    private AlertPriorityAssessment safePriorityAssessment(Alert alert) {
+        AlertPriorityAssessment priorityAssessment = alertPriorityScorer.score(alert);
+        return priorityAssessment != null ? priorityAssessment : AlertPriorityAssessment.none();
+    }
+
+    private Comparator<AlertResponseDTO> pendingAlertComparator() {
+        return Comparator.comparing(
+                        AlertResponseDTO::getPriorityScore,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                )
+                .thenComparing(AlertResponseDTO::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+    }
+
+    private List<AlertResponseDTO> buildPrioritizedPendingAlerts(List<Alert> alerts, Integer limit) {
+        return alerts.stream()
+                .map(this::mapToResponseDTO)
+                .sorted(pendingAlertComparator())
+                .limit(limit != null ? limit : Long.MAX_VALUE)
+                .collect(Collectors.toList());
     }
 }

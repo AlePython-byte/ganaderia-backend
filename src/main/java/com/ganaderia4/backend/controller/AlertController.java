@@ -51,6 +51,13 @@ public class AlertController {
         return alertService.getAlertsByStatus(status);
     }
 
+    @GetMapping("/pending/priority-queue")
+    public List<AlertResponseDTO> getPendingAlertPriorityQueue(
+            @RequestParam(required = false) Integer limit
+    ) {
+        return alertService.getPendingAlertPriorityQueue(limit);
+    }
+
     @GetMapping("/type/{type}")
     @Deprecated(since = "2.5", forRemoval = false)
     public List<AlertResponseDTO> getAlertsByType(@PathVariable AlertType type) {

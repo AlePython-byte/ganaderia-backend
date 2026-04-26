@@ -18,6 +18,8 @@ public interface AlertRepository extends JpaRepository<Alert, Long>, JpaSpecific
 
     Optional<Alert> findByCowAndTypeAndStatus(Cow cow, AlertType type, AlertStatus status);
 
+    long countByCow(Cow cow);
+
     long countByStatus(AlertStatus status);
 
     long countByTypeAndStatus(AlertType type, AlertStatus status);
