@@ -87,6 +87,31 @@ El proyecto se mantiene en Java 17 porque es compatible con Spring Boot 4 y perm
 
 ---
 
+## Quality Gates
+
+El comando recomendado para validación local y CI es:
+
+```bash
+./mvnw clean verify
+```
+
+Ese flujo ejecuta:
+
+- tests unitarios
+- tests de integración
+- reportes JaCoCo de unit tests, integration tests y cobertura combinada
+- verificación de cobertura mínima con JaCoCo
+- SpotBugs
+
+Cobertura mínima configurada sobre la cobertura global combinada:
+
+- `LINE`: `0.50`
+- `BRANCH`: `0.35`
+
+El workflow de GitHub Actions usa el mismo comando para que el quality gate se aplique también en CI.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
