@@ -4,6 +4,7 @@ import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,6 +18,12 @@ import java.util.Optional;
 public interface AlertRepository extends JpaRepository<Alert, Long>, JpaSpecificationExecutor<Alert> {
 
     List<Alert> findByStatus(AlertStatus status);
+
+    @EntityGraph(attributePaths = {"cow", "location"})
+    List<Alert> findByStatusOrderByCreatedAtAscIdAsc(AlertStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"cow", "location"})
+    List<Alert> findByStatusOrderByCreatedAtDescIdDesc(AlertStatus status, Pageable pageable);
 
     List<Alert> findByType(AlertType type);
 

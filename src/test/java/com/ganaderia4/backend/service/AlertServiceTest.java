@@ -388,6 +388,63 @@ class AlertServiceTest {
     }
 
     @Test
+    void shouldUseFullPendingSetWhenCandidateBudgetCoversAllAlerts() {
+        Alert lowerPriority = createPersistedAlert(AlertStatus.PENDIENTE);
+        lowerPriority.setId(6L);
+        lowerPriority.setCreatedAt(LocalDateTime.now().minusMinutes(5));
+
+        Alert higherPriority = createPersistedAlert(AlertStatus.PENDIENTE);
+        higherPriority.setId(7L);
+        higherPriority.setCreatedAt(LocalDateTime.now().minusHours(2));
+
+        when(alertRepository.countByStatus(AlertStatus.PENDIENTE)).thenReturn(2L);
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of(lowerPriority, higherPriority));
+        when(alertPriorityScorer.score(lowerPriority, scoringContext)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
+        when(alertPriorityScorer.score(higherPriority, scoringContext)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
+
+        List<AlertResponseDTO> response = alertService.getPendingAlertPriorityQueue(1);
+
+        assertEquals(1, response.size());
+        assertEquals(7L, response.get(0).getId());
+        verify(alertRepository).findByStatus(AlertStatus.PENDIENTE);
+        verify(alertRepository, never()).findByStatusOrderByCreatedAtAscIdAsc(eq(AlertStatus.PENDIENTE), any(Pageable.class));
+        verify(alertRepository, never()).findByStatusOrderByCreatedAtDescIdDesc(eq(AlertStatus.PENDIENTE), any(Pageable.class));
+    }
+
+    @Test
+    void shouldUseCandidateWindowsWhenPendingQueueExceedsBudget() {
+        Alert oldestCandidate = createPersistedAlert(AlertStatus.PENDIENTE);
+        oldestCandidate.setId(8L);
+        oldestCandidate.setCreatedAt(LocalDateTime.now().minusHours(8));
+
+        Alert newestCandidate = createPersistedAlert(AlertStatus.PENDIENTE);
+        newestCandidate.setId(9L);
+        newestCandidate.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+
+        when(alertRepository.countByStatus(AlertStatus.PENDIENTE)).thenReturn(500L);
+        when(alertRepository.findByStatusOrderByCreatedAtAscIdAsc(eq(AlertStatus.PENDIENTE), any(Pageable.class)))
+                .thenReturn(List.of(oldestCandidate));
+        when(alertRepository.findByStatusOrderByCreatedAtDescIdDesc(eq(AlertStatus.PENDIENTE), any(Pageable.class)))
+                .thenReturn(List.of(newestCandidate));
+        when(alertPriorityScorer.score(oldestCandidate, scoringContext)).thenReturn(new AlertPriorityAssessment(70, "HIGH"));
+        when(alertPriorityScorer.score(newestCandidate, scoringContext)).thenReturn(new AlertPriorityAssessment(55, "MEDIUM"));
+
+        List<AlertResponseDTO> response = alertService.getPendingAlertPriorityQueue(10);
+
+        assertEquals(2, response.size());
+        assertEquals(8L, response.get(0).getId());
+        assertEquals(9L, response.get(1).getId());
+
+        ArgumentCaptor<Pageable> oldestPageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        ArgumentCaptor<Pageable> newestPageCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(alertRepository).findByStatusOrderByCreatedAtAscIdAsc(eq(AlertStatus.PENDIENTE), oldestPageCaptor.capture());
+        verify(alertRepository).findByStatusOrderByCreatedAtDescIdDesc(eq(AlertStatus.PENDIENTE), newestPageCaptor.capture());
+        verify(alertRepository, never()).findByStatus(AlertStatus.PENDIENTE);
+        assertEquals(25, oldestPageCaptor.getValue().getPageSize());
+        assertEquals(25, newestPageCaptor.getValue().getPageSize());
+    }
+
+    @Test
     void shouldRejectLegacyAllAlertsWhenResultExceedsMaximum() {
         when(alertRepository.count()).thenReturn(101L);
 

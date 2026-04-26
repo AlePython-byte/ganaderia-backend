@@ -27,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,6 +38,8 @@ public class AlertService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "status", "type", "id");
     private static final int DEFAULT_PRIORITY_QUEUE_LIMIT = 20;
+    private static final int MIN_PRIORITY_QUEUE_CANDIDATES = 50;
+    private static final int PRIORITY_QUEUE_CANDIDATE_MULTIPLIER = 5;
 
     private final AlertRepository alertRepository;
     private final AlertFactory alertFactory;
@@ -182,10 +186,8 @@ public class AlertService {
     }
 
     public List<AlertResponseDTO> getPendingAlertPriorityQueue(Integer limit) {
-        return buildPrioritizedPendingAlerts(
-                alertRepository.findByStatus(AlertStatus.PENDIENTE),
-                paginationService.validateLimit(limit, DEFAULT_PRIORITY_QUEUE_LIMIT)
-        );
+        int validatedLimit = paginationService.validateLimit(limit, DEFAULT_PRIORITY_QUEUE_LIMIT);
+        return buildLimitedPendingAlertPriorityQueue(validatedLimit);
     }
 
     public List<AlertResponseDTO> getAlertsByType(AlertType type) {
@@ -508,6 +510,44 @@ public class AlertService {
                 .sorted(pendingAlertComparator())
                 .limit(limit != null ? limit : Long.MAX_VALUE)
                 .collect(Collectors.toList());
+    }
+
+    private List<AlertResponseDTO> buildLimitedPendingAlertPriorityQueue(int limit) {
+        int candidateBudget = calculatePriorityQueueCandidateBudget(limit);
+        long pendingCount = alertRepository.countByStatus(AlertStatus.PENDIENTE);
+
+        List<Alert> candidates = pendingCount <= candidateBudget
+                ? alertRepository.findByStatus(AlertStatus.PENDIENTE)
+                : loadPendingPriorityCandidates(candidateBudget);
+
+        return buildPrioritizedPendingAlerts(candidates, limit);
+    }
+
+    private int calculatePriorityQueueCandidateBudget(int limit) {
+        return Math.min(
+                paginationService.getMaxSize(),
+                Math.max(limit * PRIORITY_QUEUE_CANDIDATE_MULTIPLIER, MIN_PRIORITY_QUEUE_CANDIDATES)
+        );
+    }
+
+    private List<Alert> loadPendingPriorityCandidates(int candidateBudget) {
+        int oldestWindowSize = Math.max(1, candidateBudget / 2);
+        int newestWindowSize = Math.max(1, candidateBudget - oldestWindowSize);
+
+        List<Alert> oldestCandidates = alertRepository.findByStatusOrderByCreatedAtAscIdAsc(
+                AlertStatus.PENDIENTE,
+                PageRequest.of(0, oldestWindowSize)
+        );
+        List<Alert> newestCandidates = alertRepository.findByStatusOrderByCreatedAtDescIdDesc(
+                AlertStatus.PENDIENTE,
+                PageRequest.of(0, newestWindowSize)
+        );
+
+        Map<Long, Alert> candidatesById = new LinkedHashMap<>();
+        oldestCandidates.forEach(alert -> candidatesById.put(alert.getId(), alert));
+        newestCandidates.forEach(alert -> candidatesById.putIfAbsent(alert.getId(), alert));
+
+        return new ArrayList<>(candidatesById.values());
     }
 
     private List<AlertResponseDTO> mapToResponseDTOs(List<Alert> alerts) {
