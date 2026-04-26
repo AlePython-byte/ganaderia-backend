@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +24,8 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
     List<Collar> findByEnabledTrueAndSignalStatusOrderByLastSeenAtAsc(DeviceSignalStatus signalStatus);
 
     Optional<Collar> findByCow(Cow cow);
+
+    List<Collar> findByCowIdIn(Collection<Long> cowIds);
 
     List<Collar> findByEnabledTrueAndLastSeenAtBefore(LocalDateTime threshold);
 

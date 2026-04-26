@@ -17,6 +17,7 @@ import com.ganaderia4.backend.pattern.factory.alert.AlertFactory;
 import com.ganaderia4.backend.repository.AlertRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -130,10 +131,7 @@ public class AlertService {
     }
 
     public List<AlertResponseDTO> getAllAlerts() {
-        return alertRepository.findAll()
-                .stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
+        return mapToResponseDTOs(alertRepository.findAll());
     }
 
     public Page<AlertResponseDTO> getAlertsPage(AlertStatus status,
@@ -144,8 +142,8 @@ public class AlertService {
                                                 String direction) {
         PageRequest pageable = paginationService.createPageRequest(page, size, sort, direction, ALLOWED_SORT_FIELDS);
 
-        return alertRepository.findAll(buildSpecification(status, type), pageable)
-                .map(this::mapToResponseDTO);
+        Page<Alert> alertPage = alertRepository.findAll(buildSpecification(status, type), pageable);
+        return new PageImpl<>(mapToResponseDTOs(alertPage.getContent()), pageable, alertPage.getTotalElements());
     }
 
     public List<AlertResponseDTO> getAlertsByStatus(AlertStatus status) {
@@ -424,12 +422,16 @@ public class AlertService {
     }
 
     private AlertResponseDTO mapToResponseDTO(Alert alert) {
+        return mapToResponseDTO(alert, null);
+    }
+
+    private AlertResponseDTO mapToResponseDTO(Alert alert, AlertPriorityScorer.AlertPriorityScoringContext scoringContext) {
         Long locationId = null;
         if (alert.getLocation() != null) {
             locationId = alert.getLocation().getId();
         }
 
-        AlertPriorityAssessment priorityAssessment = safePriorityAssessment(alert);
+        AlertPriorityAssessment priorityAssessment = safePriorityAssessment(alert, scoringContext);
 
         return new AlertResponseDTO(
                 alert.getId(),
@@ -448,7 +450,14 @@ public class AlertService {
     }
 
     private AlertPriorityAssessment safePriorityAssessment(Alert alert) {
-        AlertPriorityAssessment priorityAssessment = alertPriorityScorer.score(alert);
+        return safePriorityAssessment(alert, null);
+    }
+
+    private AlertPriorityAssessment safePriorityAssessment(Alert alert,
+                                                           AlertPriorityScorer.AlertPriorityScoringContext scoringContext) {
+        AlertPriorityAssessment priorityAssessment = scoringContext != null
+                ? alertPriorityScorer.score(alert, scoringContext)
+                : alertPriorityScorer.score(alert);
         return priorityAssessment != null ? priorityAssessment : AlertPriorityAssessment.none();
     }
 
@@ -461,10 +470,17 @@ public class AlertService {
     }
 
     private List<AlertResponseDTO> buildPrioritizedPendingAlerts(List<Alert> alerts, Integer limit) {
-        return alerts.stream()
-                .map(this::mapToResponseDTO)
+        return mapToResponseDTOs(alerts).stream()
                 .sorted(pendingAlertComparator())
                 .limit(limit != null ? limit : Long.MAX_VALUE)
+                .collect(Collectors.toList());
+    }
+
+    private List<AlertResponseDTO> mapToResponseDTOs(List<Alert> alerts) {
+        AlertPriorityScorer.AlertPriorityScoringContext scoringContext = alertPriorityScorer.buildContext(alerts);
+
+        return alerts.stream()
+                .map(alert -> mapToResponseDTO(alert, scoringContext))
                 .collect(Collectors.toList());
     }
 }

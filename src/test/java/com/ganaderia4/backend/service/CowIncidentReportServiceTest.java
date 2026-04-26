@@ -3,24 +3,22 @@ package com.ganaderia4.backend.service;
 import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.CowIncidentReportDTO;
-import com.ganaderia4.backend.model.Alert;
-import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
-import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.AlertRepository;
+import com.ganaderia4.backend.repository.CowIncidentAggregateView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,12 +33,17 @@ class CowIncidentReportServiceTest {
     void shouldReturnOperationalRecurrenceOrderedByPendingAndRecency() {
         CowIncidentReportService service = new CowIncidentReportService(alertRepository, paginationService);
 
-        when(alertRepository.findAll(anyAlertSpecification(), any(Sort.class)))
+        when(alertRepository.findCowIncidentAggregatesByOperationalRecurrence(any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(List.of(
-                        createAlert(1L, "VACA-001", "Luna", CowStatus.FUERA, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 24, 10, 0)),
-                        createAlert(1L, "VACA-001", "Luna", CowStatus.FUERA, AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, LocalDateTime.of(2026, 4, 23, 10, 0)),
-                        createAlert(2L, "VACA-002", "Canela", CowStatus.DENTRO, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 25, 10, 0)),
-                        createAlert(2L, "VACA-002", "Canela", CowStatus.DENTRO, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 24, 9, 0))
+                        createAggregate(2L, "VACA-002", "Canela", CowStatus.DENTRO, 2, 2, 0, 0,
+                                LocalDateTime.of(2026, 4, 24, 9, 0), LocalDateTime.of(2026, 4, 25, 10, 0)),
+                        createAggregate(1L, "VACA-001", "Luna", CowStatus.FUERA, 2, 1, 1, 0,
+                                LocalDateTime.of(2026, 4, 23, 10, 0), LocalDateTime.of(2026, 4, 24, 10, 0))
+                ));
+        when(alertRepository.findLatestIncidentTypesByCowIds(anyList(), any(), any(), any(), any()))
+                .thenReturn(List.<Object[]>of(
+                        new Object[]{2L, AlertType.COLLAR_OFFLINE},
+                        new Object[]{1L, AlertType.COLLAR_OFFLINE}
                 ));
 
         List<CowIncidentReportDTO> report = service.getCowIncidentRecurrenceReport(new AlertReportFilterDTO(), 10);
@@ -54,31 +57,50 @@ class CowIncidentReportServiceTest {
         assertEquals("VACA-001", report.get(1).getCowToken());
     }
 
-    @SuppressWarnings("unchecked")
-    private Specification<Alert> anyAlertSpecification() {
-        return any(Specification.class);
+    @Test
+    void shouldReturnMostIncidentsReportUsingAggregateQuery() {
+        CowIncidentReportService service = new CowIncidentReportService(alertRepository, paginationService);
+
+        when(alertRepository.findCowIncidentAggregatesByTotalIncidents(any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(List.of(
+                        createAggregate(1L, "VACA-001", "Luna", CowStatus.FUERA, 3, 1, 1, 1,
+                                LocalDateTime.of(2026, 4, 23, 10, 0), LocalDateTime.of(2026, 4, 25, 10, 0))
+                ));
+        when(alertRepository.findLatestIncidentTypesByCowIds(anyList(), any(), any(), any(), any()))
+                .thenReturn(List.<Object[]>of(new Object[]{1L, AlertType.EXIT_GEOFENCE}));
+
+        List<CowIncidentReportDTO> report = service.getCowsMostIncidentsReport(new AlertReportFilterDTO(), 10);
+
+        assertEquals(1, report.size());
+        assertEquals("VACA-001", report.get(0).getCowToken());
+        assertEquals(3, report.get(0).getTotalIncidents());
+        assertEquals(1, report.get(0).getPendingIncidents());
+        assertEquals(1, report.get(0).getResolvedIncidents());
+        assertEquals(1, report.get(0).getDiscardedIncidents());
+        assertEquals("EXIT_GEOFENCE", report.get(0).getLastIncidentType());
     }
 
-    private Alert createAlert(Long cowId,
-                              String cowToken,
-                              String cowName,
-                              CowStatus cowStatus,
-                              AlertType type,
-                              AlertStatus status,
-                              LocalDateTime createdAt) {
-        Cow cow = new Cow();
-        cow.setId(cowId);
-        cow.setToken(cowToken);
-        cow.setInternalCode("INT-" + cowToken);
-        cow.setName(cowName);
-        cow.setStatus(cowStatus);
-
-        Alert alert = new Alert();
-        alert.setCow(cow);
-        alert.setType(type);
-        alert.setStatus(status);
-        alert.setMessage("incident");
-        alert.setCreatedAt(createdAt);
-        return alert;
+    private CowIncidentAggregateView createAggregate(Long cowId,
+                                                     String cowToken,
+                                                     String cowName,
+                                                     CowStatus cowStatus,
+                                                     long totalIncidents,
+                                                     long pendingIncidents,
+                                                     long resolvedIncidents,
+                                                     long discardedIncidents,
+                                                     LocalDateTime firstIncidentAt,
+                                                     LocalDateTime lastIncidentAt) {
+        return new CowIncidentAggregateView(
+                cowId,
+                cowToken,
+                cowName,
+                cowStatus,
+                totalIncidents,
+                pendingIncidents,
+                resolvedIncidents,
+                discardedIncidents,
+                firstIncidentAt,
+                lastIncidentAt
+        );
     }
 }

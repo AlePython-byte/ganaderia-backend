@@ -65,6 +65,7 @@ class AlertServiceTest {
 
     private Cow cow;
     private Location location;
+    private AlertPriorityScorer.AlertPriorityScoringContext scoringContext;
 
     @BeforeEach
     void setUp() {
@@ -77,6 +78,9 @@ class AlertServiceTest {
         location.setId(10L);
         location.setCow(cow);
         location.setTimestamp(LocalDateTime.now());
+
+        scoringContext = AlertPriorityScorer.AlertPriorityScoringContext.empty(LocalDateTime.now());
+        lenient().when(alertPriorityScorer.buildContext(anyList())).thenReturn(scoringContext);
     }
 
     @Test
@@ -290,7 +294,7 @@ class AlertServiceTest {
 
         when(alertRepository.findAll(anyAlertSpecification(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(alert)));
-        when(alertPriorityScorer.score(alert)).thenReturn(new AlertPriorityAssessment(75, "HIGH"));
+        when(alertPriorityScorer.score(alert, scoringContext)).thenReturn(new AlertPriorityAssessment(75, "HIGH"));
 
         Page<AlertResponseDTO> response = alertService.getAlertsPage(
                 AlertStatus.PENDIENTE,
@@ -351,8 +355,8 @@ class AlertServiceTest {
         higherPriority.setCreatedAt(LocalDateTime.now().minusMinutes(20));
 
         when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of(lowerPriority, higherPriority));
-        when(alertPriorityScorer.score(lowerPriority)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
-        when(alertPriorityScorer.score(higherPriority)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
+        when(alertPriorityScorer.score(lowerPriority, scoringContext)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
+        when(alertPriorityScorer.score(higherPriority, scoringContext)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
 
         List<AlertResponseDTO> response = alertService.getAlertsByStatus(AlertStatus.PENDIENTE);
 
@@ -373,8 +377,8 @@ class AlertServiceTest {
         higherPriority.setCreatedAt(LocalDateTime.now().minusHours(2));
 
         when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of(lowerPriority, higherPriority));
-        when(alertPriorityScorer.score(lowerPriority)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
-        when(alertPriorityScorer.score(higherPriority)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
+        when(alertPriorityScorer.score(lowerPriority, scoringContext)).thenReturn(new AlertPriorityAssessment(45, "MEDIUM"));
+        when(alertPriorityScorer.score(higherPriority, scoringContext)).thenReturn(new AlertPriorityAssessment(80, "HIGH"));
 
         List<AlertResponseDTO> response = alertService.getPendingAlertPriorityQueue(1);
 

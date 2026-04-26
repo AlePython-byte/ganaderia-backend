@@ -2,20 +2,15 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.CowIncidentReportDTO;
-import com.ganaderia4.backend.model.Alert;
-import com.ganaderia4.backend.model.AlertStatus;
+import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.repository.AlertRepository;
-import jakarta.persistence.criteria.Predicate;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import com.ganaderia4.backend.repository.CowIncidentAggregateView;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class CowIncidentReportService {
@@ -41,144 +36,90 @@ public class CowIncidentReportService {
                                                               Integer limit,
                                                               SortMode sortMode) {
         int effectiveLimit = paginationService.validateLimit(limit, 10);
-
-        List<Alert> alerts = alertRepository.findAll(
-                buildSpecification(filter),
-                Sort.by(Sort.Direction.DESC, "createdAt")
+        PageRequest topLimit = PageRequest.of(0, effectiveLimit);
+        List<CowIncidentAggregateView> aggregates = sortMode == SortMode.BY_OPERATIONAL_RECURRENCE
+                ? alertRepository.findCowIncidentAggregatesByOperationalRecurrence(
+                extractFrom(filter),
+                extractTo(filter),
+                extractType(filter),
+                extractStatus(filter),
+                topLimit
+        )
+                : alertRepository.findCowIncidentAggregatesByTotalIncidents(
+                extractFrom(filter),
+                extractTo(filter),
+                extractType(filter),
+                extractStatus(filter),
+                topLimit
         );
 
-        Map<Long, CowIncidentAccumulator> grouped = new LinkedHashMap<>();
+        LinkedHashMap<Long, String> lastIncidentTypeByCowId = resolveLastIncidentTypeByCowId(aggregates, filter);
 
-        for (Alert alert : alerts) {
-            if (alert.getCow() == null || alert.getCow().getId() == null) {
-                continue;
-            }
-
-            Long cowId = alert.getCow().getId();
-
-            CowIncidentAccumulator accumulator = grouped.computeIfAbsent(
-                    cowId,
-                    ignored -> new CowIncidentAccumulator(
-                            cowId,
-                            alert.getCow().getToken(),
-                            alert.getCow().getName(),
-                            alert.getCow().getStatus() != null ? alert.getCow().getStatus().name() : null
-                    )
-            );
-
-            accumulator.totalIncidents++;
-
-            if (alert.getStatus() == AlertStatus.PENDIENTE) {
-                accumulator.pendingIncidents++;
-            } else if (alert.getStatus() == AlertStatus.RESUELTA) {
-                accumulator.resolvedIncidents++;
-            } else if (alert.getStatus() == AlertStatus.DESCARTADA) {
-                accumulator.discardedIncidents++;
-            }
-
-            LocalDateTime createdAt = alert.getCreatedAt();
-            if (createdAt != null && (accumulator.firstIncidentAt == null || createdAt.isBefore(accumulator.firstIncidentAt))) {
-                accumulator.firstIncidentAt = createdAt;
-            }
-
-            if (createdAt != null && (accumulator.lastIncidentAt == null || createdAt.isAfter(accumulator.lastIncidentAt))) {
-                accumulator.lastIncidentAt = createdAt;
-                accumulator.lastIncidentType = alert.getType() != null ? alert.getType().name() : null;
-            }
-        }
-
-        Comparator<CowIncidentAccumulator> comparator = sortMode == SortMode.BY_OPERATIONAL_RECURRENCE
-                ? Comparator.comparingLong(CowIncidentAccumulator::getPendingIncidents).reversed()
-                .thenComparing(
-                        CowIncidentAccumulator::getLastIncidentAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())
-                )
-                .thenComparing(
-                        Comparator.comparingLong(CowIncidentAccumulator::getTotalIncidents).reversed()
-                )
-                : Comparator.comparingLong(CowIncidentAccumulator::getTotalIncidents).reversed()
-                .thenComparing(
-                        CowIncidentAccumulator::getLastIncidentAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())
-                );
-
-        return grouped.values()
-                .stream()
-                .sorted(comparator)
-                .limit(effectiveLimit)
-                .map(acc -> new CowIncidentReportDTO(
-                        acc.cowId,
-                        acc.cowToken,
-                        acc.cowName,
-                        acc.totalIncidents,
-                        acc.pendingIncidents,
-                        acc.resolvedIncidents,
-                        acc.discardedIncidents,
-                        acc.firstIncidentAt,
-                        acc.lastIncidentAt,
-                        acc.cowStatus,
-                        acc.lastIncidentType
+        return aggregates.stream()
+                .map(aggregate -> new CowIncidentReportDTO(
+                        aggregate.getCowId(),
+                        aggregate.getCowToken(),
+                        aggregate.getCowName(),
+                        aggregate.getTotalIncidents(),
+                        aggregate.getPendingIncidents(),
+                        aggregate.getResolvedIncidents(),
+                        aggregate.getDiscardedIncidents(),
+                        aggregate.getFirstIncidentAt(),
+                        aggregate.getLastIncidentAt(),
+                        aggregate.getCowStatus() != null ? aggregate.getCowStatus().name() : null,
+                        lastIncidentTypeByCowId.get(aggregate.getCowId())
                 ))
                 .toList();
     }
 
-    private Specification<Alert> buildSpecification(AlertReportFilterDTO filter) {
-        return (root, query, criteriaBuilder) -> {
-            List<Predicate> predicates = new ArrayList<>();
+    private LinkedHashMap<Long, String> resolveLastIncidentTypeByCowId(List<CowIncidentAggregateView> aggregates,
+                                                                        AlertReportFilterDTO filter) {
+        LinkedHashMap<Long, String> lastIncidentTypeByCowId = new LinkedHashMap<>();
+        if (aggregates.isEmpty()) {
+            return lastIncidentTypeByCowId;
+        }
 
-            if (filter != null) {
-                if (filter.getFrom() != null) {
-                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), filter.getFrom()));
-                }
+        List<Long> cowIds = aggregates.stream()
+                .map(CowIncidentAggregateView::getCowId)
+                .toList();
 
-                if (filter.getTo() != null) {
-                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), filter.getTo()));
-                }
-
-                if (filter.getType() != null) {
-                    predicates.add(criteriaBuilder.equal(root.get("type"), filter.getType()));
-                }
-
-                if (filter.getStatus() != null) {
-                    predicates.add(criteriaBuilder.equal(root.get("status"), filter.getStatus()));
-                }
+        for (Object[] row : alertRepository.findLatestIncidentTypesByCowIds(
+                cowIds,
+                extractFrom(filter),
+                extractTo(filter),
+                extractType(filter),
+                extractStatus(filter)
+        )) {
+            if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+                continue;
             }
 
-            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-        };
+            Long cowId = ((Number) row[0]).longValue();
+            if (lastIncidentTypeByCowId.containsKey(cowId)) {
+                continue;
+            }
+
+            AlertType lastIncidentType = (AlertType) row[1];
+            lastIncidentTypeByCowId.put(cowId, lastIncidentType.name());
+        }
+
+        return lastIncidentTypeByCowId;
     }
 
-    private static class CowIncidentAccumulator {
-        private final Long cowId;
-        private final String cowToken;
-        private final String cowName;
-        private final String cowStatus;
-        private long totalIncidents;
-        private long pendingIncidents;
-        private long resolvedIncidents;
-        private long discardedIncidents;
-        private LocalDateTime firstIncidentAt;
-        private LocalDateTime lastIncidentAt;
-        private String lastIncidentType;
+    private LocalDateTime extractFrom(AlertReportFilterDTO filter) {
+        return filter != null ? filter.getFrom() : null;
+    }
 
-        private CowIncidentAccumulator(Long cowId, String cowToken, String cowName, String cowStatus) {
-            this.cowId = cowId;
-            this.cowToken = cowToken;
-            this.cowName = cowName;
-            this.cowStatus = cowStatus;
-        }
+    private LocalDateTime extractTo(AlertReportFilterDTO filter) {
+        return filter != null ? filter.getTo() : null;
+    }
 
-        public long getTotalIncidents() {
-            return totalIncidents;
-        }
+    private AlertType extractType(AlertReportFilterDTO filter) {
+        return filter != null ? filter.getType() : null;
+    }
 
-        public long getPendingIncidents() {
-            return pendingIncidents;
-        }
-
-        public LocalDateTime getLastIncidentAt() {
-            return lastIncidentAt;
-        }
+    private com.ganaderia4.backend.model.AlertStatus extractStatus(AlertReportFilterDTO filter) {
+        return filter != null ? filter.getStatus() : null;
     }
 
     private enum SortMode {
