@@ -7,6 +7,7 @@ import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.service.CollarService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,6 +44,7 @@ public class CollarController {
     }
 
     @PatchMapping("/{id}/rotate-secret")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public DeviceSecretResponseDTO rotateDeviceSecret(@PathVariable Long id) {
         return collarService.rotateDeviceSecret(id);
     }

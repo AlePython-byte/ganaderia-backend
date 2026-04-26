@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -45,6 +46,9 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
         userRepository.deleteAll();
 
         createUser("Administrador", "admin@test.com", "12345678", Role.ADMINISTRADOR, true);
+        createUser("Supervisor", "supervisor@test.com", "12345678", Role.SUPERVISOR, true);
+        createUser("Tecnico", "tecnico@test.com", "12345678", Role.TECNICO, true);
+        createUser("Operador", "operador@test.com", "12345678", Role.OPERADOR, true);
     }
 
     @Test
@@ -90,6 +94,70 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("El token del collar es un identificador publico estable y no puede modificarse"))
                 .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId()));
+    }
+
+    @Test
+    void shouldAllowAdminToRotateDeviceSecret() throws Exception {
+        Collar savedCollar = createCollar("COLLAR-ROTATE-001");
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldDenySupervisorFromRotatingDeviceSecret() throws Exception {
+        Collar savedCollar = createCollar("COLLAR-ROTATE-002");
+        String token = loginAndGetToken("supervisor@test.com", "12345678");
+
+        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId() + "/rotate-secret"));
+    }
+
+    @Test
+    void shouldDenyTecnicoFromRotatingDeviceSecret() throws Exception {
+        Collar savedCollar = createCollar("COLLAR-ROTATE-003");
+        String token = loginAndGetToken("tecnico@test.com", "12345678");
+
+        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId() + "/rotate-secret"));
+    }
+
+    @Test
+    void shouldDenyOperadorFromRotatingDeviceSecret() throws Exception {
+        Collar savedCollar = createCollar("COLLAR-ROTATE-004");
+        String token = loginAndGetToken("operador@test.com", "12345678");
+
+        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId() + "/rotate-secret"));
+    }
+
+    @Test
+    void shouldRejectRotateDeviceSecretWhenTokenIsMissing() throws Exception {
+        Collar savedCollar = createCollar("COLLAR-ROTATE-005");
+
+        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId() + "/rotate-secret"));
+    }
+
+    private Collar createCollar(String collarToken) {
+        Collar collar = new Collar();
+        collar.setToken(collarToken);
+        collar.setStatus(CollarStatus.ACTIVO);
+        collar.setEnabled(true);
+        return collarRepository.save(collar);
     }
 
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
