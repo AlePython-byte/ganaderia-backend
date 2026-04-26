@@ -65,6 +65,23 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldAllowHealthzWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/healthz"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("ok"));
+    }
+
+    @Test
+    void shouldKeepApiHealthProtected() throws Exception {
+        mockMvc.perform(get("/api/health"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("No autorizado"))
+                .andExpect(jsonPath("$.path").value("/api/health"));
+    }
+
+    @Test
     void shouldAllowAdminToGetUsers() throws Exception {
         String token = loginAndGetToken("admin@test.com", "12345678");
 
