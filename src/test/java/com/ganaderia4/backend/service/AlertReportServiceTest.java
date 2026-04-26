@@ -12,6 +12,8 @@ import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.AlertRepository;
+import com.ganaderia4.backend.repository.AlertTrendAggregateProjection;
+import com.ganaderia4.backend.repository.AlertTypeRecurrenceAggregateProjection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -97,15 +99,24 @@ class AlertReportServiceTest {
     @Test
     void shouldAggregateAlertTrendByDay() {
         AlertReportService service = new AlertReportService(alertRepository, paginationService);
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(LocalDateTime.of(2026, 4, 20, 0, 0));
+        filter.setTo(LocalDateTime.of(2026, 4, 21, 23, 59));
+        filter.setType(AlertType.COLLAR_OFFLINE);
+        filter.setStatus(AlertStatus.PENDIENTE);
 
-        when(alertRepository.findAll(anyAlertSpecification(), any(Sort.class)))
+        when(alertRepository.findTrendAggregates(
+                LocalDateTime.of(2026, 4, 20, 0, 0),
+                LocalDateTime.of(2026, 4, 21, 23, 59),
+                "COLLAR_OFFLINE",
+                "PENDIENTE"
+        ))
                 .thenReturn(List.of(
-                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 20, 8, 0)),
-                        createAlert(AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, LocalDateTime.of(2026, 4, 20, 11, 0)),
-                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.DESCARTADA, LocalDateTime.of(2026, 4, 21, 9, 30))
+                        alertTrendAggregate(java.time.LocalDate.of(2026, 4, 20), 2, 1, 1, 0),
+                        alertTrendAggregate(java.time.LocalDate.of(2026, 4, 21), 1, 0, 0, 1)
                 ));
 
-        List<AlertTrendPointDTO> trend = service.getAlertTrendReport(new AlertReportFilterDTO());
+        List<AlertTrendPointDTO> trend = service.getAlertTrendReport(filter);
 
         assertEquals(2, trend.size());
         assertEquals(java.time.LocalDate.of(2026, 4, 20), trend.get(0).getDate());
@@ -120,15 +131,37 @@ class AlertReportServiceTest {
     @Test
     void shouldAggregateAlertRecurrenceByType() {
         AlertReportService service = new AlertReportService(alertRepository, paginationService);
+        AlertReportFilterDTO filter = new AlertReportFilterDTO();
+        filter.setFrom(LocalDateTime.of(2026, 4, 19, 0, 0));
+        filter.setTo(LocalDateTime.of(2026, 4, 21, 23, 59));
+        filter.setStatus(AlertStatus.RESUELTA);
 
-        when(alertRepository.findAll(anyAlertSpecification(), any(Sort.class)))
+        when(alertRepository.findTypeRecurrenceAggregates(
+                LocalDateTime.of(2026, 4, 19, 0, 0),
+                LocalDateTime.of(2026, 4, 21, 23, 59),
+                null,
+                "RESUELTA"
+        ))
                 .thenReturn(List.of(
-                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, LocalDateTime.of(2026, 4, 21, 10, 0)),
-                        createAlert(AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, LocalDateTime.of(2026, 4, 20, 10, 0)),
-                        createAlert(AlertType.EXIT_GEOFENCE, AlertStatus.DESCARTADA, LocalDateTime.of(2026, 4, 19, 10, 0))
+                        alertTypeRecurrenceAggregate(
+                                "COLLAR_OFFLINE",
+                                2,
+                                1,
+                                1,
+                                0,
+                                LocalDateTime.of(2026, 4, 21, 10, 0)
+                        ),
+                        alertTypeRecurrenceAggregate(
+                                "EXIT_GEOFENCE",
+                                1,
+                                0,
+                                0,
+                                1,
+                                LocalDateTime.of(2026, 4, 19, 10, 0)
+                        )
                 ));
 
-        List<AlertTypeRecurrenceDTO> recurrence = service.getAlertTypeRecurrenceReport(new AlertReportFilterDTO());
+        List<AlertTypeRecurrenceDTO> recurrence = service.getAlertTypeRecurrenceReport(filter);
 
         assertEquals(2, recurrence.size());
         assertEquals("COLLAR_OFFLINE", recurrence.get(0).getType());
@@ -161,6 +194,78 @@ class AlertReportServiceTest {
         alert.setMessage("Collar sin senal");
         alert.setCreatedAt(createdAt);
         return alert;
+    }
+
+    private AlertTrendAggregateProjection alertTrendAggregate(java.time.LocalDate date,
+                                                              long totalAlerts,
+                                                              long pendingAlerts,
+                                                              long resolvedAlerts,
+                                                              long discardedAlerts) {
+        return new AlertTrendAggregateProjection() {
+            @Override
+            public java.time.LocalDate getDate() {
+                return date;
+            }
+
+            @Override
+            public long getTotalAlerts() {
+                return totalAlerts;
+            }
+
+            @Override
+            public long getPendingAlerts() {
+                return pendingAlerts;
+            }
+
+            @Override
+            public long getResolvedAlerts() {
+                return resolvedAlerts;
+            }
+
+            @Override
+            public long getDiscardedAlerts() {
+                return discardedAlerts;
+            }
+        };
+    }
+
+    private AlertTypeRecurrenceAggregateProjection alertTypeRecurrenceAggregate(String type,
+                                                                                long totalAlerts,
+                                                                                long pendingAlerts,
+                                                                                long resolvedAlerts,
+                                                                                long discardedAlerts,
+                                                                                LocalDateTime lastAlertAt) {
+        return new AlertTypeRecurrenceAggregateProjection() {
+            @Override
+            public String getType() {
+                return type;
+            }
+
+            @Override
+            public long getTotalAlerts() {
+                return totalAlerts;
+            }
+
+            @Override
+            public long getPendingAlerts() {
+                return pendingAlerts;
+            }
+
+            @Override
+            public long getResolvedAlerts() {
+                return resolvedAlerts;
+            }
+
+            @Override
+            public long getDiscardedAlerts() {
+                return discardedAlerts;
+            }
+
+            @Override
+            public LocalDateTime getLastAlertAt() {
+                return lastAlertAt;
+            }
+        };
     }
 
     @SuppressWarnings("unchecked")

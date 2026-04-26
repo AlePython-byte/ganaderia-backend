@@ -32,6 +32,51 @@ public interface AlertRepository extends JpaRepository<Alert, Long>, JpaSpecific
 
     List<Alert> findTop10ByStatusOrderByCreatedAtDesc(AlertStatus status);
 
+    @Query(value = """
+            select
+                cast(a.created_at as date) as date,
+                count(*) as totalAlerts,
+                sum(case when a.status = 'PENDIENTE' then 1 else 0 end) as pendingAlerts,
+                sum(case when a.status = 'RESUELTA' then 1 else 0 end) as resolvedAlerts,
+                sum(case when a.status = 'DESCARTADA' then 1 else 0 end) as discardedAlerts
+            from alerts a
+            where a.created_at >= coalesce(cast(:from as timestamp), a.created_at)
+              and a.created_at <= coalesce(cast(:to as timestamp), a.created_at)
+              and a.type = coalesce(cast(:type as varchar), a.type)
+              and a.status = coalesce(cast(:status as varchar), a.status)
+            group by cast(a.created_at as date)
+            order by cast(a.created_at as date) asc
+            """, nativeQuery = true)
+    List<AlertTrendAggregateProjection> findTrendAggregates(
+            @Param("from") java.time.LocalDateTime from,
+            @Param("to") java.time.LocalDateTime to,
+            @Param("type") String type,
+            @Param("status") String status
+    );
+
+    @Query(value = """
+            select
+                a.type as type,
+                count(*) as totalAlerts,
+                sum(case when a.status = 'PENDIENTE' then 1 else 0 end) as pendingAlerts,
+                sum(case when a.status = 'RESUELTA' then 1 else 0 end) as resolvedAlerts,
+                sum(case when a.status = 'DESCARTADA' then 1 else 0 end) as discardedAlerts,
+                max(a.created_at) as lastAlertAt
+            from alerts a
+            where a.created_at >= coalesce(cast(:from as timestamp), a.created_at)
+              and a.created_at <= coalesce(cast(:to as timestamp), a.created_at)
+              and a.type = coalesce(cast(:type as varchar), a.type)
+              and a.status = coalesce(cast(:status as varchar), a.status)
+            group by a.type
+            order by count(*) desc, max(a.created_at) desc
+            """, nativeQuery = true)
+    List<AlertTypeRecurrenceAggregateProjection> findTypeRecurrenceAggregates(
+            @Param("from") java.time.LocalDateTime from,
+            @Param("to") java.time.LocalDateTime to,
+            @Param("type") String type,
+            @Param("status") String status
+    );
+
     @Query("""
             select a.cow.id, count(a)
             from Alert a

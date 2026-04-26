@@ -4,9 +4,7 @@ import com.ganaderia4.backend.dto.AlertReportFilterDTO;
 import com.ganaderia4.backend.dto.AlertResponseDTO;
 import com.ganaderia4.backend.dto.AlertTrendPointDTO;
 import com.ganaderia4.backend.dto.AlertTypeRecurrenceDTO;
-import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
-import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.repository.AlertRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
@@ -15,15 +13,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -68,69 +60,38 @@ public class AlertReportService {
     }
 
     public List<AlertTrendPointDTO> getAlertTrendReport(AlertReportFilterDTO filter) {
-        List<Alert> alerts = alertRepository.findAll(
-                buildSpecification(filter),
-                Sort.by(Sort.Direction.ASC, "createdAt")
-        );
-
-        Map<LocalDate, AlertCounterAccumulator> groupedByDate = new TreeMap<>();
-
-        for (Alert alert : alerts) {
-            if (alert.getCreatedAt() == null) {
-                continue;
-            }
-
-            LocalDate date = alert.getCreatedAt().toLocalDate();
-            AlertCounterAccumulator accumulator = groupedByDate.computeIfAbsent(date, ignored -> new AlertCounterAccumulator());
-            accumulator.increment(alert);
-        }
-
-        return groupedByDate.entrySet()
+        return alertRepository.findTrendAggregates(
+                        extractFrom(filter),
+                        extractTo(filter),
+                        extractType(filter),
+                        extractStatus(filter)
+                )
                 .stream()
-                .map(entry -> new AlertTrendPointDTO(
-                        entry.getKey(),
-                        entry.getValue().totalAlerts,
-                        entry.getValue().pendingAlerts,
-                        entry.getValue().resolvedAlerts,
-                        entry.getValue().discardedAlerts
+                .map(aggregate -> new AlertTrendPointDTO(
+                        aggregate.getDate(),
+                        aggregate.getTotalAlerts(),
+                        aggregate.getPendingAlerts(),
+                        aggregate.getResolvedAlerts(),
+                        aggregate.getDiscardedAlerts()
                 ))
                 .toList();
     }
 
     public List<AlertTypeRecurrenceDTO> getAlertTypeRecurrenceReport(AlertReportFilterDTO filter) {
-        List<Alert> alerts = alertRepository.findAll(
-                buildSpecification(filter),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
-
-        Map<String, AlertTypeAccumulator> groupedByType = new LinkedHashMap<>();
-
-        for (Alert alert : alerts) {
-            if (alert.getType() == null) {
-                continue;
-            }
-
-            String type = alert.getType().name();
-            AlertTypeAccumulator accumulator = groupedByType.computeIfAbsent(type, ignored -> new AlertTypeAccumulator(type));
-            accumulator.increment(alert);
-        }
-
-        return groupedByType.values()
-                .stream()
-                .sorted(
-                        Comparator.comparingLong(AlertTypeAccumulator::getTotalAlerts).reversed()
-                                .thenComparing(
-                                        AlertTypeAccumulator::getLastAlertAt,
-                                        Comparator.nullsLast(Comparator.reverseOrder())
-                                )
+        return alertRepository.findTypeRecurrenceAggregates(
+                        extractFrom(filter),
+                        extractTo(filter),
+                        extractType(filter),
+                        extractStatus(filter)
                 )
-                .map(acc -> new AlertTypeRecurrenceDTO(
-                        acc.type,
-                        acc.totalAlerts,
-                        acc.pendingAlerts,
-                        acc.resolvedAlerts,
-                        acc.discardedAlerts,
-                        acc.lastAlertAt
+                .stream()
+                .map(aggregate -> new AlertTypeRecurrenceDTO(
+                        aggregate.getType(),
+                        aggregate.getTotalAlerts(),
+                        aggregate.getPendingAlerts(),
+                        aggregate.getResolvedAlerts(),
+                        aggregate.getDiscardedAlerts(),
+                        aggregate.getLastAlertAt()
                 ))
                 .toList();
     }
@@ -178,49 +139,19 @@ public class AlertReportService {
         );
     }
 
-    private static class AlertCounterAccumulator {
-        protected long totalAlerts;
-        protected long pendingAlerts;
-        protected long resolvedAlerts;
-        protected long discardedAlerts;
-
-        protected void increment(Alert alert) {
-            totalAlerts++;
-
-            if (alert.getStatus() == AlertStatus.PENDIENTE) {
-                pendingAlerts++;
-            } else if (alert.getStatus() == AlertStatus.RESUELTA) {
-                resolvedAlerts++;
-            } else if (alert.getStatus() == AlertStatus.DESCARTADA) {
-                discardedAlerts++;
-            }
-        }
+    private java.time.LocalDateTime extractFrom(AlertReportFilterDTO filter) {
+        return filter != null ? filter.getFrom() : null;
     }
 
-    private static class AlertTypeAccumulator extends AlertCounterAccumulator {
-        private final String type;
-        private LocalDateTime lastAlertAt;
+    private java.time.LocalDateTime extractTo(AlertReportFilterDTO filter) {
+        return filter != null ? filter.getTo() : null;
+    }
 
-        private AlertTypeAccumulator(String type) {
-            this.type = type;
-        }
+    private String extractType(AlertReportFilterDTO filter) {
+        return filter != null && filter.getType() != null ? filter.getType().name() : null;
+    }
 
-        @Override
-        protected void increment(Alert alert) {
-            super.increment(alert);
-
-            LocalDateTime createdAt = alert.getCreatedAt();
-            if (createdAt != null && (lastAlertAt == null || createdAt.isAfter(lastAlertAt))) {
-                lastAlertAt = createdAt;
-            }
-        }
-
-        public long getTotalAlerts() {
-            return totalAlerts;
-        }
-
-        public LocalDateTime getLastAlertAt() {
-            return lastAlertAt;
-        }
+    private String extractStatus(AlertReportFilterDTO filter) {
+        return filter != null && filter.getStatus() != null ? filter.getStatus().name() : null;
     }
 }

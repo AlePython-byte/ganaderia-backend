@@ -184,6 +184,29 @@ class ReportControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldApplyTypeFilterToAlertTrendReport() throws Exception {
+        Cow cow = createCow("VACA-REP-005", "Estrella");
+
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "tf1", LocalDateTime.of(2026, 4, 13, 8, 0));
+        createAlert(cow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "tf2", LocalDateTime.of(2026, 4, 13, 9, 0));
+
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/alerts/trend")
+                        .param("from", "2026-04-13T00:00:00")
+                        .param("to", "2026-04-13T23:59:59")
+                        .param("type", "COLLAR_OFFLINE")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].date").value("2026-04-13"))
+                .andExpect(jsonPath("$[0].totalAlerts").value(1))
+                .andExpect(jsonPath("$[0].pendingAlerts").value(1))
+                .andExpect(jsonPath("$[0].resolvedAlerts").value(0))
+                .andExpect(jsonPath("$[0].discardedAlerts").value(0));
+    }
+
+    @Test
     void shouldReturnAlertTypeRecurrenceOrderedByTotalAlerts() throws Exception {
         Cow cow = createCow("VACA-REP-004", "Nube");
 
@@ -205,6 +228,32 @@ class ReportControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].resolvedAlerts").value(1))
                 .andExpect(jsonPath("$[1].type").value("EXIT_GEOFENCE"))
                 .andExpect(jsonPath("$[1].discardedAlerts").value(1));
+    }
+
+    @Test
+    void shouldApplyStatusFilterToAlertTypeRecurrenceReport() throws Exception {
+        Cow cow = createCow("VACA-REP-006", "Aura");
+
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "rf1", LocalDateTime.of(2026, 4, 14, 8, 0));
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, "rf2", LocalDateTime.of(2026, 4, 14, 9, 0));
+        createAlert(cow, AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, "rf3", LocalDateTime.of(2026, 4, 14, 10, 0));
+
+        String token = loginAndGetToken("supervisor@test.com", "12345678");
+
+        mockMvc.perform(get("/api/reports/alerts/type-recurrence")
+                        .param("from", "2026-04-14T00:00:00")
+                        .param("to", "2026-04-14T23:59:59")
+                        .param("status", "RESUELTA")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].type").value("EXIT_GEOFENCE"))
+                .andExpect(jsonPath("$[0].totalAlerts").value(1))
+                .andExpect(jsonPath("$[0].pendingAlerts").value(0))
+                .andExpect(jsonPath("$[0].resolvedAlerts").value(1))
+                .andExpect(jsonPath("$[1].type").value("COLLAR_OFFLINE"))
+                .andExpect(jsonPath("$[1].totalAlerts").value(1))
+                .andExpect(jsonPath("$[1].resolvedAlerts").value(1));
     }
 
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
