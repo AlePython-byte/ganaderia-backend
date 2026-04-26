@@ -124,6 +124,22 @@ Las actualizaciones mayores no deben aceptarse sin revisar changelog, notas de c
 
 ---
 
+## Escaneo de vulnerabilidades
+
+Dependabot revisa actualizaciones disponibles y ayuda a detectar alertas de dependencias sobre Maven, GitHub Actions y Docker.
+
+OWASP Dependency-Check analiza vulnerabilidades conocidas en las dependencias del proyecto y genera reportes en HTML, JSON y JUNIT.
+
+El escaneo corre manualmente o semanalmente en GitHub Actions mediante un workflow separado.
+
+No corre en cada push para evitar lentitud adicional y falsos positivos iniciales sobre el pipeline principal.
+
+Si se detectan vulnerabilidades con `CVSS >= 7.0`, el workflow de escaneo debe fallar.
+
+Los reportes del análisis quedan publicados como artifacts del workflow para revisión posterior.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
