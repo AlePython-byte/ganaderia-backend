@@ -156,6 +156,14 @@ Los reportes del escaneo quedan publicados como artifacts del workflow.
 
 ---
 
+## Lifecycle de collares
+
+El lifecycle oficial de collares, incluyendo la semántica de `status`, `enabled`, `signalStatus` y `lastSeenAt`, está documentado en [docs/collar-lifecycle.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/collar-lifecycle.md:1).
+
+Ese documento también deja explícitas las reglas objetivo para procesamiento de ubicaciones y monitoreo offline, junto con los cambios de código recomendados para el siguiente bloque.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
