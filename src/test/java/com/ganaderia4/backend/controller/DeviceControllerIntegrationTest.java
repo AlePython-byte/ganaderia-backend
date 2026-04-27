@@ -114,6 +114,72 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectLocationFromDisabledActiveCollar() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-DISABLED", "Mora");
+        Collar collar = createCollar("COLLAR-DEVICE-DISABLED", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA, false);
+
+        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+
+        String body = """
+                {
+                  "latitude": 1.218,
+                  "longitude": -77.285,
+                  "timestamp": "%s"
+                }
+                """.formatted(timestamp.withNano(0));
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El collar está deshabilitado"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
+    }
+
+    @Test
+    void shouldRejectLocationFromInactiveCollar() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-INACTIVE", "Sombra");
+        Collar collar = createCollar("COLLAR-DEVICE-INACTIVE", cow, CollarStatus.INACTIVO, DeviceSignalStatus.MEDIA);
+
+        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+
+        String body = """
+                {
+                  "latitude": 1.219,
+                  "longitude": -77.286,
+                  "timestamp": "%s"
+                }
+                """.formatted(timestamp.withNano(0));
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El collar no está activo"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
+    }
+
+    @Test
+    void shouldRejectLocationFromMaintenanceCollar() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-MAINT", "Aura");
+        Collar collar = createCollar("COLLAR-DEVICE-MAINT", cow, CollarStatus.MANTENIMIENTO, DeviceSignalStatus.MEDIA);
+
+        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+
+        String body = """
+                {
+                  "latitude": 1.220,
+                  "longitude": -77.287,
+                  "timestamp": "%s"
+                }
+                """.formatted(timestamp.withNano(0));
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El collar no está activo"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
+    }
+
+    @Test
     void shouldRejectRequestWhenDeviceTokenHeaderIsMissing() throws Exception {
         LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
 
@@ -403,11 +469,19 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                                 Cow cow,
                                 CollarStatus status,
                                 DeviceSignalStatus signalStatus) {
+        return createCollar(token, cow, status, signalStatus, true);
+    }
+
+    private Collar createCollar(String token,
+                                Cow cow,
+                                CollarStatus status,
+                                DeviceSignalStatus signalStatus,
+                                boolean enabled) {
         Collar collar = new Collar();
         collar.setToken(token);
         collar.setCow(cow);
         collar.setStatus(status);
-        collar.setEnabled(true);
+        collar.setEnabled(enabled);
         collar.setBatteryLevel(85);
         collar.setSignalStatus(signalStatus);
         collar.setLastSeenAt(LocalDateTime.now().minusHours(2));

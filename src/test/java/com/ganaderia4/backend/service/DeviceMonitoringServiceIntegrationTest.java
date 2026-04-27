@@ -122,6 +122,44 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         assertEquals(0, alertRepository.count());
     }
 
+    @Test
+    void shouldIgnoreInactiveCollarsDuringOfflineMonitoring() {
+        Cow cow = createCow("VACA-OFF-004", "Nube");
+        Collar collar = createCollar(
+                "COLLAR-OFF-004",
+                cow,
+                LocalDateTime.now().minusMinutes(40),
+                DeviceSignalStatus.MEDIA,
+                true,
+                CollarStatus.INACTIVO
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(DeviceSignalStatus.MEDIA, updatedCollar.getSignalStatus());
+        assertEquals(0, alertRepository.count());
+    }
+
+    @Test
+    void shouldIgnoreMaintenanceCollarsDuringOfflineMonitoring() {
+        Cow cow = createCow("VACA-OFF-005", "Brisa");
+        Collar collar = createCollar(
+                "COLLAR-OFF-005",
+                cow,
+                LocalDateTime.now().minusMinutes(40),
+                DeviceSignalStatus.MEDIA,
+                true,
+                CollarStatus.MANTENIMIENTO
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(DeviceSignalStatus.MEDIA, updatedCollar.getSignalStatus());
+        assertEquals(0, alertRepository.count());
+    }
+
     private Cow createCow(String token, String name) {
         Cow cow = new Cow();
         cow.setToken(token);
@@ -136,10 +174,19 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
                                 LocalDateTime lastSeenAt,
                                 DeviceSignalStatus signalStatus,
                                 boolean enabled) {
+        return createCollar(token, cow, lastSeenAt, signalStatus, enabled, CollarStatus.ACTIVO);
+    }
+
+    private Collar createCollar(String token,
+                                Cow cow,
+                                LocalDateTime lastSeenAt,
+                                DeviceSignalStatus signalStatus,
+                                boolean enabled,
+                                CollarStatus status) {
         Collar collar = new Collar();
         collar.setToken(token);
         collar.setCow(cow);
-        collar.setStatus(CollarStatus.ACTIVO);
+        collar.setStatus(status);
         collar.setBatteryLevel(80);
         collar.setLastSeenAt(lastSeenAt);
         collar.setSignalStatus(signalStatus);

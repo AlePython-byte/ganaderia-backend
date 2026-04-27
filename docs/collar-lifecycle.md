@@ -86,7 +86,7 @@ Un collar solo puede procesar ubicaciones si se cumplen simultáneamente estas c
 Notas:
 
 - esta es la definición oficial del lifecycle;
-- la validación completa de `enabled == true` en `/api/device/locations` queda recomendada para el siguiente bloque de código.
+- esta regla ya debe considerarse implementada en el flujo de `/api/device/locations`.
 
 ## Regla oficial para monitoreo offline
 
@@ -99,7 +99,7 @@ El monitoreo offline solo debe evaluar collares que cumplan simultáneamente est
 Notas:
 
 - `signalStatus` es un resultado o indicador de conectividad, no el criterio administrativo primario;
-- evitar marcar como offline collares `INACTIVO` o `MANTENIMIENTO` queda recomendado para el siguiente bloque de código.
+- esta regla ya debe considerarse implementada para el monitoreo offline.
 
 ## Casos de referencia
 
@@ -122,7 +122,7 @@ Caso esperado:
 Importante:
 
 - este comportamiento debe considerarse oficial;
-- reforzarlo en código queda recomendado para el siguiente bloque.
+- esta restricción ya debe considerarse implementada en código.
 
 ### C. Collar `INACTIVO`
 
@@ -179,11 +179,16 @@ Estas observaciones no cambian la definición oficial anterior. Solo documentan 
 
 ## Cambios de código recomendados
 
-Recomendado para el siguiente bloque:
+Implementado en este bloque:
 
-- agregar validación de `enabled == true` en el flujo de `/api/device/locations`;
-- evitar que el offline monitoring marque como offline collares `INACTIVO` o `MANTENIMIENTO`;
-- agregar tests de integración que fijen estas reglas de lifecycle y eviten regresiones.
+- validación de `enabled == true` en el flujo de `/api/device/locations`;
+- exclusión de collares `INACTIVO` y `MANTENIMIENTO` del offline monitoring;
+- tests de integración para fijar estas reglas de lifecycle.
+
+Recomendado para siguientes bloques:
+
+- revisar si reportes y métricas derivadas de conectividad deben filtrar también por `status == ACTIVO`;
+- seguir ampliando cobertura de integración alrededor de transiciones de lifecycle y recuperación de conectividad.
 
 ## Resumen operativo
 

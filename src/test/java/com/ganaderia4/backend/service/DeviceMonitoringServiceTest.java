@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.model.Collar;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.repository.CollarRepository;
@@ -36,7 +37,7 @@ class DeviceMonitoringServiceTest {
         Collar collarToMark = collar(DeviceSignalStatus.MEDIA);
         Collar alreadyOffline = collar(DeviceSignalStatus.SIN_SENAL);
 
-        when(collarRepository.findByEnabledTrueAndLastSeenAtBefore(any(LocalDateTime.class)))
+        when(collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(org.mockito.ArgumentMatchers.eq(CollarStatus.ACTIVO), any(LocalDateTime.class)))
                 .thenReturn(List.of(collarToMark, alreadyOffline));
 
         service.monitorOfflineCollars();
@@ -63,7 +64,7 @@ class DeviceMonitoringServiceTest {
                 new DomainMetricsService(new SimpleMeterRegistry())
         );
 
-        when(collarRepository.findByEnabledTrueAndLastSeenAtBefore(any(LocalDateTime.class)))
+        when(collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(org.mockito.ArgumentMatchers.eq(CollarStatus.ACTIVO), any(LocalDateTime.class)))
                 .thenThrow(new IllegalStateException("database unavailable"));
 
         assertThrows(IllegalStateException.class, service::monitorOfflineCollars);

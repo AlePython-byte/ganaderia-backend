@@ -27,7 +27,7 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
 
     List<Collar> findByCowIdIn(Collection<Long> cowIds);
 
-    List<Collar> findByEnabledTrueAndLastSeenAtBefore(LocalDateTime threshold);
+    List<Collar> findByEnabledTrueAndStatusAndLastSeenAtBefore(CollarStatus status, LocalDateTime threshold);
 
     List<Collar> findByEnabledTrueAndSignalStatus(DeviceSignalStatus signalStatus);
 

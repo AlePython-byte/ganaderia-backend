@@ -49,7 +49,8 @@ class LocationValidationChainTest {
                 new CoordinateValidationHandler(),
                 new CollarExistsValidationHandler(collarRepository),
                 new CollarAssignedValidationHandler(),
-                new CollarActiveValidationHandler()
+                new CollarActiveValidationHandler(),
+                new CollarEnabledValidationHandler()
         ));
     }
 
@@ -140,6 +141,24 @@ class LocationValidationChainTest {
     @Test
     void shouldFailWhenCollarIsNotActive() {
         collar.setStatus(CollarStatus.INACTIVO);
+
+        LocationCommand command = new LocationCommand(
+                "COL-001",
+                1.0,
+                1.0,
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        when(collarRepository.findByToken("COL-001")).thenReturn(Optional.of(collar));
+
+        LocationValidationContext context = new LocationValidationContext(command);
+
+        assertThrows(BadRequestException.class, () -> locationValidationChain.validate(context));
+    }
+
+    @Test
+    void shouldFailWhenCollarIsDisabled() {
+        collar.setEnabled(false);
 
         LocationCommand command = new LocationCommand(
                 "COL-001",

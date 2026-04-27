@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.model.Collar;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
@@ -45,7 +46,8 @@ public class DeviceMonitoringService {
 
         try {
             LocalDateTime threshold = LocalDateTime.now().minusMinutes(offlineThresholdMinutes);
-            List<Collar> offlineCollars = collarRepository.findByEnabledTrueAndLastSeenAtBefore(threshold);
+            List<Collar> offlineCollars =
+                    collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(CollarStatus.ACTIVO, threshold);
 
             for (Collar collar : offlineCollars) {
                 processed++;
