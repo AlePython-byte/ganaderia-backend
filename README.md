@@ -140,6 +140,22 @@ Los reportes del análisis quedan publicados como artifacts del workflow para re
 
 ---
 
+## Escaneo de contenedores
+
+Trivy escanea la imagen Docker del backend para revisar vulnerabilidades en la imagen base, paquetes del sistema y componentes presentes en la imagen final.
+
+El workflow corre manualmente o semanalmente en GitHub Actions y construye una imagen temporal solo para análisis.
+
+La imagen no se publica en ningún registry como parte de este proceso.
+
+El workflow falla inicialmente solo por vulnerabilidades `CRITICAL`.
+
+Las vulnerabilidades `HIGH` se reportan para revisión, pero todavía no bloquean el flujo.
+
+Los reportes del escaneo quedan publicados como artifacts del workflow.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
