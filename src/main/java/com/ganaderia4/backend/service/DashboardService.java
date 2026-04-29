@@ -7,6 +7,7 @@ import com.ganaderia4.backend.repository.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,6 +21,7 @@ public class DashboardService {
     private final LocationRepository locationRepository;
     private final AlertService alertService;
     private final CowIncidentReportService cowIncidentReportService;
+    private final Clock clock;
 
     @Value("${app.device-monitor.offline-threshold-minutes:15}")
     private long offlineThresholdMinutes;
@@ -29,13 +31,15 @@ public class DashboardService {
                             CollarRepository collarRepository,
                             LocationRepository locationRepository,
                             AlertService alertService,
-                            CowIncidentReportService cowIncidentReportService) {
+                            CowIncidentReportService cowIncidentReportService,
+                            Clock clock) {
         this.alertRepository = alertRepository;
         this.cowRepository = cowRepository;
         this.collarRepository = collarRepository;
         this.locationRepository = locationRepository;
         this.alertService = alertService;
         this.cowIncidentReportService = cowIncidentReportService;
+        this.clock = clock;
     }
 
     public DashboardSummaryDTO getSummary() {
@@ -66,7 +70,7 @@ public class DashboardService {
     }
 
     public PendingAlertAgingDTO getPendingAlertAging() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         return new PendingAlertAgingDTO(
                 alertRepository.countByStatus(AlertStatus.PENDIENTE),
@@ -77,7 +81,7 @@ public class DashboardService {
     }
 
     public TelemetryFreshnessDTO getTelemetryFreshness() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime threshold = now.minusMinutes(offlineThresholdMinutes);
 
         return new TelemetryFreshnessDTO(

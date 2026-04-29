@@ -98,6 +98,7 @@ Prioridad posterior:
 6. Eliminar gradualmente el uso de `LocalDateTime` en puntos donde represente eventos absolutos.
 
 Como avance incremental, `DeviceMonitoringService` ya usa `Clock` inyectable para que el monitoreo offline sea determinístico y no dependa del reloj real del servidor.
+`DashboardService` ya usa `Clock` inyectable para que los cálculos de aging y freshness sean determinísticos.
 
 ## 10. Criterio actual de compatibilidad
 

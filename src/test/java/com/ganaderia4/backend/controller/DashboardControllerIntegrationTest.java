@@ -21,12 +21,19 @@ import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +42,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(DashboardControllerIntegrationTest.FixedClockConfig.class)
 class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
+
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-04-28T18:00:00Z"), ZoneId.of("UTC"));
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.now(FIXED_CLOCK);
 
     @Autowired
     private MockMvc mockMvc;
@@ -77,14 +89,14 @@ class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
                 AlertType.EXIT_GEOFENCE,
                 AlertStatus.PENDIENTE,
                 "La vaca sigue fuera de la geocerca",
-                LocalDateTime.now().minusHours(2)
+                FIXED_NOW.minusHours(2)
         );
         createAlert(
                 lowerPriorityCow,
                 AlertType.COLLAR_OFFLINE,
                 AlertStatus.PENDIENTE,
                 "Collar sin reporte reciente",
-                LocalDateTime.now().minusMinutes(5)
+                FIXED_NOW.minusMinutes(5)
         );
 
         String token = loginAndGetToken("operador@test.com", "12345678");
@@ -110,14 +122,14 @@ class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
                 AlertType.EXIT_GEOFENCE,
                 AlertStatus.PENDIENTE,
                 "La vaca sigue fuera de la geocerca",
-                LocalDateTime.now().minusHours(2)
+                FIXED_NOW.minusHours(2)
         );
         createAlert(
                 lowerPriorityCow,
                 AlertType.COLLAR_OFFLINE,
                 AlertStatus.PENDIENTE,
                 "Collar sin reporte reciente",
-                LocalDateTime.now().minusMinutes(5)
+                FIXED_NOW.minusMinutes(5)
         );
 
         String token = loginAndGetToken("operador@test.com", "12345678");
@@ -136,10 +148,10 @@ class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
         Cow mediumCow = createCow("VACA-031", "Bruma", CowStatus.DENTRO);
         Cow oldCow = createCow("VACA-032", "Nina", CowStatus.DENTRO);
 
-        createAlert(recentCow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "Reciente", LocalDateTime.now().minusMinutes(10));
-        createAlert(mediumCow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "Media", LocalDateTime.now().minusMinutes(30));
-        createAlert(oldCow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "Antigua", LocalDateTime.now().minusHours(2));
-        createAlert(oldCow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "Muy antigua", LocalDateTime.now().minusHours(7));
+        createAlert(recentCow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "Reciente", FIXED_NOW.minusMinutes(10));
+        createAlert(mediumCow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "Media", FIXED_NOW.minusMinutes(30));
+        createAlert(oldCow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "Antigua", FIXED_NOW.minusHours(2));
+        createAlert(oldCow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "Muy antigua", FIXED_NOW.minusHours(7));
 
         String token = loginAndGetToken("operador@test.com", "12345678");
 
@@ -159,9 +171,9 @@ class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
         Cow veryStaleCow = createCow("VACA-042", "Duna", CowStatus.DENTRO);
         Cow neverReportedCow = createCow("VACA-043", "Aura", CowStatus.DENTRO);
 
-        createCollar("COL-040", withinThresholdCow, LocalDateTime.now().minusMinutes(5));
-        createCollar("COL-041", staleCow, LocalDateTime.now().minusMinutes(20));
-        createCollar("COL-042", veryStaleCow, LocalDateTime.now().minusHours(7));
+        createCollar("COL-040", withinThresholdCow, FIXED_NOW.minusMinutes(5));
+        createCollar("COL-041", staleCow, FIXED_NOW.minusMinutes(20));
+        createCollar("COL-042", veryStaleCow, FIXED_NOW.minusHours(7));
         createCollar("COL-043", neverReportedCow, null);
 
         String token = loginAndGetToken("operador@test.com", "12345678");
@@ -183,12 +195,12 @@ class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
         Cow topCow = createCow("VACA-050", "Niebla", CowStatus.DENTRO);
         Cow secondCow = createCow("VACA-051", "Selva", CowStatus.DENTRO);
 
-        createAlert(topCow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "A1", LocalDateTime.now().minusHours(3));
-        createAlert(topCow, AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, "A2", LocalDateTime.now().minusHours(2));
-        createAlert(topCow, AlertType.EXIT_GEOFENCE, AlertStatus.DESCARTADA, "A3", LocalDateTime.now().minusHours(1));
+        createAlert(topCow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "A1", FIXED_NOW.minusHours(3));
+        createAlert(topCow, AlertType.COLLAR_OFFLINE, AlertStatus.RESUELTA, "A2", FIXED_NOW.minusHours(2));
+        createAlert(topCow, AlertType.EXIT_GEOFENCE, AlertStatus.DESCARTADA, "A3", FIXED_NOW.minusHours(1));
 
-        createAlert(secondCow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "B1", LocalDateTime.now().minusHours(4));
-        createAlert(secondCow, AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, "B2", LocalDateTime.now().minusMinutes(30));
+        createAlert(secondCow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "B1", FIXED_NOW.minusHours(4));
+        createAlert(secondCow, AlertType.EXIT_GEOFENCE, AlertStatus.RESUELTA, "B2", FIXED_NOW.minusMinutes(30));
 
         String token = loginAndGetToken("operador@test.com", "12345678");
 
@@ -265,5 +277,15 @@ class DashboardControllerIntegrationTest extends AbstractIntegrationTest {
         String token = json.get("token").asText();
         assertTrue(token != null && !token.isBlank());
         return token;
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return FIXED_CLOCK;
+        }
     }
 }

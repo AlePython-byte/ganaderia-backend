@@ -13,7 +13,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,6 +27,10 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardServiceTest {
+
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-04-28T18:00:00Z"), ZoneId.of("UTC"));
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.now(FIXED_CLOCK);
 
     @Mock
     private AlertRepository alertRepository;
@@ -43,8 +50,20 @@ class DashboardServiceTest {
     @Mock
     private CowIncidentReportService cowIncidentReportService;
 
-    @InjectMocks
     private DashboardService dashboardService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        dashboardService = new DashboardService(
+                alertRepository,
+                cowRepository,
+                collarRepository,
+                locationRepository,
+                alertService,
+                cowIncidentReportService,
+                FIXED_CLOCK
+        );
+    }
 
     @Test
     void shouldReturnCriticalAlertsFromPrioritizedQueueWithCompatibilityLimit() {
@@ -89,6 +108,18 @@ class DashboardServiceTest {
         assertEquals(9L, response.getOlderThan15Minutes());
         assertEquals(4L, response.getOlderThan1Hour());
         assertEquals(1L, response.getOlderThan6Hours());
+        verify(alertRepository).countByStatusAndCreatedAtBefore(
+                com.ganaderia4.backend.model.AlertStatus.PENDIENTE,
+                FIXED_NOW.minusMinutes(15)
+        );
+        verify(alertRepository).countByStatusAndCreatedAtBefore(
+                com.ganaderia4.backend.model.AlertStatus.PENDIENTE,
+                FIXED_NOW.minusHours(1)
+        );
+        verify(alertRepository).countByStatusAndCreatedAtBefore(
+                com.ganaderia4.backend.model.AlertStatus.PENDIENTE,
+                FIXED_NOW.minusHours(6)
+        );
     }
 
     @Test
@@ -109,13 +140,17 @@ class DashboardServiceTest {
         assertEquals(4L, response.getLastSeenOlderThan1Hour());
         assertEquals(1L, response.getLastSeenOlderThan6Hours());
         assertEquals(15L, response.getOperationalThresholdMinutes());
+        verify(collarRepository).countByEnabledTrueAndLastSeenAtGreaterThanEqual(FIXED_NOW.minusMinutes(15));
+        verify(collarRepository).countByEnabledTrueAndLastSeenAtBefore(FIXED_NOW.minusMinutes(15));
+        verify(collarRepository).countByEnabledTrueAndLastSeenAtBefore(FIXED_NOW.minusHours(1));
+        verify(collarRepository).countByEnabledTrueAndLastSeenAtBefore(FIXED_NOW.minusHours(6));
     }
 
     @Test
     void shouldExposeTopProblematicCowsFromIncidentReportService() {
         List<CowIncidentReportDTO> topProblematicCows = List.of(
-                new CowIncidentReportDTO(2L, "VACA-002", "Estrella", 7, 3, 3, 1, LocalDateTime.now()),
-                new CowIncidentReportDTO(1L, "VACA-001", "Luna", 5, 2, 2, 1, LocalDateTime.now().minusHours(1))
+                new CowIncidentReportDTO(2L, "VACA-002", "Estrella", 7, 3, 3, 1, FIXED_NOW),
+                new CowIncidentReportDTO(1L, "VACA-001", "Luna", 5, 2, 2, 1, FIXED_NOW.minusHours(1))
         );
 
         when(cowIncidentReportService.getCowsMostIncidentsReport(null, 2)).thenReturn(topProblematicCows);
@@ -133,7 +168,7 @@ class DashboardServiceTest {
                 id,
                 "EXIT_GEOFENCE",
                 "Alerta " + id,
-                LocalDateTime.now(),
+                FIXED_NOW,
                 "PENDIENTE",
                 null,
                 1L,
