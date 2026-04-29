@@ -176,6 +176,12 @@ La política completa está documentada en [docs/time-policy.md](/C:/Users/ALEJA
 
 ---
 
+## Resumen de Fase 1
+
+El cierre formal de la Fase 1 de hardening, incluyendo seguridad, observabilidad, lifecycle y política temporal, está resumido en [docs/phase-1-hardening-summary.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/phase-1-hardening-summary.md:1).
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
