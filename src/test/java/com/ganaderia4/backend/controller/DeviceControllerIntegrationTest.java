@@ -2,6 +2,9 @@ package com.ganaderia4.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.ganaderia4.backend.dto.DeviceLocationRequestDTO;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
@@ -29,6 +32,8 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
     private static final String DEVICE_LOCATION_PATH = "/api/device/locations";
+    private static final ZoneId TEST_ZONE = ZoneId.systemDefault();
 
     @Autowired
     private MockMvc mockMvc;
@@ -72,6 +78,9 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     private DeviceSigningSecretService deviceSigningSecretService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper deviceBodyObjectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @BeforeEach
     void setUp() {
@@ -87,17 +96,10 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-001", "Luna");
         Collar collar = createCollar("COLLAR-DEVICE-001", cow, CollarStatus.ACTIVO, DeviceSignalStatus.SIN_SENAL);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.214, -77.281, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
-        String body = """
-                {
-                  "latitude": 1.214,
-                  "longitude": -77.281,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
-
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.cowToken").value("VACA-DEVICE-001"))
                 .andExpect(jsonPath("$.cowName").value("Luna"))
@@ -118,20 +120,13 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-DISABLED", "Mora");
         Collar collar = createCollar("COLLAR-DEVICE-DISABLED", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA, false);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.218, -77.285, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
-        String body = """
-                {
-                  "latitude": 1.218,
-                  "longitude": -77.285,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
-
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
-                .andExpect(jsonPath("$.message").value("El collar está deshabilitado"))
+                .andExpect(jsonPath("$.message").value("El collar est\u00e1 deshabilitado"))
                 .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
     }
 
@@ -140,20 +135,13 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-INACTIVE", "Sombra");
         Collar collar = createCollar("COLLAR-DEVICE-INACTIVE", cow, CollarStatus.INACTIVO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.219, -77.286, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
-        String body = """
-                {
-                  "latitude": 1.219,
-                  "longitude": -77.286,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
-
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
-                .andExpect(jsonPath("$.message").value("El collar no está activo"))
+                .andExpect(jsonPath("$.message").value("El collar no est\u00e1 activo"))
                 .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
     }
 
@@ -162,34 +150,20 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-MAINT", "Aura");
         Collar collar = createCollar("COLLAR-DEVICE-MAINT", cow, CollarStatus.MANTENIMIENTO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.220, -77.287, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
-        String body = """
-                {
-                  "latitude": 1.220,
-                  "longitude": -77.287,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
-
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
-                .andExpect(jsonPath("$.message").value("El collar no está activo"))
+                .andExpect(jsonPath("$.message").value("El collar no est\u00e1 activo"))
                 .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
     }
 
     @Test
     void shouldRejectRequestWhenDeviceTokenHeaderIsMissing() throws Exception {
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
-
-        String body = """
-                {
-                  "latitude": 1.100,
-                  "longitude": -77.100,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.100, -77.100, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
         mockMvc.perform(post(DEVICE_LOCATION_PATH)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -202,20 +176,13 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldRejectRequestWhenDeviceSignatureIsMissing() throws Exception {
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
-
-        String body = """
-                {
-                  "latitude": 1.120,
-                  "longitude": -77.120,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.120, -77.120, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
         mockMvc.perform(post(DEVICE_LOCATION_PATH)
                         .header("X-Device-Token", "COLLAR-DEVICE-001")
-                        .header("X-Device-Timestamp", Instant.now().toString())
-                        .header("X-Device-Nonce", UUID.randomUUID().toString())
+                        .header("X-Device-Timestamp", requestInstant.toString())
+                        .header("X-Device-Nonce", randomNonce())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized())
@@ -226,17 +193,16 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldRejectRequestWhenDeviceTokenDoesNotExist() throws Exception {
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.150, -77.150, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
-        String body = """
-                {
-                  "latitude": 1.150,
-                  "longitude": -77.150,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
-
-        mockMvc.perform(signedDeviceLocationRequest("COLLAR-INEXISTENTE", "SECRET-INEXISTENTE", body))
+        mockMvc.perform(signedDeviceLocationRequest(
+                        "COLLAR-INEXISTENTE",
+                        "SECRET-INEXISTENTE",
+                        body,
+                        requestInstant,
+                        randomNonce()
+                ))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message").value("Dispositivo no autorizado"))
@@ -248,17 +214,10 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-002", "Canela");
         Collar collar = createCollar("COLLAR-DEVICE-002", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().plusMinutes(10);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.300, -77.300, bodyTimestampFrom(requestInstant).plusMinutes(10));
 
-        String body = """
-                {
-                  "latitude": 1.300,
-                  "longitude": -77.300,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
-
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("El timestamp reportado no puede estar demasiado en el futuro"))
@@ -267,22 +226,15 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldRejectRequestWhenSignatureTimestampIsExpired() throws Exception {
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
-
-        String body = """
-                {
-                  "latitude": 1.330,
-                  "longitude": -77.330,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.330, -77.330, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
         mockMvc.perform(signedDeviceLocationRequest(
                         "COLLAR-DEVICE-EXPIRED",
                         "SECRET-EXPIRED",
                         body,
-                        Instant.now().minusSeconds(301),
-                        UUID.randomUUID().toString()
+                        requestInstant.minusSeconds(301),
+                        randomNonce()
                 ))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
@@ -295,20 +247,13 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-BAD-SIGNATURE", "Bad signature");
         Collar collar = createCollar("COLLAR-DEVICE-BAD-SIGNATURE", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1);
-
-        String body = """
-                {
-                  "latitude": 1.360,
-                  "longitude": -77.360,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp.withNano(0));
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.360, -77.360, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
         mockMvc.perform(post(DEVICE_LOCATION_PATH)
                         .header("X-Device-Token", collar.getToken())
-                        .header("X-Device-Timestamp", Instant.now().toString())
-                        .header("X-Device-Nonce", UUID.randomUUID().toString())
+                        .header("X-Device-Timestamp", requestInstant.toString())
+                        .header("X-Device-Nonce", randomNonce())
                         .header("X-Device-Signature", "invalid-signature")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -323,17 +268,9 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-REPLAY", "Replay");
         Collar collar = createCollar("COLLAR-DEVICE-REPLAY", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1).withNano(0);
-        String body = """
-                {
-                  "latitude": 1.410,
-                  "longitude": -77.410,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp);
-
-        Instant signatureTimestamp = Instant.now();
-        String nonce = UUID.randomUUID().toString();
+        Instant signatureTimestamp = currentRequestInstant();
+        String body = deviceLocationBody(1.410, -77.410, bodyTimestampFrom(signatureTimestamp).minusMinutes(1));
+        String nonce = randomNonce();
 
         mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, signatureTimestamp, nonce))
                 .andExpect(status().isCreated());
@@ -353,21 +290,19 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-003", "Estrella");
         Collar collar = createCollar("COLLAR-DEVICE-003", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(2).withNano(0);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.450, -77.450, bodyTimestampFrom(requestInstant).minusMinutes(2));
 
-        String body = """
-                {
-                  "latitude": 1.450,
-                  "longitude": -77.450,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp);
-
-        MvcResult firstResult = mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        MvcResult firstResult = mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isCreated())
                 .andReturn();
 
-        MvcResult secondResult = mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        MvcResult secondResult = mockMvc.perform(signedDeviceLocationRequest(
+                        collar.getToken(),
+                        body,
+                        requestInstant.plusSeconds(1),
+                        randomNonce()
+                ))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -386,22 +321,16 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Cow cow = createCow("VACA-DEVICE-RATE-LIMIT", "Rate limit");
         Collar collar = createCollar("COLLAR-DEVICE-RATE-LIMIT", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
 
-        LocalDateTime timestamp = LocalDateTime.now().minusMinutes(1).withNano(0);
-        String body = """
-                {
-                  "latitude": 1.510,
-                  "longitude": -77.510,
-                  "timestamp": "%s"
-                }
-                """.formatted(timestamp);
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.510, -77.510, bodyTimestampFrom(requestInstant).minusMinutes(1));
 
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant.plusSeconds(1), randomNonce()))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body))
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant.plusSeconds(2), randomNonce()))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
@@ -410,13 +339,13 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token, String body) throws Exception {
-        return signedDeviceLocationRequest(token, body, Instant.now(), UUID.randomUUID().toString());
+        return signedDeviceLocationRequest(token, body, currentRequestInstant(), randomNonce());
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token,
                                                                       String secret,
                                                                       String body) throws Exception {
-        return signedDeviceLocationRequest(token, secret, body, Instant.now(), UUID.randomUUID().toString());
+        return signedDeviceLocationRequest(token, secret, body, currentRequestInstant(), randomNonce());
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token,
@@ -432,7 +361,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
                                                                       String body,
                                                                       Instant timestamp,
                                                                       String nonce) throws Exception {
-        String timestampHeader = timestamp.toString();
+        String timestampHeader = timestamp.truncatedTo(ChronoUnit.SECONDS).toString();
         String signature = sign(secret, timestampHeader, nonce, body);
 
         return post(DEVICE_LOCATION_PATH)
@@ -454,6 +383,28 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return Base64.getEncoder().encodeToString(mac.doFinal(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private String deviceLocationBody(double latitude,
+                                      double longitude,
+                                      LocalDateTime timestamp) throws Exception {
+        DeviceLocationRequestDTO request = new DeviceLocationRequestDTO();
+        request.setLatitude(latitude);
+        request.setLongitude(longitude);
+        request.setTimestamp(timestamp.truncatedTo(ChronoUnit.SECONDS));
+        return deviceBodyObjectMapper.writeValueAsString(request);
+    }
+
+    private Instant currentRequestInstant() {
+        return Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    }
+
+    private LocalDateTime bodyTimestampFrom(Instant instant) {
+        return LocalDateTime.ofInstant(instant, TEST_ZONE);
+    }
+
+    private String randomNonce() {
+        return UUID.randomUUID().toString();
     }
 
     private Cow createCow(String token, String name) {
@@ -484,7 +435,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         collar.setEnabled(enabled);
         collar.setBatteryLevel(85);
         collar.setSignalStatus(signalStatus);
-        collar.setLastSeenAt(LocalDateTime.now().minusHours(2));
+        collar.setLastSeenAt(LocalDateTime.now(TEST_ZONE).minusHours(2).truncatedTo(ChronoUnit.SECONDS));
         return collarRepository.save(collar);
     }
 }
