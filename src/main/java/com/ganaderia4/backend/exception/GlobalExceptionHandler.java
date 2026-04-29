@@ -2,6 +2,7 @@ package com.ganaderia4.backend.exception;
 
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponseDTO> handleResourceNotFoundException(ResourceNotFoundException ex,
                                                                             HttpServletRequest request) {
+        logHandled(HttpStatus.NOT_FOUND, "not_found", request);
         return buildErrorResponse(
                 HttpStatus.NOT_FOUND,
                 ApiErrorCode.RESOURCE_NOT_FOUND,
@@ -33,6 +35,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorResponseDTO> handleBadRequestException(BadRequestException ex,
                                                                       HttpServletRequest request) {
+        logHandled(HttpStatus.BAD_REQUEST, "bad_request", request);
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.BAD_REQUEST,
@@ -44,6 +47,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponseDTO> handleConflictException(ConflictException ex,
                                                                     HttpServletRequest request) {
+        logHandled(HttpStatus.CONFLICT, "conflict", request);
         return buildErrorResponse(
                 HttpStatus.CONFLICT,
                 ApiErrorCode.CONFLICT,
@@ -77,6 +81,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ErrorResponseDTO> handleTooManyRequestsException(TooManyRequestsException ex,
                                                                            HttpServletRequest request) {
+        logHandled(HttpStatus.TOO_MANY_REQUESTS, "rate_limited", request);
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
                 .body(buildError(
@@ -94,6 +99,7 @@ public class GlobalExceptionHandler {
                 ? ex.getBindingResult().getFieldError().getDefaultMessage()
                 : "Error de validación";
 
+        logHandled(HttpStatus.BAD_REQUEST, "validation", request);
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.VALIDATION_ERROR,
@@ -105,7 +111,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleGenericException(Exception ex,
                                                                    HttpServletRequest request) {
-        log.error("Error interno no controlado en {} {}", request.getMethod(), request.getRequestURI(), ex);
+        log.error(
+                "event=http_error_unhandled requestId={} category=internal_error status={} method={} path={} queryPresent={}",
+                OperationalLogSanitizer.requestId(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                method(request),
+                path(request),
+                queryPresent(request),
+                ex
+        );
 
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -140,11 +154,36 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleMethodNotSupportedException(
             org.springframework.web.HttpRequestMethodNotSupportedException ex,
             HttpServletRequest request) {
+        logHandled(HttpStatus.METHOD_NOT_ALLOWED, "method_not_allowed", request);
         return buildErrorResponse(
                 HttpStatus.METHOD_NOT_ALLOWED,
                 ApiErrorCode.BAD_REQUEST,
                 "Método HTTP no permitido para este endpoint",
                 request.getRequestURI()
         );
+    }
+
+    private void logHandled(HttpStatus status, String category, HttpServletRequest request) {
+        log.warn(
+                "event=http_error_handled requestId={} category={} status={} method={} path={} queryPresent={}",
+                OperationalLogSanitizer.requestId(),
+                OperationalLogSanitizer.safe(category),
+                status.value(),
+                method(request),
+                path(request),
+                queryPresent(request)
+        );
+    }
+
+    private String method(HttpServletRequest request) {
+        return request == null ? "-" : OperationalLogSanitizer.safe(request.getMethod());
+    }
+
+    private String path(HttpServletRequest request) {
+        return request == null ? "-" : OperationalLogSanitizer.safe(request.getRequestURI());
+    }
+
+    private boolean queryPresent(HttpServletRequest request) {
+        return request != null && request.getQueryString() != null && !request.getQueryString().isBlank();
     }
 }
