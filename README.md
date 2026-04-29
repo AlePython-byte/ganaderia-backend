@@ -164,6 +164,18 @@ Ese documento también deja explícitas las reglas objetivo para procesamiento d
 
 ---
 
+## Política temporal UTC
+
+El backend adopta UTC como política temporal interna.
+
+Por compatibilidad, varios campos siguen usando `LocalDateTime`.
+
+En esta fase esos valores se interpretan como UTC y el contrato JSON público no cambia.
+
+La política completa está documentada en [docs/time-policy.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/time-policy.md:1).
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
