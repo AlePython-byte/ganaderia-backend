@@ -86,7 +86,7 @@ public class AlertPriorityScorer {
 
         Set<Long> offlineCowIds = alerts.stream()
                 .filter(this::isOperationallyScorable)
-                .filter(alert -> alert.getType() == AlertType.COLLAR_OFFLINE)
+                .filter(alert -> alert.getType() == AlertType.COLLAR_OFFLINE || alert.getType() == AlertType.LOW_BATTERY)
                 .map(alert -> alert.getCow().getId())
                 .filter(id -> id != null)
                 .collect(Collectors.toSet());
@@ -131,6 +131,10 @@ public class AlertPriorityScorer {
 
         if (type == AlertType.COLLAR_OFFLINE) {
             return 40;
+        }
+
+        if (type == AlertType.LOW_BATTERY) {
+            return 35;
         }
 
         return 20;
@@ -182,6 +186,10 @@ public class AlertPriorityScorer {
             return offlineDurationScore(collar, evaluatedAt);
         }
 
+        if (alert.getType() == AlertType.LOW_BATTERY) {
+            return lowBatteryScore(collar);
+        }
+
         return 0;
     }
 
@@ -210,6 +218,23 @@ public class AlertPriorityScorer {
 
         if (minutesWithoutReport >= offlineThresholdMinutes) {
             return 5;
+        }
+
+        return 0;
+    }
+
+    private int lowBatteryScore(Collar collar) {
+        if (collar == null || collar.getBatteryLevel() == null) {
+            return 0;
+        }
+
+        int batteryLevel = collar.getBatteryLevel();
+        if (batteryLevel <= AlertService.CRITICAL_BATTERY_ALERT_THRESHOLD) {
+            return 20;
+        }
+
+        if (batteryLevel <= AlertService.LOW_BATTERY_ALERT_THRESHOLD) {
+            return 10;
         }
 
         return 0;

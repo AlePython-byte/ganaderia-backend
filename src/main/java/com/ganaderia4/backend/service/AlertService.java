@@ -36,6 +36,9 @@ import java.util.stream.Collectors;
 @Service
 public class AlertService {
 
+    static final int LOW_BATTERY_ALERT_THRESHOLD = 20;
+    static final int CRITICAL_BATTERY_ALERT_THRESHOLD = 10;
+    static final int LOW_BATTERY_RECOVERY_THRESHOLD = 25;
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt", "status", "type", "id");
     private static final int DEFAULT_PRIORITY_QUEUE_LIMIT = 20;
     private static final int MIN_PRIORITY_QUEUE_CANDIDATES = 50;
@@ -131,6 +134,47 @@ public class AlertService {
         domainMetricsService.incrementAlertCreated(savedAlert.getType());
         sendCriticalAlertNotification(savedAlert);
 
+        return savedAlert;
+    }
+
+    @Transactional
+    public Alert createLowBatteryAlert(Collar collar) {
+        if (!isLowBatteryAlertEligible(collar)) {
+            return null;
+        }
+
+        Integer batteryLevel = collar.getBatteryLevel();
+        if (batteryLevel == null || batteryLevel > LOW_BATTERY_ALERT_THRESHOLD) {
+            return null;
+        }
+
+        Cow cow = collar.getCow();
+        if (alertRepository.findByCowAndTypeAndStatus(cow, AlertType.LOW_BATTERY, AlertStatus.PENDIENTE).isPresent()) {
+            return null;
+        }
+
+        Alert alert = new Alert();
+        alert.setType(AlertType.LOW_BATTERY);
+        alert.setCow(cow);
+        alert.setLocation(null);
+        alert.setCreatedAt(LocalDateTime.now());
+        alert.setStatus(AlertStatus.PENDIENTE);
+        alert.setMessage(buildLowBatteryMessage(collar, batteryLevel));
+        alert.setObservations(buildLowBatteryObservation(batteryLevel));
+
+        Alert savedAlert = alertRepository.save(alert);
+
+        auditLogService.log(
+                "CREATE_LOW_BATTERY_ALERT",
+                "ALERT",
+                savedAlert.getId(),
+                "SYSTEM",
+                "SYSTEM",
+                "Alerta automática por batería baja del collar " + collar.getToken(),
+                true
+        );
+
+        domainMetricsService.incrementAlertCreated(savedAlert.getType());
         return savedAlert;
     }
 
@@ -376,6 +420,50 @@ public class AlertService {
                 .orElse(null);
     }
 
+    @Transactional
+    public Alert resolvePendingLowBatteryAlert(Collar collar, LocalDateTime recoveredAt) {
+        if (!isLowBatteryAlertEligible(collar)) {
+            return null;
+        }
+
+        Integer batteryLevel = collar.getBatteryLevel();
+        if (batteryLevel == null || batteryLevel <= LOW_BATTERY_RECOVERY_THRESHOLD) {
+            return null;
+        }
+
+        Cow cow = collar.getCow();
+
+        return alertRepository.findByCowAndTypeAndStatus(cow, AlertType.LOW_BATTERY, AlertStatus.PENDIENTE)
+                .map(alert -> {
+                    AlertStatus previousStatus = alert.getStatus();
+
+                    alert.setStatus(AlertStatus.RESUELTA);
+
+                    String automaticObservation =
+                            "Alerta resuelta automáticamente: el collar " + collar.getToken()
+                                    + " recuperó batería saludable (" + batteryLevel + "%) el " + recoveredAt;
+
+                    alert.setObservations(mergeObservations(alert.getObservations(), automaticObservation));
+
+                    Alert updatedAlert = alertRepository.save(alert);
+
+                    auditLogService.log(
+                            "AUTO_RESOLVE_LOW_BATTERY_ALERT",
+                            "ALERT",
+                            updatedAlert.getId(),
+                            "SYSTEM",
+                            "SYSTEM",
+                            "Resolución automática de alerta de batería baja del collar " + collar.getToken(),
+                            true
+                    );
+
+                    recordStatusTransition(previousStatus, updatedAlert);
+
+                    return updatedAlert;
+                })
+                .orElse(null);
+    }
+
     private void sendCriticalAlertNotification(Alert alert) {
         if (alert == null || alert.getType() == null || alert.getCow() == null) {
             return;
@@ -439,6 +527,29 @@ public class AlertService {
         }
 
         return currentObservations + " | " + newObservation;
+    }
+
+    private boolean isLowBatteryAlertEligible(Collar collar) {
+        return collar != null
+                && collar.getCow() != null
+                && Boolean.TRUE.equals(collar.getEnabled())
+                && collar.getStatus() == com.ganaderia4.backend.model.CollarStatus.ACTIVO;
+    }
+
+    private String buildLowBatteryMessage(Collar collar, int batteryLevel) {
+        if (batteryLevel <= CRITICAL_BATTERY_ALERT_THRESHOLD) {
+            return "El collar " + collar.getToken() + " reporta batería crítica (" + batteryLevel + "%).";
+        }
+
+        return "El collar " + collar.getToken() + " reporta batería baja (" + batteryLevel + "%).";
+    }
+
+    private String buildLowBatteryObservation(int batteryLevel) {
+        if (batteryLevel <= CRITICAL_BATTERY_ALERT_THRESHOLD) {
+            return "Alerta operativa generada automáticamente por batería crítica del dispositivo";
+        }
+
+        return "Alerta operativa generada automáticamente por batería baja del dispositivo";
     }
 
     private Specification<Alert> buildSpecification(AlertStatus status, AlertType type) {

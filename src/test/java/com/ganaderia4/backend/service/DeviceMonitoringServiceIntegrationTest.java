@@ -278,6 +278,61 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         assertFalse(alertRepository.findAll().isEmpty());
     }
 
+    @Test
+    void shouldCreateLowBatteryAlertForActiveEnabledCollar() {
+        Cow cow = createCow("VACA-BAT-001", "Iris");
+        createCollar(
+                "COLLAR-BAT-001",
+                cow,
+                FIXED_NOW.minusMinutes(5),
+                DeviceSignalStatus.FUERTE,
+                true,
+                CollarStatus.ACTIVO,
+                20
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        List<Alert> alerts = alertRepository.findAll();
+        assertEquals(1, alerts.size());
+        Alert alert = alerts.get(0);
+        assertEquals(AlertType.LOW_BATTERY, alert.getType());
+        assertEquals(AlertStatus.PENDIENTE, alert.getStatus());
+        assertTrue(alert.getMessage().contains("20%"));
+    }
+
+    @Test
+    void shouldResolvePendingLowBatteryAlertWhenBatteryRecovers() {
+        Cow cow = createCow("VACA-BAT-002", "Mora");
+        Collar collar = createCollar(
+                "COLLAR-BAT-002",
+                cow,
+                FIXED_NOW.minusMinutes(5),
+                DeviceSignalStatus.FUERTE,
+                true,
+                CollarStatus.ACTIVO,
+                30
+        );
+
+        Alert existing = new Alert();
+        existing.setCow(cow);
+        existing.setType(AlertType.LOW_BATTERY);
+        existing.setStatus(AlertStatus.PENDIENTE);
+        existing.setMessage("Batería baja");
+        existing.setObservations("previa");
+        existing.setCreatedAt(FIXED_NOW.minusMinutes(20));
+        alertRepository.save(existing);
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Alert resolvedAlert = alertRepository.findAll().get(0);
+        assertEquals(AlertStatus.RESUELTA, resolvedAlert.getStatus());
+        assertTrue(resolvedAlert.getObservations().contains("30%"));
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(Integer.valueOf(30), updatedCollar.getBatteryLevel());
+    }
+
     private Cow createCow(String token, String name) {
         Cow cow = new Cow();
         cow.setToken(token);
@@ -292,7 +347,7 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
                                 LocalDateTime lastSeenAt,
                                 DeviceSignalStatus signalStatus,
                                 boolean enabled) {
-        return createCollar(token, cow, lastSeenAt, signalStatus, enabled, CollarStatus.ACTIVO);
+        return createCollar(token, cow, lastSeenAt, signalStatus, enabled, CollarStatus.ACTIVO, 80);
     }
 
     private Collar createCollar(String token,
@@ -301,11 +356,21 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
                                 DeviceSignalStatus signalStatus,
                                 boolean enabled,
                                 CollarStatus status) {
+        return createCollar(token, cow, lastSeenAt, signalStatus, enabled, status, 80);
+    }
+
+    private Collar createCollar(String token,
+                                Cow cow,
+                                LocalDateTime lastSeenAt,
+                                DeviceSignalStatus signalStatus,
+                                boolean enabled,
+                                CollarStatus status,
+                                int batteryLevel) {
         Collar collar = new Collar();
         collar.setToken(token);
         collar.setCow(cow);
         collar.setStatus(status);
-        collar.setBatteryLevel(80);
+        collar.setBatteryLevel(batteryLevel);
         collar.setLastSeenAt(lastSeenAt);
         collar.setSignalStatus(signalStatus);
         collar.setEnabled(enabled);

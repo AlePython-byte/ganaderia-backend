@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +52,8 @@ class DeviceMonitoringServiceTest {
 
         when(collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(eq(CollarStatus.ACTIVO), any(LocalDateTime.class)))
                 .thenReturn(List.of(collarToMark, alreadyOffline));
+        when(collarRepository.findByEnabledTrueAndStatus(CollarStatus.ACTIVO))
+                .thenReturn(List.of(collarToMark, alreadyOffline));
 
         service.monitorOfflineCollars();
 
@@ -60,6 +64,8 @@ class DeviceMonitoringServiceTest {
         assertTrue(logs.contains("processed=2"));
         assertTrue(logs.contains("affected=1"));
         assertTrue(logs.contains("alertsRequested=2"));
+        assertTrue(logs.contains("lowBatteryCreated=0"));
+        assertTrue(logs.contains("lowBatteryResolved=0"));
         assertTrue(logs.contains("durationMs="));
         verify(collarRepository).findByEnabledTrueAndStatusAndLastSeenAtBefore(
                 CollarStatus.ACTIVO,
@@ -67,6 +73,47 @@ class DeviceMonitoringServiceTest {
         );
         verify(alertService).createCollarOfflineAlert(collarToMark);
         verify(alertService).createCollarOfflineAlert(alreadyOffline);
+    }
+
+    @Test
+    void shouldEvaluateLowBatteryAlertsDuringMonitoring(CapturedOutput output) {
+        CollarRepository collarRepository = mock(CollarRepository.class);
+        AlertService alertService = mock(AlertService.class);
+        DeviceMonitoringService service = new DeviceMonitoringService(
+                collarRepository,
+                alertService,
+                new DomainMetricsService(new SimpleMeterRegistry()),
+                FIXED_CLOCK
+        );
+        ReflectionTestUtils.setField(service, "offlineThresholdMinutes", 15L);
+
+        Collar lowBattery = collar(DeviceSignalStatus.MEDIA);
+        lowBattery.setBatteryLevel(15);
+        Collar recoveredBattery = collar(DeviceSignalStatus.FUERTE);
+        recoveredBattery.setBatteryLevel(30);
+        Collar inRangeBattery = collar(DeviceSignalStatus.FUERTE);
+        inRangeBattery.setBatteryLevel(23);
+
+        when(collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(eq(CollarStatus.ACTIVO), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+        when(collarRepository.findByEnabledTrueAndStatus(CollarStatus.ACTIVO))
+                .thenReturn(List.of(lowBattery, recoveredBattery, inRangeBattery));
+        when(alertService.createLowBatteryAlert(any(Collar.class))).thenReturn(null);
+        when(alertService.resolvePendingLowBatteryAlert(any(Collar.class), eq(FIXED_NOW))).thenReturn(null);
+        doReturn(new com.ganaderia4.backend.model.Alert()).when(alertService).createLowBatteryAlert(same(lowBattery));
+        doReturn(new com.ganaderia4.backend.model.Alert()).when(alertService).resolvePendingLowBatteryAlert(same(recoveredBattery), eq(FIXED_NOW));
+
+        service.monitorOfflineCollars();
+
+        String logs = output.getOut();
+        assertTrue(logs.contains("lowBatteryCreated=1"));
+        assertTrue(logs.contains("lowBatteryResolved=1"));
+        verify(alertService).createLowBatteryAlert(lowBattery);
+        verify(alertService).resolvePendingLowBatteryAlert(lowBattery, FIXED_NOW);
+        verify(alertService).createLowBatteryAlert(recoveredBattery);
+        verify(alertService).resolvePendingLowBatteryAlert(recoveredBattery, FIXED_NOW);
+        verify(alertService).createLowBatteryAlert(inRangeBattery);
+        verify(alertService).resolvePendingLowBatteryAlert(inRangeBattery, FIXED_NOW);
     }
 
     @Test
@@ -93,6 +140,8 @@ class DeviceMonitoringServiceTest {
         assertTrue(logs.contains("processed=0"));
         assertTrue(logs.contains("affected=0"));
         assertTrue(logs.contains("alertsRequested=0"));
+        assertTrue(logs.contains("lowBatteryCreated=0"));
+        assertTrue(logs.contains("lowBatteryResolved=0"));
         assertTrue(logs.contains("errorType=IllegalStateException"));
         assertTrue(logs.contains("database_unavailable"));
         assertTrue(logs.contains("java.lang.IllegalStateException"));
@@ -112,6 +161,8 @@ class DeviceMonitoringServiceTest {
 
         when(collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(eq(CollarStatus.ACTIVO), any(LocalDateTime.class)))
                 .thenReturn(List.of());
+        when(collarRepository.findByEnabledTrueAndStatus(CollarStatus.ACTIVO))
+                .thenReturn(List.of());
 
         service.monitorOfflineCollars();
 
@@ -119,6 +170,7 @@ class DeviceMonitoringServiceTest {
                 CollarStatus.ACTIVO,
                 FIXED_NOW.minusMinutes(15)
         );
+        verify(collarRepository).findByEnabledTrueAndStatus(CollarStatus.ACTIVO);
     }
 
     private Collar collar(DeviceSignalStatus signalStatus) {

@@ -21,6 +21,8 @@ public interface CollarRepository extends JpaRepository<Collar, Long> {
 
     Page<Collar> findByStatus(CollarStatus status, Pageable pageable);
 
+    List<Collar> findByEnabledTrueAndStatus(CollarStatus status);
+
     List<Collar> findByEnabledTrueAndSignalStatusOrderByLastSeenAtAsc(DeviceSignalStatus signalStatus);
 
     Optional<Collar> findByCow(Cow cow);

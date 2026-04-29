@@ -48,9 +48,12 @@ public class DeviceMonitoringService {
         int processed = 0;
         int markedOffline = 0;
         int alertsRequested = 0;
+        int lowBatteryCreated = 0;
+        int lowBatteryResolved = 0;
 
         try {
-            LocalDateTime threshold = LocalDateTime.now(clock).minusMinutes(offlineThresholdMinutes);
+            LocalDateTime now = LocalDateTime.now(clock);
+            LocalDateTime threshold = now.minusMinutes(offlineThresholdMinutes);
             List<Collar> offlineCollars =
                     collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(CollarStatus.ACTIVO, threshold);
 
@@ -70,14 +73,35 @@ public class DeviceMonitoringService {
                 alertsRequested++;
             }
 
-            logMonitorSummary(requestId, processed, markedOffline, alertsRequested, elapsedMs(startedAt));
-        } catch (RuntimeException ex) {
-            log.error(
-                    "event=offline_monitoring_failed requestId={} processed={} affected={} alertsRequested={} durationMs={} errorType={} error={}",
+            List<Collar> activeEnabledCollars = collarRepository.findByEnabledTrueAndStatus(CollarStatus.ACTIVO);
+            for (Collar collar : activeEnabledCollars) {
+                if (alertService.createLowBatteryAlert(collar) != null) {
+                    lowBatteryCreated++;
+                }
+
+                if (alertService.resolvePendingLowBatteryAlert(collar, now) != null) {
+                    lowBatteryResolved++;
+                }
+            }
+
+            logMonitorSummary(
                     requestId,
                     processed,
                     markedOffline,
                     alertsRequested,
+                    lowBatteryCreated,
+                    lowBatteryResolved,
+                    elapsedMs(startedAt)
+            );
+        } catch (RuntimeException ex) {
+            log.error(
+                    "event=offline_monitoring_failed requestId={} processed={} affected={} alertsRequested={} lowBatteryCreated={} lowBatteryResolved={} durationMs={} errorType={} error={}",
+                    requestId,
+                    processed,
+                    markedOffline,
+                    alertsRequested,
+                    lowBatteryCreated,
+                    lowBatteryResolved,
                     elapsedMs(startedAt),
                     ex.getClass().getSimpleName(),
                     OperationalLogSanitizer.safe(ex.getMessage()),
@@ -91,16 +115,19 @@ public class DeviceMonitoringService {
                                    int processed,
                                    int markedOffline,
                                    int alertsRequested,
+                                   int lowBatteryCreated,
+                                   int lowBatteryResolved,
                                    long durationMs) {
         String message = "event=offline_monitoring_completed requestId={} processed={} affected={} "
-                + "alertsRequested={} durationMs={}";
+                + "alertsRequested={} lowBatteryCreated={} lowBatteryResolved={} durationMs={}";
 
-        if (processed == 0 && markedOffline == 0 && alertsRequested == 0) {
-            log.debug(message, requestId, processed, markedOffline, alertsRequested, durationMs);
+        if (processed == 0 && markedOffline == 0 && alertsRequested == 0
+                && lowBatteryCreated == 0 && lowBatteryResolved == 0) {
+            log.debug(message, requestId, processed, markedOffline, alertsRequested, lowBatteryCreated, lowBatteryResolved, durationMs);
             return;
         }
 
-        log.info(message, requestId, processed, markedOffline, alertsRequested, durationMs);
+        log.info(message, requestId, processed, markedOffline, alertsRequested, lowBatteryCreated, lowBatteryResolved, durationMs);
     }
 
     private long elapsedMs(long startedAt) {

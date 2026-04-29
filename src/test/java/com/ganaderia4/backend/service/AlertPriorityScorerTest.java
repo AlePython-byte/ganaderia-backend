@@ -174,4 +174,32 @@ class AlertPriorityScorerTest {
         assertEquals(80, assessment.priorityScore());
         assertEquals("HIGH", assessment.priority());
     }
+
+    @Test
+    void shouldIncreasePriorityForCriticalLowBatteryAlert() {
+        Cow cow = new Cow();
+        cow.setId(6L);
+        cow.setToken("VACA-006");
+        cow.setStatus(CowStatus.DENTRO);
+
+        Alert alert = new Alert();
+        alert.setId(14L);
+        alert.setType(AlertType.LOW_BATTERY);
+        alert.setStatus(AlertStatus.PENDIENTE);
+        alert.setCreatedAt(FIXED_NOW.minusMinutes(30));
+        alert.setCow(cow);
+
+        Collar collar = new Collar();
+        collar.setId(22L);
+        collar.setCow(cow);
+        collar.setBatteryLevel(9);
+
+        when(alertRepository.countByCow(cow)).thenReturn(3L);
+        when(collarRepository.findByCow(cow)).thenReturn(Optional.of(collar));
+
+        AlertPriorityAssessment assessment = alertPriorityScorer.score(alert);
+
+        assertEquals(65, assessment.priorityScore());
+        assertEquals("MEDIUM", assessment.priority());
+    }
 }

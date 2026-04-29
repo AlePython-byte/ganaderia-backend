@@ -8,6 +8,7 @@ import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertStatus;
 import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Collar;
+import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.notification.NotificationDispatcher;
@@ -205,6 +206,126 @@ class AlertServiceTest {
         verify(alertRepository, never()).save(any(Alert.class));
         verify(domainMetricsService, never()).incrementAlertCreated(AlertType.COLLAR_OFFLINE);
         verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
+    }
+
+    @Test
+    void shouldCreateLowBatteryAlertWhenCollarIsActiveEnabledAndBatteryAtThreshold() {
+        Collar collar = new Collar();
+        collar.setId(32L);
+        collar.setToken("COLLAR-LOW-001");
+        collar.setCow(cow);
+        collar.setEnabled(true);
+        collar.setStatus(CollarStatus.ACTIVO);
+        collar.setBatteryLevel(20);
+
+        when(alertRepository.findByCowAndTypeAndStatus(
+                cow,
+                AlertType.LOW_BATTERY,
+                AlertStatus.PENDIENTE
+        )).thenReturn(Optional.empty());
+
+        when(alertRepository.save(any(Alert.class))).thenAnswer(invocation -> {
+            Alert alert = invocation.getArgument(0);
+            alert.setId(302L);
+            return alert;
+        });
+
+        Alert created = alertService.createLowBatteryAlert(collar);
+
+        assertNotNull(created);
+        assertEquals(AlertType.LOW_BATTERY, created.getType());
+        assertEquals(AlertStatus.PENDIENTE, created.getStatus());
+        assertEquals(cow, created.getCow());
+        assertTrue(created.getMessage().contains("COLLAR-LOW-001"));
+        assertTrue(created.getMessage().contains("20%"));
+        verify(domainMetricsService).incrementAlertCreated(AlertType.LOW_BATTERY);
+        verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
+    }
+
+    @Test
+    void shouldNotDuplicatePendingLowBatteryAlert() {
+        Collar collar = new Collar();
+        collar.setId(33L);
+        collar.setToken("COLLAR-LOW-002");
+        collar.setCow(cow);
+        collar.setEnabled(true);
+        collar.setStatus(CollarStatus.ACTIVO);
+        collar.setBatteryLevel(10);
+
+        Alert existingAlert = new Alert();
+        existingAlert.setId(303L);
+        existingAlert.setCow(cow);
+        existingAlert.setType(AlertType.LOW_BATTERY);
+        existingAlert.setStatus(AlertStatus.PENDIENTE);
+
+        when(alertRepository.findByCowAndTypeAndStatus(
+                cow,
+                AlertType.LOW_BATTERY,
+                AlertStatus.PENDIENTE
+        )).thenReturn(Optional.of(existingAlert));
+
+        Alert result = alertService.createLowBatteryAlert(collar);
+
+        assertNull(result);
+        verify(alertRepository, never()).save(any(Alert.class));
+        verify(domainMetricsService, never()).incrementAlertCreated(AlertType.LOW_BATTERY);
+    }
+
+    @Test
+    void shouldNotCreateLowBatteryAlertWhenCollarIsDisabledOrInactive() {
+        Collar disabledCollar = new Collar();
+        disabledCollar.setToken("COLLAR-LOW-003");
+        disabledCollar.setCow(cow);
+        disabledCollar.setEnabled(false);
+        disabledCollar.setStatus(CollarStatus.ACTIVO);
+        disabledCollar.setBatteryLevel(15);
+
+        Collar inactiveCollar = new Collar();
+        inactiveCollar.setToken("COLLAR-LOW-004");
+        inactiveCollar.setCow(cow);
+        inactiveCollar.setEnabled(true);
+        inactiveCollar.setStatus(CollarStatus.INACTIVO);
+        inactiveCollar.setBatteryLevel(15);
+
+        assertNull(alertService.createLowBatteryAlert(disabledCollar));
+        assertNull(alertService.createLowBatteryAlert(inactiveCollar));
+
+        verify(alertRepository, never()).save(any(Alert.class));
+        verify(domainMetricsService, never()).incrementAlertCreated(AlertType.LOW_BATTERY);
+    }
+
+    @Test
+    void shouldResolvePendingLowBatteryAlertWhenBatteryRecoversAboveThreshold() {
+        Collar collar = new Collar();
+        collar.setId(34L);
+        collar.setToken("COLLAR-LOW-005");
+        collar.setCow(cow);
+        collar.setEnabled(true);
+        collar.setStatus(CollarStatus.ACTIVO);
+        collar.setBatteryLevel(30);
+
+        Alert alert = new Alert();
+        alert.setId(304L);
+        alert.setType(AlertType.LOW_BATTERY);
+        alert.setMessage("Batería baja");
+        alert.setCreatedAt(LocalDateTime.now().minusMinutes(30));
+        alert.setStatus(AlertStatus.PENDIENTE);
+        alert.setObservations("Previa");
+        alert.setCow(cow);
+
+        when(alertRepository.findByCowAndTypeAndStatus(
+                cow,
+                AlertType.LOW_BATTERY,
+                AlertStatus.PENDIENTE
+        )).thenReturn(Optional.of(alert));
+        when(alertRepository.save(any(Alert.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Alert resolved = alertService.resolvePendingLowBatteryAlert(collar, LocalDateTime.now());
+
+        assertNotNull(resolved);
+        assertEquals(AlertStatus.RESUELTA, resolved.getStatus());
+        assertTrue(resolved.getObservations().contains("30%"));
+        verify(domainMetricsService).incrementAlertResolved(AlertType.LOW_BATTERY);
     }
 
     @Test
