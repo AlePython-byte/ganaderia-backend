@@ -1,49 +1,49 @@
-# Ganadería 4.0 Backend
+﻿# GanaderÃ­a 4.0 Backend
 
-Backend del sistema **Ganadería 4.0**, una plataforma para monitoreo ganadero con collares GPS, geocercas, alertas operativas, autenticación JWT, reportes y observabilidad.
+Backend del sistema **GanaderÃ­a 4.0**, una plataforma para monitoreo ganadero con collares GPS, geocercas, alertas operativas, autenticaciÃ³n JWT, reportes y observabilidad.
 
-## Descripción
+## DescripciÃ³n
 
-Este proyecto implementa un backend en **Spring Boot** para gestionar el monitoreo de ganado mediante dispositivos de rastreo. El sistema permite administrar vacas, collares, geocercas, ubicaciones y alertas, además de ofrecer endpoints de autenticación, reportes, observabilidad y despliegue automatizado.
+Este proyecto implementa un backend en **Spring Boot** para gestionar el monitoreo de ganado mediante dispositivos de rastreo. El sistema permite administrar vacas, collares, geocercas, ubicaciones y alertas, ademÃ¡s de ofrecer endpoints de autenticaciÃ³n, reportes, observabilidad y despliegue automatizado.
 
 El objetivo principal es detectar eventos relevantes del negocio, como:
 
 - salida de una vaca de su geocerca
-- collares sin señal o sin reportes recientes
+- collares sin seÃ±al o sin reportes recientes
 - historial de ubicaciones
 - seguimiento operativo de alertas
 - reportes de incidencias
 
 ---
 
-## Características principales
+## CaracterÃ­sticas principales
 
-### Autenticación y seguridad
-- autenticación con **JWT**
+### AutenticaciÃ³n y seguridad
+- autenticaciÃ³n con **JWT**
 - control de acceso por roles
 - seguridad endurecida
 - CORS configurado
 - respuestas de error sanitizadas
-- persistencia de sesión mediante token
+- persistencia de sesiÃ³n mediante token
 
-### Gestión de dominio
-- gestión de **vacas**
-- gestión de **collares**
-- gestión de **geocercas**
-- gestión de **ubicaciones**
-- gestión de **alertas**
+### GestiÃ³n de dominio
+- gestiÃ³n de **vacas**
+- gestiÃ³n de **collares**
+- gestiÃ³n de **geocercas**
+- gestiÃ³n de **ubicaciones**
+- gestiÃ³n de **alertas**
 
-### Lógica operativa
-- creación automática de alertas por salida de geocerca
-- creación automática de alertas por collar offline
-- auto-resolución de alertas cuando el estado se recupera
-- validación defensiva del endpoint de dispositivos
+### LÃ³gica operativa
+- creaciÃ³n automÃ¡tica de alertas por salida de geocerca
+- creaciÃ³n automÃ¡tica de alertas por collar offline
+- auto-resoluciÃ³n de alertas cuando el estado se recupera
+- validaciÃ³n defensiva del endpoint de dispositivos
 - control de duplicados en ubicaciones reportadas por collares
 
 ### Observabilidad
 - `X-Request-Id` por request
 - Actuator habilitado
-- métricas técnicas y de dominio
+- mÃ©tricas tÃ©cnicas y de dominio
 - endpoint Prometheus
 - health indicator del monitoreo offline
 
@@ -52,27 +52,27 @@ El objetivo principal es detectar eventos relevantes del negocio, como:
 - dispatcher central
 - canal por logs para local/test
 - canal webhook saliente configurable
-- disparo para alertas críticas
+- disparo para alertas crÃ­ticas
 
 ### Reportes
 - reporte de alertas con filtros
 - reporte de collares offline
-- reporte de vacas con más incidencias
-- exportación CSV del reporte de alertas
+- reporte de vacas con mÃ¡s incidencias
+- exportaciÃ³n CSV del reporte de alertas
 
 ### Calidad y despliegue
-- pruebas unitarias e integración
+- pruebas unitarias e integraciÃ³n
 - **SpringBootTest**
 - **MockMvc**
 - **Testcontainers con PostgreSQL**
 - **Flyway activo en tests**
 - GitHub Actions para CI/CD
 - despliegue en **Render**
-- validación Docker en pipeline
+- validaciÃ³n Docker en pipeline
 
 ---
 
-## Plataforma técnica
+## Plataforma tÃ©cnica
 
 - Java 17
 - Spring Boot 4.0.3
@@ -89,7 +89,7 @@ El proyecto se mantiene en Java 17 porque es compatible con Spring Boot 4 y perm
 
 ## Quality Gates
 
-El comando recomendado para validación local y CI es:
+El comando recomendado para validaciÃ³n local y CI es:
 
 ```bash
 ./mvnw clean verify
@@ -98,17 +98,17 @@ El comando recomendado para validación local y CI es:
 Ese flujo ejecuta:
 
 - tests unitarios
-- tests de integración
+- tests de integraciÃ³n
 - reportes JaCoCo de unit tests, integration tests y cobertura combinada
-- verificación de cobertura mínima con JaCoCo
+- verificaciÃ³n de cobertura mÃ­nima con JaCoCo
 - SpotBugs
 
-Cobertura mínima configurada sobre la cobertura global combinada:
+Cobertura mÃ­nima configurada sobre la cobertura global combinada:
 
 - `LINE`: `0.50`
 - `BRANCH`: `0.35`
 
-El workflow de GitHub Actions usa el mismo comando para que el quality gate se aplique también en CI.
+El workflow de GitHub Actions usa el mismo comando para que el quality gate se aplique tambiÃ©n en CI.
 
 ---
 
@@ -116,9 +116,9 @@ El workflow de GitHub Actions usa el mismo comando para que el quality gate se a
 
 Dependabot revisa semanalmente dependencias de Maven, GitHub Actions y Docker.
 
-Dependabot abre pull requests automáticos con labels de dependencias y seguridad para mantener el proyecto actualizado sin intervenir manualmente en cada revisión.
+Dependabot abre pull requests automÃ¡ticos con labels de dependencias y seguridad para mantener el proyecto actualizado sin intervenir manualmente en cada revisiÃ³n.
 
-Cada pull request de actualización debe pasar `./mvnw clean verify` antes de fusionarse.
+Cada pull request de actualizaciÃ³n debe pasar `./mvnw clean verify` antes de fusionarse.
 
 Las actualizaciones mayores no deben aceptarse sin revisar changelog, notas de compatibilidad e impacto sobre CI, build y despliegue.
 
@@ -136,7 +136,7 @@ No corre en cada push para evitar lentitud adicional y falsos positivos iniciale
 
 Si se detectan vulnerabilidades con `CVSS >= 7.0`, el workflow de escaneo debe fallar.
 
-Los reportes del análisis quedan publicados como artifacts del workflow para revisión posterior.
+Los reportes del anÃ¡lisis quedan publicados como artifacts del workflow para revisiÃ³n posterior.
 
 ---
 
@@ -144,13 +144,13 @@ Los reportes del análisis quedan publicados como artifacts del workflow para re
 
 Trivy escanea la imagen Docker del backend para revisar vulnerabilidades en la imagen base, paquetes del sistema y componentes presentes en la imagen final.
 
-El workflow corre manualmente o semanalmente en GitHub Actions y construye una imagen temporal solo para análisis.
+El workflow corre manualmente o semanalmente en GitHub Actions y construye una imagen temporal solo para anÃ¡lisis.
 
-La imagen no se publica en ningún registry como parte de este proceso.
+La imagen no se publica en ningÃºn registry como parte de este proceso.
 
 El workflow falla inicialmente solo por vulnerabilidades `CRITICAL`.
 
-Las vulnerabilidades `HIGH` se reportan para revisión, pero todavía no bloquean el flujo.
+Las vulnerabilidades `HIGH` se reportan para revisiÃ³n, pero todavÃ­a no bloquean el flujo.
 
 Los reportes del escaneo quedan publicados como artifacts del workflow.
 
@@ -158,31 +158,52 @@ Los reportes del escaneo quedan publicados como artifacts del workflow.
 
 ## Lifecycle de collares
 
-El lifecycle oficial de collares, incluyendo la semántica de `status`, `enabled`, `signalStatus` y `lastSeenAt`, está documentado en [docs/collar-lifecycle.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/collar-lifecycle.md:1).
+El lifecycle oficial de collares, incluyendo la semÃ¡ntica de `status`, `enabled`, `signalStatus` y `lastSeenAt`, estÃ¡ documentado en [docs/collar-lifecycle.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/collar-lifecycle.md:1).
 
-Ese documento también deja explícitas las reglas objetivo para procesamiento de ubicaciones y monitoreo offline, junto con los cambios de código recomendados para el siguiente bloque.
+Ese documento tambiÃ©n deja explÃ­citas las reglas objetivo para procesamiento de ubicaciones y monitoreo offline, junto con los cambios de cÃ³digo recomendados para el siguiente bloque.
 
 ---
 
-## Política temporal UTC
+## PolÃ­tica temporal UTC
 
-El backend adopta UTC como política temporal interna.
+El backend adopta UTC como polÃ­tica temporal interna.
 
 Por compatibilidad, varios campos siguen usando `LocalDateTime`.
 
-En esta fase esos valores se interpretan como UTC y el contrato JSON público no cambia.
+En esta fase esos valores se interpretan como UTC y el contrato JSON pÃºblico no cambia.
 
-La política completa está documentada en [docs/time-policy.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/time-policy.md:1).
+La polÃ­tica completa estÃ¡ documentada en [docs/time-policy.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/time-policy.md:1).
 
 ---
 
 ## Resumen de Fase 1
 
-El cierre formal de la Fase 1 de hardening, incluyendo seguridad, observabilidad, lifecycle y política temporal, está resumido en [docs/phase-1-hardening-summary.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/phase-1-hardening-summary.md:1).
+El cierre formal de la Fase 1 de hardening, incluyendo seguridad, observabilidad, lifecycle y polÃ­tica temporal, estÃ¡ resumido en [docs/phase-1-hardening-summary.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/phase-1-hardening-summary.md:1).
 
 ---
 
-## Tecnologías utilizadas
+## Swagger / OpenAPI
+
+En `local` y `dev`, Swagger UI esta disponible en `/swagger-ui.html` y el documento OpenAPI JSON en `/v3/api-docs`.
+
+En `prod`, Swagger/OpenAPI esta deshabilitado por seguridad segun la configuracion actual del backend.
+
+Uso esperado:
+
+- `POST /api/auth/login` es un endpoint publico para obtener JWT Bearer.
+- Los endpoints protegidos del backend usan `Authorization: Bearer <token>`.
+- `POST /api/device/locations` no usa JWT; usa autenticacion HMAC por headers `X-Device-Token`, `X-Device-Timestamp`, `X-Device-Nonce` y `X-Device-Signature`.
+- No deben cargarse secretos reales ni claves de dispositivos dentro de Swagger UI.
+
+---
+
+## Matriz de permisos
+
+La matriz oficial de permisos y la politica actual de RBAC del backend estan documentadas en [docs/permissions-matrix.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/permissions-matrix.md:1).
+
+---
+
+## TecnologÃ­as utilizadas
 
 - **Java 17**
 - **Spring Boot 4.0.3**
@@ -209,21 +230,21 @@ El cierre formal de la Fase 1 de hardening, incluyendo seguridad, observabilidad
 El proyecto sigue una arquitectura en capas:
 
 - **controller**: expone endpoints REST
-- **service**: contiene lógica de negocio
+- **service**: contiene lÃ³gica de negocio
 - **repository**: acceso a base de datos
 - **model**: entidades del dominio
 - **dto**: contratos de entrada y salida
-- **config**: seguridad, CORS y configuración general
-- **observability**: métricas, correlation id y health
-- **notification**: servicios de notificación desacoplados
-- **pattern**: implementación de patrones de diseño usados por el flujo de monitoreo
+- **config**: seguridad, CORS y configuraciÃ³n general
+- **observability**: mÃ©tricas, correlation id y health
+- **notification**: servicios de notificaciÃ³n desacoplados
+- **pattern**: implementaciÃ³n de patrones de diseÃ±o usados por el flujo de monitoreo
 
 ---
 
-## Módulos del sistema
+## MÃ³dulos del sistema
 
-### 1. Autenticación
-Permite iniciar sesión y proteger el acceso al resto del sistema mediante JWT.
+### 1. AutenticaciÃ³n
+Permite iniciar sesiÃ³n y proteger el acceso al resto del sistema mediante JWT.
 
 ### 2. Vacas
 Permite registrar, consultar y actualizar vacas.
@@ -232,21 +253,21 @@ Permite registrar, consultar y actualizar vacas.
 Permite registrar, actualizar, habilitar, deshabilitar y reasignar collares a vacas.
 
 ### 4. Geocercas
-Permite administrar áreas geográficas válidas para monitoreo.
+Permite administrar Ã¡reas geogrÃ¡ficas vÃ¡lidas para monitoreo.
 
 ### 5. Ubicaciones
-Permite registrar y consultar ubicaciones históricas de las vacas reportadas por collares.
+Permite registrar y consultar ubicaciones histÃ³ricas de las vacas reportadas por collares.
 
 ### 6. Alertas
-Permite consultar y gestionar alertas operativas, tanto manuales como automáticas.
+Permite consultar y gestionar alertas operativas, tanto manuales como automÃ¡ticas.
 
 ### 7. Reportes
 Permite consultar indicadores y exportar reportes operativos.
 
 ### 8. Observabilidad
-Permite revisar health, métricas y trazabilidad de requests.
+Permite revisar health, mÃ©tricas y trazabilidad de requests.
 
-Métricas operativas principales:
+MÃ©tricas operativas principales:
 
 - `ganaderia.alerts.created` con tag `type`
 - `ganaderia.alerts.resolved` con tag `type`
@@ -257,7 +278,7 @@ Métricas operativas principales:
 - `ganaderia.notifications.sent` con tags `channel` y `eventType`
 - `ganaderia.notifications.failed` con tags `channel` y `eventType`
 
-En `prod`, Actuator expone por defecto `health,info`. Para habilitar scraping operativo de métricas sin tocar código:
+En `prod`, Actuator expone por defecto `health,info`. Para habilitar scraping operativo de mÃ©tricas sin tocar cÃ³digo:
 
 ```env
 MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
@@ -276,7 +297,7 @@ Los roles principales del backend son:
 - `OPERADOR`
 - `TECNICO`
 
-La autorización depende del endpoint y del método HTTP.
+La autorizaciÃ³n depende del endpoint y del mÃ©todo HTTP.
 
 ---
 
@@ -331,16 +352,16 @@ MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
 
 ### Perfiles de Spring
 
-- `local`: perfil por defecto para desarrollo local. Usa PostgreSQL local en `localhost:5432/ganaderia4`, Swagger habilitado y secretos locales no aptos para producción.
+- `local`: perfil por defecto para desarrollo local. Usa PostgreSQL local en `localhost:5432/ganaderia4`, Swagger habilitado y secretos locales no aptos para producciÃ³n.
 - `dev`: perfil para entornos de desarrollo compartidos. Requiere `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY`.
-- `prod`: perfil de producción. Requiere secretos por variables de entorno, mantiene Swagger apagado y expone por defecto solo `health,info` en Actuator.
+- `prod`: perfil de producciÃ³n. Requiere secretos por variables de entorno, mantiene Swagger apagado y expone por defecto solo `health,info` en Actuator.
 - `test`: perfil usado por las pruebas con Testcontainers.
 
-En `dev` y `prod`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY` deben tener al menos 32 bytes. Si faltan o son demasiado cortos, la aplicación falla al iniciar.
+En `dev` y `prod`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY` deben tener al menos 32 bytes. Si faltan o son demasiado cortos, la aplicaciÃ³n falla al iniciar.
 
 ---
 
-## Ejecución local
+## EjecuciÃ³n local
 
 Levantar PostgreSQL local con una base `ganaderia4` y credenciales por defecto `postgres/postgres`, o definir `DB_URL`, `DB_USERNAME` y `DB_PASSWORD`.
 
@@ -348,7 +369,7 @@ Levantar PostgreSQL local con una base `ganaderia4` y credenciales por defecto `
 ./mvnw spring-boot:run
 ```
 
-Para crear un administrador inicial en una base vacía, definir `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes de iniciar.
+Para crear un administrador inicial en una base vacÃ­a, definir `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes de iniciar.
 
 El perfil `local` queda activo por defecto. Para usar otro perfil:
 
@@ -356,7 +377,7 @@ El perfil `local` queda activo por defecto. Para usar otro perfil:
 SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 ```
 
-La validación de CI usa Java 17 y ejecuta:
+La validaciÃ³n de CI usa Java 17 y ejecuta:
 
 ```bash
 ./mvnw clean verify
