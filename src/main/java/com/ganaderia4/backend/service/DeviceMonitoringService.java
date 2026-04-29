@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,16 +25,19 @@ public class DeviceMonitoringService {
     private final CollarRepository collarRepository;
     private final AlertService alertService;
     private final DomainMetricsService domainMetricsService;
+    private final Clock clock;
 
     @Value("${app.device-monitor.offline-threshold-minutes:15}")
     private long offlineThresholdMinutes;
 
     public DeviceMonitoringService(CollarRepository collarRepository,
                                    AlertService alertService,
-                                   DomainMetricsService domainMetricsService) {
+                                   DomainMetricsService domainMetricsService,
+                                   Clock clock) {
         this.collarRepository = collarRepository;
         this.alertService = alertService;
         this.domainMetricsService = domainMetricsService;
+        this.clock = clock;
     }
 
     @Scheduled(fixedDelayString = "${app.device-monitor.offline-check-ms:60000}")
@@ -45,7 +49,7 @@ public class DeviceMonitoringService {
         int alertsRequested = 0;
 
         try {
-            LocalDateTime threshold = LocalDateTime.now().minusMinutes(offlineThresholdMinutes);
+            LocalDateTime threshold = LocalDateTime.now(clock).minusMinutes(offlineThresholdMinutes);
             List<Collar> offlineCollars =
                     collarRepository.findByEnabledTrueAndStatusAndLastSeenAtBefore(CollarStatus.ACTIVO, threshold);
 

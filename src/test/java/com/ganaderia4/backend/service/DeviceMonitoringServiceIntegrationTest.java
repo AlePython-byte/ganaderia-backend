@@ -16,13 +16,28 @@ import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Import(DeviceMonitoringServiceIntegrationTest.FixedClockConfig.class)
 class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
+
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-04-28T18:00:00Z"), ZoneId.of("UTC"));
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.now(FIXED_CLOCK);
 
     @Autowired
     private DeviceMonitoringService deviceMonitoringService;
@@ -53,7 +68,7 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         Collar collar = createCollar(
                 "COLLAR-OFF-001",
                 cow,
-                LocalDateTime.now().minusMinutes(40),
+                FIXED_NOW.minusMinutes(40),
                 DeviceSignalStatus.MEDIA,
                 true
         );
@@ -80,7 +95,7 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         Collar collar = createCollar(
                 "COLLAR-OFF-002",
                 cow,
-                LocalDateTime.now().minusMinutes(50),
+                FIXED_NOW.minusMinutes(50),
                 DeviceSignalStatus.MEDIA,
                 true
         );
@@ -90,8 +105,8 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         existing.setType(AlertType.COLLAR_OFFLINE);
         existing.setStatus(AlertStatus.PENDIENTE);
         existing.setMessage("Alerta previa");
-        existing.setObservations("ya existía");
-        existing.setCreatedAt(LocalDateTime.now().minusMinutes(10));
+        existing.setObservations("ya existia");
+        existing.setCreatedAt(FIXED_NOW.minusMinutes(10));
         alertRepository.save(existing);
 
         deviceMonitoringService.monitorOfflineCollars();
@@ -110,7 +125,7 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         Collar collar = createCollar(
                 "COLLAR-OFF-003",
                 cow,
-                LocalDateTime.now().minusMinutes(3),
+                FIXED_NOW.minusMinutes(3),
                 DeviceSignalStatus.FUERTE,
                 true
         );
@@ -123,12 +138,66 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldIgnoreInactiveCollarsDuringOfflineMonitoring() {
-        Cow cow = createCow("VACA-OFF-004", "Nube");
+    void shouldIgnoreCollarExactlyAtOfflineThreshold() {
+        Cow cow = createCow("VACA-OFF-004", "Aura");
         Collar collar = createCollar(
                 "COLLAR-OFF-004",
                 cow,
-                LocalDateTime.now().minusMinutes(40),
+                FIXED_NOW.minusMinutes(15),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(DeviceSignalStatus.MEDIA, updatedCollar.getSignalStatus());
+        assertEquals(0, alertRepository.count());
+    }
+
+    @Test
+    void shouldIgnoreCollarOneMinuteBeforeOfflineThreshold() {
+        Cow cow = createCow("VACA-OFF-005", "Sol");
+        Collar collar = createCollar(
+                "COLLAR-OFF-005",
+                cow,
+                FIXED_NOW.minusMinutes(14),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(DeviceSignalStatus.MEDIA, updatedCollar.getSignalStatus());
+        assertEquals(0, alertRepository.count());
+    }
+
+    @Test
+    void shouldProcessCollarOneMinuteAfterOfflineThreshold() {
+        Cow cow = createCow("VACA-OFF-006", "Rocio");
+        Collar collar = createCollar(
+                "COLLAR-OFF-006",
+                cow,
+                FIXED_NOW.minusMinutes(16),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(DeviceSignalStatus.SIN_SENAL, updatedCollar.getSignalStatus());
+        assertEquals(1, alertRepository.count());
+    }
+
+    @Test
+    void shouldIgnoreInactiveCollarsDuringOfflineMonitoring() {
+        Cow cow = createCow("VACA-OFF-007", "Nube");
+        Collar collar = createCollar(
+                "COLLAR-OFF-007",
+                cow,
+                FIXED_NOW.minusMinutes(40),
                 DeviceSignalStatus.MEDIA,
                 true,
                 CollarStatus.INACTIVO
@@ -143,11 +212,11 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldIgnoreMaintenanceCollarsDuringOfflineMonitoring() {
-        Cow cow = createCow("VACA-OFF-005", "Brisa");
+        Cow cow = createCow("VACA-OFF-008", "Brisa");
         Collar collar = createCollar(
-                "COLLAR-OFF-005",
+                "COLLAR-OFF-008",
                 cow,
-                LocalDateTime.now().minusMinutes(40),
+                FIXED_NOW.minusMinutes(40),
                 DeviceSignalStatus.MEDIA,
                 true,
                 CollarStatus.MANTENIMIENTO
@@ -158,6 +227,55 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
         assertEquals(DeviceSignalStatus.MEDIA, updatedCollar.getSignalStatus());
         assertEquals(0, alertRepository.count());
+    }
+
+    @Test
+    void shouldIgnoreDisabledCollarsDuringOfflineMonitoring() {
+        Cow cow = createCow("VACA-OFF-009", "Perla");
+        Collar collar = createCollar(
+                "COLLAR-OFF-009",
+                cow,
+                FIXED_NOW.minusMinutes(40),
+                DeviceSignalStatus.MEDIA,
+                false
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar updatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(DeviceSignalStatus.MEDIA, updatedCollar.getSignalStatus());
+        assertEquals(0, alertRepository.count());
+    }
+
+    @Test
+    void shouldNotDependOnServerRealTime() {
+        Cow freshCow = createCow("VACA-OFF-010", "Menta");
+        Cow staleCow = createCow("VACA-OFF-011", "Lira");
+
+        Collar fresh = createCollar(
+                "COLLAR-OFF-010",
+                freshCow,
+                FIXED_NOW.minusMinutes(14),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+        Collar stale = createCollar(
+                "COLLAR-OFF-011",
+                staleCow,
+                FIXED_NOW.minusMinutes(16),
+                DeviceSignalStatus.MEDIA,
+                true
+        );
+
+        deviceMonitoringService.monitorOfflineCollars();
+
+        Collar freshUpdated = collarRepository.findById(fresh.getId()).orElseThrow();
+        Collar staleUpdated = collarRepository.findById(stale.getId()).orElseThrow();
+
+        assertEquals(DeviceSignalStatus.MEDIA, freshUpdated.getSignalStatus());
+        assertEquals(DeviceSignalStatus.SIN_SENAL, staleUpdated.getSignalStatus());
+        assertEquals(1, alertRepository.count());
+        assertFalse(alertRepository.findAll().isEmpty());
     }
 
     private Cow createCow(String token, String name) {
@@ -192,5 +310,15 @@ class DeviceMonitoringServiceIntegrationTest extends AbstractIntegrationTest {
         collar.setSignalStatus(signalStatus);
         collar.setEnabled(enabled);
         return collarRepository.save(collar);
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return FIXED_CLOCK;
+        }
     }
 }

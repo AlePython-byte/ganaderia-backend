@@ -97,6 +97,8 @@ Prioridad posterior:
 5. Planificar cambios de esquema solo cuando el impacto sobre compatibilidad esté controlado.
 6. Eliminar gradualmente el uso de `LocalDateTime` en puntos donde represente eventos absolutos.
 
+Como avance incremental, `DeviceMonitoringService` ya usa `Clock` inyectable para que el monitoreo offline sea determinístico y no dependa del reloj real del servidor.
+
 ## 10. Criterio actual de compatibilidad
 
 Mientras dure esta fase:
