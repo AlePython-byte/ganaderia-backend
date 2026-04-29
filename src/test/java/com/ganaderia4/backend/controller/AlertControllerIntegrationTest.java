@@ -17,12 +17,19 @@ import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,7 +39,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@Import(AlertControllerIntegrationTest.FixedClockConfig.class)
 class AlertControllerIntegrationTest extends AbstractIntegrationTest {
+
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-04-28T18:00:00Z"), ZoneId.of("UTC"));
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.now(FIXED_CLOCK);
 
     @Autowired
     private MockMvc mockMvc;
@@ -112,7 +124,7 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
                 AlertStatus.PENDIENTE,
                 "La vaca sigue fuera de la geocerca",
                 null,
-                LocalDateTime.now().minusHours(2)
+                FIXED_NOW.minusHours(2)
         );
         createAlert(
                 lowerPriorityCow,
@@ -120,7 +132,7 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
                 AlertStatus.PENDIENTE,
                 "Collar sin reporte reciente",
                 null,
-                LocalDateTime.now().minusMinutes(5)
+                FIXED_NOW.minusMinutes(5)
         );
 
         String token = loginAndGetToken("operador@test.com", "12345678");
@@ -253,7 +265,7 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
                               AlertStatus status,
                               String message,
                               String observations) {
-        return createAlert(cow, type, status, message, observations, LocalDateTime.now().minusMinutes(5));
+        return createAlert(cow, type, status, message, observations, FIXED_NOW.minusMinutes(5));
     }
 
     private Alert createAlert(Cow cow,
@@ -287,5 +299,15 @@ class AlertControllerIntegrationTest extends AbstractIntegrationTest {
         String token = json.get("token").asText();
         assertTrue(token != null && !token.isBlank());
         return token;
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return FIXED_CLOCK;
+        }
     }
 }
