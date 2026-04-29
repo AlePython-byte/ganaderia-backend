@@ -7,8 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -23,8 +21,7 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
     public static final int MAX_REQUEST_ID_LENGTH = 64;
 
     private static final Logger log = LoggerFactory.getLogger(RequestCorrelationFilter.class);
-    private static final Pattern SAFE_REQUEST_ID_PATTERN = Pattern.compile("^[A-Za-z0-9._:-]+$");
-    private static final String ANONYMOUS_USER = "ANONYMOUS";
+    private static final Pattern SAFE_REQUEST_ID_PATTERN = Pattern.compile("^[A-Za-z0-9._-]+$");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -84,15 +81,15 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
         String method = safe(request.getMethod());
         String path = safe(request.getRequestURI());
         int status = resolveStatus(response, failure);
-        String user = resolveAuthenticatedUser();
+        boolean queryPresent = request.getQueryString() != null && !request.getQueryString().isBlank();
 
-        String message = "event=http_request requestId={} method={} path={} status={} durationMs={} user={}";
+        String message = "event=http_request_completed requestId={} method={} path={} status={} durationMs={} queryPresent={}";
         if (isHealthEndpoint(path)) {
-            log.debug(message, requestId, method, path, status, durationMs, user);
+            log.debug(message, requestId, method, path, status, durationMs, queryPresent);
             return;
         }
 
-        log.info(message, requestId, method, path, status, durationMs, user);
+        log.info(message, requestId, method, path, status, durationMs, queryPresent);
     }
 
     private int resolveStatus(HttpServletResponse response, Throwable failure) {
@@ -102,20 +99,6 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
         }
 
         return status;
-    }
-
-    private String resolveAuthenticatedUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ANONYMOUS_USER;
-        }
-
-        String name = authentication.getName();
-        if (name == null || name.isBlank() || "anonymousUser".equalsIgnoreCase(name)) {
-            return ANONYMOUS_USER;
-        }
-
-        return sanitizeLogValue(name);
     }
 
     private boolean isHealthEndpoint(String path) {

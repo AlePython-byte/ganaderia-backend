@@ -8,10 +8,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.slf4j.MDC;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -27,14 +25,14 @@ class RequestCorrelationFilterTest {
 
     @AfterEach
     void tearDown() {
-        SecurityContextHolder.clearContext();
+        MDC.clear();
     }
 
     @Test
     void shouldReuseSafeIncomingRequestId() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        String requestId = "req-safe_001:test.trace";
+        String requestId = "req-safe_001.test-trace";
 
         request.addHeader(RequestCorrelationFilter.HEADER_NAME, requestId);
 
@@ -49,7 +47,7 @@ class RequestCorrelationFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        request.addHeader(RequestCorrelationFilter.HEADER_NAME, "req invalid");
+        request.addHeader(RequestCorrelationFilter.HEADER_NAME, "req:invalid");
 
         filter.doFilter(request, response, emptyChain());
 
@@ -78,16 +76,42 @@ class RequestCorrelationFilterTest {
     }
 
     @Test
+    void shouldGenerateUuidWhenIncomingRequestIdIsBlank() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        request.addHeader(RequestCorrelationFilter.HEADER_NAME, "   ");
+
+        filter.doFilter(request, response, emptyChain());
+
+        String generatedRequestId = response.getHeader(RequestCorrelationFilter.HEADER_NAME);
+
+        assertFalse(generatedRequestId == null || generatedRequestId.isBlank());
+        assertDoesNotThrow(() -> UUID.fromString(generatedRequestId));
+    }
+
+    @Test
+    void shouldExposeRequestIdInMdcDuringRequestAndClearItAfterwards() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) -> {
+            String requestId = (String) ((MockHttpServletRequest) servletRequest)
+                    .getAttribute(RequestCorrelationFilter.REQUEST_ATTRIBUTE);
+            assertEquals(requestId, MDC.get(RequestCorrelationFilter.MDC_KEY));
+        });
+
+        assertEquals(null, MDC.get(RequestCorrelationFilter.MDC_KEY));
+    }
+
+    @Test
     void shouldWriteStructuredAccessLog(CapturedOutput output) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/cows");
         MockHttpServletResponse response = new MockHttpServletResponse();
         String requestId = "req-access-001";
-        String username = "admin@test.com";
 
         request.addHeader(RequestCorrelationFilter.HEADER_NAME, requestId);
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(username, null, List.of())
-        );
+        request.setQueryString("page=0&size=20");
 
         filter.doFilter(request, response, (servletRequest, servletResponse) -> {
             ((MockHttpServletResponse) servletResponse).setStatus(201);
@@ -95,13 +119,14 @@ class RequestCorrelationFilterTest {
 
         String logs = output.getOut();
 
-        assertTrue(logs.contains("event=http_request"));
+        assertTrue(logs.contains("event=http_request_completed"));
         assertTrue(logs.contains("requestId=" + requestId));
         assertTrue(logs.contains("method=POST"));
         assertTrue(logs.contains("path=/api/cows"));
         assertTrue(logs.contains("status=201"));
         assertTrue(logs.contains("durationMs="));
-        assertTrue(logs.contains("user=" + username));
+        assertTrue(logs.contains("queryPresent=true"));
+        assertFalse(logs.contains("page=0&size=20"));
     }
 
     @Test
@@ -111,7 +136,7 @@ class RequestCorrelationFilterTest {
 
         filter.doFilter(request, response, emptyChain());
 
-        assertFalse(output.getOut().contains("event=http_request"));
+        assertFalse(output.getOut().contains("event=http_request_completed"));
     }
 
     @Test
@@ -121,7 +146,7 @@ class RequestCorrelationFilterTest {
 
         filter.doFilter(request, response, emptyChain());
 
-        assertFalse(output.getOut().contains("event=http_request"));
+        assertFalse(output.getOut().contains("event=http_request_completed"));
     }
 
     @Test
@@ -131,7 +156,7 @@ class RequestCorrelationFilterTest {
 
         filter.doFilter(request, response, emptyChain());
 
-        assertFalse(output.getOut().contains("event=http_request"));
+        assertFalse(output.getOut().contains("event=http_request_completed"));
     }
 
     private FilterChain emptyChain() {
