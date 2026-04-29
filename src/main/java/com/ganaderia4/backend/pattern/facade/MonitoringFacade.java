@@ -81,7 +81,11 @@ public class MonitoringFacade {
             return mapToResponseDTO(duplicatedLocation);
         }
 
-        collar.setLastSeenAt(command.getTimestamp());
+        boolean lastSeenAtAdvanced = shouldAdvanceLastSeenAt(collar, command.getTimestamp());
+        if (lastSeenAtAdvanced) {
+            collar.setLastSeenAt(command.getTimestamp());
+        }
+
         collar.setStatus(CollarStatus.ACTIVO);
 
         if (collar.getSignalStatus() == null || collar.getSignalStatus() == DeviceSignalStatus.SIN_SENAL) {
@@ -90,7 +94,9 @@ public class MonitoringFacade {
 
         collarRepository.save(collar);
 
-        alertService.resolvePendingCollarOfflineAlert(collar, command.getTimestamp());
+        if (lastSeenAtAdvanced) {
+            alertService.resolvePendingCollarOfflineAlert(collar, command.getTimestamp());
+        }
 
         Location location = new Location();
         location.setLatitude(command.getLatitude());
@@ -119,6 +125,10 @@ public class MonitoringFacade {
         });
 
         return mapToResponseDTO(savedLocation);
+    }
+
+    private boolean shouldAdvanceLastSeenAt(Collar collar, java.time.LocalDateTime incomingTimestamp) {
+        return collar.getLastSeenAt() == null || incomingTimestamp.isAfter(collar.getLastSeenAt());
     }
 
     private LocationResponseDTO mapToResponseDTO(Location location) {

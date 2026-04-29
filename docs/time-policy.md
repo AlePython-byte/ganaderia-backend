@@ -47,6 +47,9 @@ El proyecto todavía usa `LocalDateTime` en varios campos de dominio y API. Esto
 5. Pruebas que usan `LocalDateTime.now()` pueden volverse frágiles.
 6. `lastSeenAt` puede representar telemetría del dispositivo, no necesariamente hora de recepción del servidor.
 
+Además, `lastSeenAt` no debe retroceder si llega una telemetría vieja pero todavía válida dentro de la ventana aceptada.
+El historial de ubicaciones puede conservar eventos antiguos válidos, pero la frescura operativa del collar debe permanecer monotónica.
+
 ## 5. Configuración técnica base
 
 El proyecto debe mantener configuración explícita de UTC en Spring y Hibernate:
