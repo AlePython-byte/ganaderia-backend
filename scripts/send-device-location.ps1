@@ -32,16 +32,15 @@ $path = "/api/device/locations"
 $trimmedBaseUrl = $BaseUrl.TrimEnd("/")
 
 # Header timestamp:
-# - must be ISO-8601 UTC and is validated by DeviceRequestAuthenticationService as Instant.
+# - must be ISO-8601 UTC with Z and is validated by DeviceRequestAuthenticationService as Instant.
 $requestInstantUtc = [DateTimeOffset]::UtcNow
 $timestampHeader = $requestInstantUtc.ToString("yyyy-MM-ddTHH:mm:ss'Z'")
 
 # Body timestamp:
-# - DeviceLocationRequestDTO expects yyyy-MM-ddTHH:mm:ss without offset.
-# - The current backend validates this field as a LocalDateTime close to the server clock.
-# - For a local Windows test against the same machine, using local server time is the most
-#   reproducible option while keeping the auth timestamp in UTC.
-$bodyTimestamp = $requestInstantUtc.ToLocalTime().ToString("yyyy-MM-ddTHH:mm:ss")
+# - DeviceLocationRequestDTO expects yyyy-MM-ddTHH:mm:ss without offset because it uses LocalDateTime.
+# - To avoid clock interpretation drift between Windows local time, Docker and Render,
+#   the script uses the same UTC instant as the auth timestamp, but without the trailing Z.
+$bodyTimestamp = $requestInstantUtc.ToString("yyyy-MM-ddTHH:mm:ss")
 
 $nonce = [Guid]::NewGuid().ToString()
 

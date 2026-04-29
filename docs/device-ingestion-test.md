@@ -47,6 +47,7 @@ Detalles relevantes del código actual:
 Notas:
 
 - `timestamp` del body no lleva offset ni sufijo `Z`.
+- El script usa UTC sin sufijo `Z` tambien en el body para evitar desfases entre Windows local, Docker y Render.
 - El backend no acepta actualmente `batteryLevel` ni `gpsAccuracy` en este endpoint.
 - El script PowerShell recibe `BatteryLevel` y `GpsAccuracy` solo como metadatos locales para la prueba, pero no los envía.
 
