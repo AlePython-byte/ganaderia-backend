@@ -56,6 +56,7 @@ public class WebhookNotificationDeliveryProcessor {
     }
 
     public void processDueDeliveries() {
+        long startedAt = System.nanoTime();
         LocalDateTime now = LocalDateTime.now();
         List<Long> claimedDeliveryIds = transactionTemplate.execute(status -> claimEligibleDeliveries(now));
 
@@ -79,11 +80,13 @@ public class WebhookNotificationDeliveryProcessor {
         }
 
         logger.info(
-                "event=notification_webhook_processor_completed claimed={} delivered={} retried={} failedPermanent={}",
+                "event=webhook_delivery_processor_completed requestId={} claimed={} delivered={} retried={} failedPermanent={} durationMs={}",
+                OperationalLogSanitizer.requestIdOr("scheduled"),
                 claimedDeliveryIds.size(),
                 delivered,
                 retried,
-                failedPermanent
+                failedPermanent,
+                elapsedMs(startedAt)
         );
     }
 
@@ -287,9 +290,8 @@ public class WebhookNotificationDeliveryProcessor {
                             int attemptNumber,
                             long startedAt) {
         logger.info(
-                "event=notification_webhook_delivery_result channel={} result={} notificationId={} deliveryId={} destination={} status={} attempts={} durationMs={} eventType={}",
-                CHANNEL,
-                "delivered",
+                "event=webhook_delivery_success requestId={} notificationId={} deliveryId={} host={} status={} attempts={} durationMs={} notificationType={}",
+                OperationalLogSanitizer.requestIdOr("scheduled"),
                 OperationalLogSanitizer.safe(delivery.getNotificationId()),
                 delivery.getId(),
                 destinationSummary(delivery.getDestination()),
@@ -307,9 +309,8 @@ public class WebhookNotificationDeliveryProcessor {
                           String errorType,
                           long startedAt) {
         logger.warn(
-                "event=notification_webhook_delivery_result channel={} result={} notificationId={} deliveryId={} destination={} status={} attempts={} nextAttemptAt={} durationMs={} eventType={} errorType={}",
-                CHANNEL,
-                "retry_scheduled",
+                "event=webhook_delivery_failed requestId={} notificationId={} deliveryId={} host={} status={} attempts={} nextAttemptAt={} durationMs={} notificationType={} errorType={} reason=retry_scheduled",
+                OperationalLogSanitizer.requestIdOr("scheduled"),
                 OperationalLogSanitizer.safe(delivery.getNotificationId()),
                 delivery.getId(),
                 destinationSummary(delivery.getDestination()),
@@ -328,13 +329,12 @@ public class WebhookNotificationDeliveryProcessor {
                                      String errorType,
                                      long startedAt) {
         logger.error(
-                "event=notification_webhook_delivery_result channel={} result={} notificationId={} deliveryId={} destination={} status={} attempts={} durationMs={} eventType={} errorType={} error={}",
-                CHANNEL,
-                "failed_permanent",
+                "event=webhook_delivery_failed requestId={} notificationId={} deliveryId={} host={} status={} attempts={} durationMs={} notificationType={} errorType={} reason={}",
+                OperationalLogSanitizer.requestIdOr("scheduled"),
                 OperationalLogSanitizer.safe(delivery.getNotificationId()),
                 delivery.getId(),
                 destinationSummary(delivery.getDestination()),
-                delivery.getStatus().name(),
+                failureStatusForLog(failureReason),
                 attemptNumber,
                 elapsedMs(startedAt),
                 OperationalLogSanitizer.safe(delivery.getEventType()),
@@ -345,6 +345,14 @@ public class WebhookNotificationDeliveryProcessor {
 
     private String summarizeError(String errorMessage) {
         return errorMessage == null || errorMessage.isBlank() ? "UNKNOWN" : errorMessage;
+    }
+
+    private String failureStatusForLog(String failureReason) {
+        if (failureReason != null && failureReason.startsWith("HTTP_")) {
+            return failureReason.substring("HTTP_".length());
+        }
+
+        return "N/A";
     }
 
     private String destinationSummary(String destination) {

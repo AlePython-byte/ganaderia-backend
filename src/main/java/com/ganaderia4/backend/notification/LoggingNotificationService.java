@@ -22,7 +22,8 @@ public class LoggingNotificationService implements NotificationService {
         }
 
         logger.info(
-                "event=notification_log channel={} eventType={} severity={} metadataKeys={} metadataSize={}",
+                "event=notification_logged requestId={} channel={} notificationType={} severity={} metadataKeys={} metadataSize={}",
+                OperationalLogSanitizer.requestId(),
                 getChannel().name(),
                 OperationalLogSanitizer.safe(notificationMessage.getEventType()),
                 OperationalLogSanitizer.safe(notificationMessage.getSeverity()),

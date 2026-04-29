@@ -85,7 +85,8 @@ public class LocationService {
         LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
 
         log.info(
-                "event=device_location_registered device={} cow={} locationId={} reportedAt={}",
+                "event=device_location_registered requestId={} device={} cow={} locationId={} reportedAt={}",
+                OperationalLogSanitizer.requestId(),
                 OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken()),
                 OperationalLogSanitizer.maskToken(response.getCowToken()),
                 response.getId(),
@@ -141,18 +142,19 @@ public class LocationService {
 
     private void validateDevicePayload(DeviceLocationPayloadDTO payloadDTO) {
         if (payloadDTO == null) {
-            log.warn("event=device_location_rejected reason=null_payload device=UNKNOWN");
+            log.warn("event=device_location_rejected requestId={} reason=null_payload device=UNKNOWN", OperationalLogSanitizer.requestId());
             throw new BadRequestException("Payload de dispositivo inválido");
         }
 
         if (payloadDTO.getDeviceToken() == null || payloadDTO.getDeviceToken().isBlank()) {
-            log.warn("event=device_location_rejected reason=invalid_device_token device=UNKNOWN");
+            log.warn("event=device_location_rejected requestId={} reason=invalid_device_token device=UNKNOWN", OperationalLogSanitizer.requestId());
             throw new BadRequestException("Token de dispositivo inválido");
         }
 
         if (payloadDTO.getLat() == null) {
             log.warn(
-                    "event=device_location_rejected reason=missing_latitude device={}",
+                    "event=device_location_rejected requestId={} reason=missing_latitude device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("La latitud es obligatoria");
@@ -160,7 +162,8 @@ public class LocationService {
 
         if (payloadDTO.getLon() == null) {
             log.warn(
-                    "event=device_location_rejected reason=missing_longitude device={}",
+                    "event=device_location_rejected requestId={} reason=missing_longitude device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("La longitud es obligatoria");
@@ -168,7 +171,8 @@ public class LocationService {
 
         if (payloadDTO.getReportedAt() == null) {
             log.warn(
-                    "event=device_location_rejected reason=missing_reported_at device={}",
+                    "event=device_location_rejected requestId={} reason=missing_reported_at device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("El timestamp reportado es obligatorio");
@@ -176,7 +180,8 @@ public class LocationService {
 
         if (payloadDTO.getLat() < -90.0 || payloadDTO.getLat() > 90.0) {
             log.warn(
-                    "event=device_location_rejected reason=latitude_out_of_range device={}",
+                    "event=device_location_rejected requestId={} reason=latitude_out_of_range device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("La latitud está fuera de rango");
@@ -184,7 +189,8 @@ public class LocationService {
 
         if (payloadDTO.getLon() < -180.0 || payloadDTO.getLon() > 180.0) {
             log.warn(
-                    "event=device_location_rejected reason=longitude_out_of_range device={}",
+                    "event=device_location_rejected requestId={} reason=longitude_out_of_range device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("La longitud está fuera de rango");
@@ -194,7 +200,8 @@ public class LocationService {
 
         if (payloadDTO.getReportedAt().isAfter(now.plus(MAX_FUTURE_DRIFT))) {
             log.warn(
-                    "event=device_location_rejected reason=reported_at_too_new device={}",
+                    "event=device_location_rejected requestId={} reason=reported_at_too_new device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("El timestamp reportado no puede estar demasiado en el futuro");
@@ -202,7 +209,8 @@ public class LocationService {
 
         if (payloadDTO.getReportedAt().isBefore(now.minus(MAX_PAST_AGE))) {
             log.warn(
-                    "event=device_location_rejected reason=reported_at_too_old device={}",
+                    "event=device_location_rejected requestId={} reason=reported_at_too_old device={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
             );
             throw new BadRequestException("El timestamp reportado es demasiado antiguo para ser procesado");

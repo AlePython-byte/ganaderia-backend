@@ -55,10 +55,10 @@ class DeviceMonitoringServiceTest {
 
         String logs = output.getOut();
 
-        assertTrue(logs.contains("event=device_offline_monitor_completed"));
-        assertTrue(logs.contains("result=success"));
+        assertTrue(logs.contains("event=offline_monitoring_completed"));
+        assertTrue(logs.contains("requestId=scheduled"));
         assertTrue(logs.contains("processed=2"));
-        assertTrue(logs.contains("markedOffline=1"));
+        assertTrue(logs.contains("affected=1"));
         assertTrue(logs.contains("alertsRequested=2"));
         assertTrue(logs.contains("durationMs="));
         verify(collarRepository).findByEnabledTrueAndStatusAndLastSeenAtBefore(
@@ -88,10 +88,10 @@ class DeviceMonitoringServiceTest {
 
         String logs = output.getOut() + output.getErr();
 
-        assertTrue(logs.contains("event=device_offline_monitor_completed"));
-        assertTrue(logs.contains("result=failure"));
+        assertTrue(logs.contains("event=offline_monitoring_failed"));
+        assertTrue(logs.contains("requestId=scheduled"));
         assertTrue(logs.contains("processed=0"));
-        assertTrue(logs.contains("markedOffline=0"));
+        assertTrue(logs.contains("affected=0"));
         assertTrue(logs.contains("alertsRequested=0"));
         assertTrue(logs.contains("errorType=IllegalStateException"));
         assertTrue(logs.contains("database_unavailable"));

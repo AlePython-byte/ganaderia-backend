@@ -53,7 +53,8 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
 
     private void logFailure(String channel, NotificationMessage notificationMessage, RuntimeException ex) {
         logger.error(
-                "event=notification_dispatch_failed channel={} eventType={} severity={} errorType={} error={}",
+                "event=notification_dispatch_failed requestId={} channel={} notificationType={} severity={} errorType={} error={}",
+                OperationalLogSanitizer.requestId(),
                 channel,
                 OperationalLogSanitizer.safe(notificationMessage.getEventType()),
                 OperationalLogSanitizer.safe(notificationMessage.getSeverity()),

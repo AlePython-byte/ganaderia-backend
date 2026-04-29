@@ -8,7 +8,6 @@ import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.repository.WebhookNotificationDeliveryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -107,10 +106,8 @@ public class WebhookNotificationService implements NotificationService {
     private void logQueued(WebhookNotificationDelivery delivery,
                            NotificationMessage notificationMessage) {
         logger.info(
-                "event=notification_webhook_enqueued channel={} result={} requestId={} notificationId={} destination={} status={} attempts={} nextAttemptAt={} readTimeoutMs={} eventType={}",
-                getChannel().name(),
-                "queued",
-                requestId(),
+                "event=webhook_delivery_enqueued requestId={} notificationId={} host={} status={} attempts={} nextAttemptAt={} readTimeoutMs={} notificationType={}",
+                OperationalLogSanitizer.requestId(),
                 OperationalLogSanitizer.safe(delivery.getNotificationId()),
                 OperationalLogSanitizer.destination(webhookUri),
                 delivery.getStatus().name(),
@@ -124,18 +121,12 @@ public class WebhookNotificationService implements NotificationService {
     private void logPersistenceFailure(NotificationMessage notificationMessage,
                                        RuntimeException exception) {
         logger.error(
-                "event=notification_webhook_enqueue_failed channel={} result={} requestId={} destination={} eventType={} errorType={} error={}",
-                getChannel().name(),
-                "failure",
-                requestId(),
+                "event=webhook_delivery_enqueue_failed requestId={} host={} notificationType={} errorType={} error={}",
+                OperationalLogSanitizer.requestId(),
                 OperationalLogSanitizer.destination(webhookUri),
                 OperationalLogSanitizer.safe(notificationMessage.getEventType()),
                 exception.getClass().getSimpleName(),
                 OperationalLogSanitizer.safe(exception.getMessage())
         );
-    }
-
-    private String requestId() {
-        return OperationalLogSanitizer.safe(MDC.get("requestId"));
     }
 }

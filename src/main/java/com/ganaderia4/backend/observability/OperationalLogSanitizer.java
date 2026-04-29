@@ -66,4 +66,13 @@ public final class OperationalLogSanitizer {
     public static String requestId() {
         return safe(MDC.get(RequestCorrelationFilter.MDC_KEY));
     }
+
+    public static String requestIdOr(String fallback) {
+        String requestId = MDC.get(RequestCorrelationFilter.MDC_KEY);
+        if (requestId == null || requestId.isBlank()) {
+            return safe(fallback);
+        }
+
+        return safe(requestId);
+    }
 }

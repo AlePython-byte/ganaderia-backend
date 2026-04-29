@@ -65,7 +65,7 @@ class WebhookNotificationServiceTest {
         WebhookNotificationDelivery delivery = captor.getValue();
         assertNotNull(delivery.getNotificationId());
         assertEquals("CRITICAL_ALERT_CREATED", delivery.getEventType());
-        assertEquals("https://example.com/notifications", delivery.getDestination());
+        assertEquals("https://example.com/notifications?access_token=secret-token", delivery.getDestination());
         assertEquals(WebhookNotificationDeliveryStatus.PENDING, delivery.getStatus());
         assertEquals(0, delivery.getAttempts());
         assertNull(delivery.getLastError());
@@ -89,14 +89,14 @@ class WebhookNotificationServiceTest {
         );
 
         String logs = output.getOut();
-        assertTrue(logs.contains("event=notification_webhook_enqueued"));
-        assertTrue(logs.contains("channel=WEBHOOK"));
-        assertTrue(logs.contains("result=queued"));
+        assertTrue(logs.contains("event=webhook_delivery_enqueued"));
         assertTrue(logs.contains("requestId=req-webhook-001"));
-        assertTrue(logs.contains("destination=https://example.com"));
+        assertTrue(logs.contains("host=https://example.com"));
         assertTrue(logs.contains("status=PENDING"));
-        assertTrue(logs.contains("eventType=CRITICAL_ALERT_CREATED"));
+        assertTrue(logs.contains("notificationType=CRITICAL_ALERT_CREATED"));
         assertFalse(logs.contains(delivery.getPayload()));
+        assertFalse(logs.contains("/notifications"));
+        assertFalse(logs.contains("access_token=secret-token"));
     }
 
     @Test
@@ -162,7 +162,7 @@ class WebhookNotificationServiceTest {
     private WebhookNotificationProperties webhookProperties() {
         WebhookNotificationProperties properties = new WebhookNotificationProperties();
         properties.setEnabled(true);
-        properties.setUrl("https://example.com/notifications");
+        properties.setUrl("https://example.com/notifications?access_token=secret-token");
         properties.setConnectTimeout(Duration.ofSeconds(2));
         properties.setReadTimeout(Duration.ofSeconds(2));
         properties.setSecret("webhook-secret");

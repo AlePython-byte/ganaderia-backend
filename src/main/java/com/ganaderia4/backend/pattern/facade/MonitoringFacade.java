@@ -73,7 +73,8 @@ public class MonitoringFacade {
 
         if (duplicatedLocation != null) {
             log.info(
-                    "event=location_duplicate_ignored collar={} locationId={} timestamp={}",
+                    "event=location_duplicate_ignored requestId={} collar={} locationId={} timestamp={}",
+                    OperationalLogSanitizer.requestId(),
                     OperationalLogSanitizer.maskToken(collar.getToken()),
                     duplicatedLocation.getId(),
                     command.getTimestamp()

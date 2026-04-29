@@ -13,7 +13,8 @@ public class LogGeofenceExitObserver implements GeofenceExitObserver {
     @Override
     public void onGeofenceExit(GeofenceExitEvent event) {
         logger.warn(
-                "event=geofence_exit_detected cow={} locationId={}",
+                "event=geofence_exit_detected requestId={} cow={} locationId={}",
+                OperationalLogSanitizer.requestId(),
                 OperationalLogSanitizer.maskToken(event.getCow().getToken()),
                 event.getLocation().getId()
         );

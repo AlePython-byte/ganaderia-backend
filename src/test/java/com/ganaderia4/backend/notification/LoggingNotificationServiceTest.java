@@ -28,9 +28,10 @@ class LoggingNotificationServiceTest {
 
         String logs = output.getOut();
 
-        assertTrue(logs.contains("event=notification_log"));
+        assertTrue(logs.contains("event=notification_logged"));
+        assertTrue(logs.contains("requestId=-"));
         assertTrue(logs.contains("channel=LOG"));
-        assertTrue(logs.contains("eventType=CRITICAL_ALERT_CREATED"));
+        assertTrue(logs.contains("notificationType=CRITICAL_ALERT_CREATED"));
         assertTrue(logs.contains("severity=HIGH"));
         assertTrue(logs.contains("metadataKeys=alertType,collarToken,cowToken"));
         assertTrue(logs.contains("metadataSize=3"));

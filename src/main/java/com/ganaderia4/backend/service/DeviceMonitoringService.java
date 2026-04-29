@@ -44,6 +44,7 @@ public class DeviceMonitoringService {
     @Transactional
     public void monitorOfflineCollars() {
         long startedAt = System.nanoTime();
+        String requestId = OperationalLogSanitizer.requestIdOr("scheduled");
         int processed = 0;
         int markedOffline = 0;
         int alertsRequested = 0;
@@ -69,10 +70,11 @@ public class DeviceMonitoringService {
                 alertsRequested++;
             }
 
-            logMonitorSummary("success", processed, markedOffline, alertsRequested, elapsedMs(startedAt));
+            logMonitorSummary(requestId, processed, markedOffline, alertsRequested, elapsedMs(startedAt));
         } catch (RuntimeException ex) {
             log.error(
-                    "event=device_offline_monitor_completed result=failure processed={} markedOffline={} alertsRequested={} durationMs={} errorType={} error={}",
+                    "event=offline_monitoring_failed requestId={} processed={} affected={} alertsRequested={} durationMs={} errorType={} error={}",
+                    requestId,
                     processed,
                     markedOffline,
                     alertsRequested,
@@ -85,20 +87,20 @@ public class DeviceMonitoringService {
         }
     }
 
-    private void logMonitorSummary(String result,
+    private void logMonitorSummary(String requestId,
                                    int processed,
                                    int markedOffline,
                                    int alertsRequested,
                                    long durationMs) {
-        String message = "event=device_offline_monitor_completed result={} processed={} markedOffline={} "
+        String message = "event=offline_monitoring_completed requestId={} processed={} affected={} "
                 + "alertsRequested={} durationMs={}";
 
         if (processed == 0 && markedOffline == 0 && alertsRequested == 0) {
-            log.debug(message, result, processed, markedOffline, alertsRequested, durationMs);
+            log.debug(message, requestId, processed, markedOffline, alertsRequested, durationMs);
             return;
         }
 
-        log.info(message, result, processed, markedOffline, alertsRequested, durationMs);
+        log.info(message, requestId, processed, markedOffline, alertsRequested, durationMs);
     }
 
     private long elapsedMs(long startedAt) {
