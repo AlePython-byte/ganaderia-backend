@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.slf4j.MDC;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -70,6 +71,7 @@ class DeviceRequestAuthenticationServiceTest {
                 new InMemoryDeviceReplayProtectionStore(),
                 new FixedDeviceSigningSecretService(Map.of("COLLAR-UNIT-002", "SECRET-UNIT-002"))
         );
+        MDC.put("requestId", "req-device-invalid-signature-001");
 
         assertThrows(DeviceUnauthorizedException.class, () -> service.authenticate(
                 "COLLAR-UNIT-002",
@@ -88,13 +90,15 @@ class DeviceRequestAuthenticationServiceTest {
         ).count());
 
         String logs = output.getOut();
-        assertTrue(logs.contains("event=security_auth_failed"));
+        assertTrue(logs.contains("event=device_signature_invalid"));
         assertTrue(logs.contains("reason=invalid_signature"));
+        assertTrue(logs.contains("requestId=req-device-invalid-signature-001"));
+        assertTrue(logs.contains("method=POST"));
         assertTrue(logs.contains("path=" + PATH));
         assertTrue(logs.contains("device=****-002"));
         assertTrue(logs.contains("status=401"));
-        assertFalse(logs.contains("COLLAR-UNIT-002"));
-        assertFalse(logs.contains(signature));
+        assertFalse(logs.contains("device=COLLAR-UNIT-002"));
+        MDC.clear();
     }
 
     @Test

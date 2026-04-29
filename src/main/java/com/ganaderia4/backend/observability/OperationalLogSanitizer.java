@@ -1,5 +1,7 @@
 package com.ganaderia4.backend.observability;
 
+import org.slf4j.MDC;
+
 import java.net.URI;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -59,5 +61,9 @@ public final class OperationalLogSanitizer {
                 .map(OperationalLogSanitizer::safe)
                 .sorted()
                 .collect(Collectors.joining(","));
+    }
+
+    public static String requestId() {
+        return safe(MDC.get(RequestCorrelationFilter.MDC_KEY));
     }
 }

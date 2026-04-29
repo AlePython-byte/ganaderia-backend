@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.observability.RequestCorrelationFilter;
 import com.ganaderia4.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -148,9 +149,10 @@ public class SecurityConfig {
                                 if (!Boolean.TRUE.equals(request.getAttribute(
                                         JwtAuthenticationFilter.SECURITY_FAILURE_LOGGED_ATTRIBUTE))) {
                                     logSecurityResponse(
-                                            "unauthorized",
+                                            "http_unauthorized",
+                                            "authentication_required",
+                                            request.getMethod(),
                                             request.getRequestURI(),
-                                            null,
                                             HttpStatus.UNAUTHORIZED
                                     );
                                 }
@@ -164,9 +166,10 @@ public class SecurityConfig {
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                                 logSecurityResponse(
-                                        "forbidden",
+                                        "http_forbidden",
+                                        "access_denied",
+                                        request.getMethod(),
                                         request.getRequestURI(),
-                                        request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : null,
                                         HttpStatus.FORBIDDEN
                                 );
                                 writeErrorResponse(
@@ -203,15 +206,18 @@ public class SecurityConfig {
         response.getWriter().write(objectMapper.writeValueAsString(error));
     }
 
-    private void logSecurityResponse(String reason,
+    private void logSecurityResponse(String event,
+                                     String reason,
+                                     String method,
                                      String path,
-                                     String user,
                                      HttpStatus status) {
         log.warn(
-                "event=security_auth_failed reason={} path={} user={} status={}",
+                "event={} reason={} requestId={} method={} path={} status={}",
+                event,
                 reason,
+                OperationalLogSanitizer.requestId(),
+                safeLogValue(method),
                 safeLogValue(path),
-                safeLogValue(user != null ? user : "ANONYMOUS"),
                 status.value()
         );
     }

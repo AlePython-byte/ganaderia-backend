@@ -2,6 +2,7 @@ package com.ganaderia4.backend.security;
 
 import com.ganaderia4.backend.exception.DeviceUnauthorizedException;
 import com.ganaderia4.backend.observability.DomainMetricsService;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -194,13 +195,28 @@ public class DeviceRequestAuthenticationService {
     private DeviceUnauthorizedException unauthorized(String reason, String message, String deviceToken, String path) {
         domainMetricsService.incrementDeviceRequestRejected(reason);
         log.warn(
-                "event=security_auth_failed reason={} path={} device={} status={}",
+                "event={} reason={} requestId={} method={} path={} device={} status={}",
+                eventFor(reason),
                 reason,
+                OperationalLogSanitizer.requestId(),
+                "POST",
                 safeLogValue(path),
                 maskDeviceToken(deviceToken),
                 401
         );
         return new DeviceUnauthorizedException(message);
+    }
+
+    private String eventFor(String reason) {
+        return switch (reason) {
+            case "invalid_signature", "missing_signature", "signature_too_long", "signature_validation_error" ->
+                    "device_signature_invalid";
+            case "missing_timestamp", "invalid_timestamp", "expired_timestamp" ->
+                    "device_timestamp_invalid";
+            case "replayed_nonce" -> "device_nonce_reused";
+            case "unknown_device", "missing_token", "token_too_long" -> "device_token_unknown";
+            default -> "device_auth_failed";
+        };
     }
 
     private String maskDeviceToken(String token) {

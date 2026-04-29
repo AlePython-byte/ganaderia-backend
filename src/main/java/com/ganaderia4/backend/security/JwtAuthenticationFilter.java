@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.security;
 
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -21,7 +22,6 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
-    private static final String UNKNOWN_USER = "UNKNOWN";
     public static final String SECURITY_FAILURE_LOGGED_ATTRIBUTE =
             "com.ganaderia4.backend.security.failureLogged";
 
@@ -66,23 +66,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (ExpiredJwtException ex) {
-            logAuthenticationFailure("expired_jwt", request, UNKNOWN_USER);
+            logAuthenticationFailure("jwt_token_expired", "expired_jwt", request);
         } catch (JwtException | IllegalArgumentException ignored) {
-            logAuthenticationFailure("invalid_jwt", request, UNKNOWN_USER);
+            logAuthenticationFailure("jwt_token_invalid", "invalid_jwt", request);
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void logAuthenticationFailure(String reason,
-                                          HttpServletRequest request,
-                                          String user) {
+    private void logAuthenticationFailure(String event,
+                                          String reason,
+                                          HttpServletRequest request) {
         request.setAttribute(SECURITY_FAILURE_LOGGED_ATTRIBUTE, Boolean.TRUE);
         log.warn(
-                "event=security_auth_failed reason={} path={} user={} status={}",
+                "event={} reason={} requestId={} method={} path={} status={}",
+                event,
                 reason,
+                OperationalLogSanitizer.requestId(),
+                safeLogValue(request.getMethod()),
                 safeLogValue(request.getRequestURI()),
-                safeLogValue(user),
                 HttpServletResponse.SC_UNAUTHORIZED
         );
     }

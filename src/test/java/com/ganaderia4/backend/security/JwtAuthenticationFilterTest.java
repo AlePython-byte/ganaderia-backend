@@ -9,6 +9,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.slf4j.MDC;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,20 +32,23 @@ class JwtAuthenticationFilterTest {
 
         request.addHeader("Authorization", "Bearer " + token);
         when(jwtService.extractUsername(token)).thenThrow(new JwtException("invalid token"));
+        MDC.put("requestId", "req-jwt-invalid-001");
 
         filter.doFilter(request, response, filterChain);
 
         String logs = output.getOut();
 
-        assertTrue(logs.contains("event=security_auth_failed"));
+        assertTrue(logs.contains("event=jwt_token_invalid"));
         assertTrue(logs.contains("reason=invalid_jwt"));
+        assertTrue(logs.contains("requestId=req-jwt-invalid-001"));
+        assertTrue(logs.contains("method=GET"));
         assertTrue(logs.contains("path=/api/auth/me"));
-        assertTrue(logs.contains("user=UNKNOWN"));
         assertTrue(logs.contains("status=401"));
         assertFalse(logs.contains(token));
         assertTrue(Boolean.TRUE.equals(request.getAttribute(
                 JwtAuthenticationFilter.SECURITY_FAILURE_LOGGED_ATTRIBUTE)));
         verify(filterChain).doFilter(request, response);
+        MDC.clear();
     }
 
     @Test
@@ -59,19 +63,22 @@ class JwtAuthenticationFilterTest {
 
         request.addHeader("Authorization", "Bearer " + token);
         when(jwtService.extractUsername(token)).thenThrow(new ExpiredJwtException(null, null, "expired token"));
+        MDC.put("requestId", "req-jwt-expired-001");
 
         filter.doFilter(request, response, filterChain);
 
         String logs = output.getOut();
 
-        assertTrue(logs.contains("event=security_auth_failed"));
+        assertTrue(logs.contains("event=jwt_token_expired"));
         assertTrue(logs.contains("reason=expired_jwt"));
+        assertTrue(logs.contains("requestId=req-jwt-expired-001"));
+        assertTrue(logs.contains("method=GET"));
         assertTrue(logs.contains("path=/api/reports/alerts"));
-        assertTrue(logs.contains("user=UNKNOWN"));
         assertTrue(logs.contains("status=401"));
         assertFalse(logs.contains(token));
         assertTrue(Boolean.TRUE.equals(request.getAttribute(
                 JwtAuthenticationFilter.SECURITY_FAILURE_LOGGED_ATTRIBUTE)));
         verify(filterChain).doFilter(request, response);
+        MDC.clear();
     }
 }
