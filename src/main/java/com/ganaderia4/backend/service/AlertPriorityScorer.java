@@ -33,16 +33,16 @@ public class AlertPriorityScorer {
 
     @Autowired
     public AlertPriorityScorer(AlertRepository alertRepository,
-                               CollarRepository collarRepository) {
-        this(alertRepository, collarRepository, Clock.systemDefaultZone());
-    }
-
-    AlertPriorityScorer(AlertRepository alertRepository,
-                        CollarRepository collarRepository,
-                        Clock clock) {
+                               CollarRepository collarRepository,
+                               Clock clock) {
         this.alertRepository = alertRepository;
         this.collarRepository = collarRepository;
         this.clock = clock;
+    }
+
+    AlertPriorityScorer(AlertRepository alertRepository,
+                        CollarRepository collarRepository) {
+        this(alertRepository, collarRepository, Clock.systemUTC());
     }
 
     public AlertPriorityAssessment score(Alert alert) {
