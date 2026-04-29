@@ -1,410 +1,350 @@
-﻿# GanaderÃ­a 4.0 Backend
+# Ganadería 4.0 Backend
 
-Backend del sistema **GanaderÃ­a 4.0**, una plataforma para monitoreo ganadero con collares GPS, geocercas, alertas operativas, autenticaciÃ³n JWT, reportes y observabilidad.
+Backend del sistema **Ganadería 4.0**, orientado al monitoreo ganadero mediante collares con telemetría GPS, geocercas, alertas operativas, autenticación JWT y endpoints de integración para dispositivos.
 
-## DescripciÃ³n
+## Estado actual del proyecto
 
-Este proyecto implementa un backend en **Spring Boot** para gestionar el monitoreo de ganado mediante dispositivos de rastreo. El sistema permite administrar vacas, collares, geocercas, ubicaciones y alertas, ademÃ¡s de ofrecer endpoints de autenticaciÃ³n, reportes, observabilidad y despliegue automatizado.
+El proyecto se encuentra en un estado funcional y validado para presentación técnica y académica.
 
-El objetivo principal es detectar eventos relevantes del negocio, como:
+- Compila correctamente con Maven Wrapper.
+- La validación completa se ejecuta con `./mvnw clean verify`.
+- La última evidencia local disponible en `target/surefire-reports` y `target/failsafe-reports` registra `238` pruebas ejecutadas.
+- El backend expone módulos operativos para vacas, collares, geocercas, ubicaciones, alertas, reportes, dashboard y auditoría.
+- La seguridad combina autenticación JWT para usuarios del backend y autenticación HMAC para dispositivos en `/api/device/locations`.
+- El proyecto incluye migraciones versionadas con Flyway, observabilidad con Actuator, documentación Swagger/OpenAPI, contenedorización con Docker y automatización con GitHub Actions.
 
-- salida de una vaca de su geocerca
-- collares sin seÃ±al o sin reportes recientes
-- historial de ubicaciones
-- seguimiento operativo de alertas
-- reportes de incidencias
+## Descripción
 
----
+Ganadería 4.0 Backend implementa una API REST en **Spring Boot** para soportar la operación de monitoreo de ganado. El sistema administra entidades del dominio, procesa ubicaciones reportadas por collares, evalúa geocercas, genera alertas operativas y ofrece capacidades de consulta, trazabilidad y despliegue automatizado.
 
-## CaracterÃ­sticas principales
+El backend está orientado a resolver flujos como:
 
-### AutenticaciÃ³n y seguridad
-- autenticaciÃ³n con **JWT**
-- control de acceso por roles
-- seguridad endurecida
-- CORS configurado
-- respuestas de error sanitizadas
-- persistencia de sesiÃ³n mediante token
+- seguimiento de vacas y collares
+- registro y consulta de ubicaciones
+- detección de salida de geocerca
+- monitoreo de collares sin señal o sin telemetría reciente
+- consulta de alertas, dashboard y reportes operativos
+- trazabilidad básica de acciones mediante auditoría
 
-### GestiÃ³n de dominio
-- gestiÃ³n de **vacas**
-- gestiÃ³n de **collares**
-- gestiÃ³n de **geocercas**
-- gestiÃ³n de **ubicaciones**
-- gestiÃ³n de **alertas**
-
-### LÃ³gica operativa
-- creaciÃ³n automÃ¡tica de alertas por salida de geocerca
-- creaciÃ³n automÃ¡tica de alertas por collar offline
-- auto-resoluciÃ³n de alertas cuando el estado se recupera
-- validaciÃ³n defensiva del endpoint de dispositivos
-- control de duplicados en ubicaciones reportadas por collares
-
-### Observabilidad
-- `X-Request-Id` por request
-- Actuator habilitado
-- mÃ©tricas tÃ©cnicas y de dominio
-- endpoint Prometheus
-- health indicator del monitoreo offline
-
-### Notificaciones
-- arquitectura desacoplada de notificaciones
-- dispatcher central
-- canal por logs para local/test
-- canal webhook saliente configurable
-- disparo para alertas crÃ­ticas
-
-### Reportes
-- reporte de alertas con filtros
-- reporte de collares offline
-- reporte de vacas con mÃ¡s incidencias
-- exportaciÃ³n CSV del reporte de alertas
-
-### Calidad y despliegue
-- pruebas unitarias e integraciÃ³n
-- **SpringBootTest**
-- **MockMvc**
-- **Testcontainers con PostgreSQL**
-- **Flyway activo en tests**
-- GitHub Actions para CI/CD
-- despliegue en **Render**
-- validaciÃ³n Docker en pipeline
-
----
-
-## Plataforma tÃ©cnica
+## Stack tecnológico
 
 - Java 17
 - Spring Boot 4.0.3
-- Maven Wrapper
+- Spring Security
+- Spring Data JPA
 - PostgreSQL
 - Flyway
 - JWT
+- Springdoc OpenAPI / Swagger UI
+- Spring Boot Actuator
+- Micrometer + Prometheus
+- JUnit 5
+- MockMvc
+- Testcontainers
 - Docker
 - GitHub Actions
 
-El proyecto se mantiene en Java 17 porque es compatible con Spring Boot 4 y permite estabilidad en CI/CD y despliegue.
+## Funcionalidades implementadas
 
----
+### Seguridad y control de acceso
 
-## Quality Gates
+- autenticación con JWT para usuarios
+- autorización por roles (`ADMINISTRADOR`, `SUPERVISOR`, `OPERADOR`, `TECNICO`)
+- endpoint de login público en `/api/auth/login`
+- protección de endpoints según rol y método HTTP
+- respuestas de error sanitizadas para flujos de autenticación y autorización
+- soporte de CORS configurable por variables de entorno
 
-El comando recomendado para validaciÃ³n local y CI es:
+### Ingestión segura desde dispositivos
 
-```bash
-./mvnw clean verify
-```
+- endpoint dedicado en `POST /api/device/locations`
+- autenticación HMAC por headers `X-Device-Token`, `X-Device-Timestamp`, `X-Device-Nonce` y `X-Device-Signature`
+- protección anti-replay mediante almacenamiento y validación de `nonce`
+- ventana temporal de autenticación configurable
+- controles de abuso y rate limiting para el canal de dispositivos
 
-Ese flujo ejecuta:
+### Gestión del dominio
 
-- tests unitarios
-- tests de integraciÃ³n
-- reportes JaCoCo de unit tests, integration tests y cobertura combinada
-- verificaciÃ³n de cobertura mÃ­nima con JaCoCo
-- SpotBugs
+- gestión de vacas
+- gestión de collares
+- gestión de geocercas
+- gestión de ubicaciones
+- gestión de alertas
+- consultas de usuarios y eventos de auditoría
 
-Cobertura mÃ­nima configurada sobre la cobertura global combinada:
+### Lógica operativa
 
-- `LINE`: `0.50`
-- `BRANCH`: `0.35`
+- registro de ubicaciones desde API interna y desde dispositivos
+- evaluación de geocercas sobre eventos de ubicación
+- generación automática de alertas operativas
+- monitoreo de collares offline según umbral configurable
+- soporte de idempotencia y control de duplicados en ubicaciones
 
-El workflow de GitHub Actions usa el mismo comando para que el quality gate se aplique tambiÃ©n en CI.
+### Dashboard, reportes y trazabilidad
 
----
+- dashboard operativo en `/api/dashboard/**`
+- reportes de alertas, collares offline y vacas con mayor recurrencia de incidentes
+- exportación CSV del reporte de alertas
+- consulta de auditoría en `/api/audit-logs`
 
-## Mantenimiento de dependencias
+### Observabilidad y documentación
 
-Dependabot revisa semanalmente dependencias de Maven, GitHub Actions y Docker.
+- Actuator habilitado
+- métricas técnicas y de dominio
+- endpoint Prometheus habilitable por configuración
+- `X-Request-Id` por request mediante filtro de correlación
+- Swagger UI y OpenAPI habilitados en `local` y `dev`
+- `health` e `info` disponibles para chequeos operativos; `metrics` y `prometheus` requieren rol `ADMINISTRADOR`
 
-Dependabot abre pull requests automÃ¡ticos con labels de dependencias y seguridad para mantener el proyecto actualizado sin intervenir manualmente en cada revisiÃ³n.
+### Contenedorización y automatización
 
-Cada pull request de actualizaciÃ³n debe pasar `./mvnw clean verify` antes de fusionarse.
-
-Las actualizaciones mayores no deben aceptarse sin revisar changelog, notas de compatibilidad e impacto sobre CI, build y despliegue.
-
----
-
-## Escaneo de vulnerabilidades
-
-Dependabot revisa actualizaciones disponibles y ayuda a detectar alertas de dependencias sobre Maven, GitHub Actions y Docker.
-
-OWASP Dependency-Check analiza vulnerabilidades conocidas en las dependencias del proyecto y genera reportes en HTML, JSON y JUNIT.
-
-El escaneo corre manualmente o semanalmente en GitHub Actions mediante un workflow separado.
-
-No corre en cada push para evitar lentitud adicional y falsos positivos iniciales sobre el pipeline principal.
-
-Si se detectan vulnerabilidades con `CVSS >= 7.0`, el workflow de escaneo debe fallar.
-
-Los reportes del anÃ¡lisis quedan publicados como artifacts del workflow para revisiÃ³n posterior.
-
----
-
-## Escaneo de contenedores
-
-Trivy escanea la imagen Docker del backend para revisar vulnerabilidades en la imagen base, paquetes del sistema y componentes presentes en la imagen final.
-
-El workflow corre manualmente o semanalmente en GitHub Actions y construye una imagen temporal solo para anÃ¡lisis.
-
-La imagen no se publica en ningÃºn registry como parte de este proceso.
-
-El workflow falla inicialmente solo por vulnerabilidades `CRITICAL`.
-
-Las vulnerabilidades `HIGH` se reportan para revisiÃ³n, pero todavÃ­a no bloquean el flujo.
-
-Los reportes del escaneo quedan publicados como artifacts del workflow.
-
----
-
-## Lifecycle de collares
-
-El lifecycle oficial de collares, incluyendo la semÃ¡ntica de `status`, `enabled`, `signalStatus` y `lastSeenAt`, estÃ¡ documentado en [docs/collar-lifecycle.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/collar-lifecycle.md:1).
-
-Ese documento tambiÃ©n deja explÃ­citas las reglas objetivo para procesamiento de ubicaciones y monitoreo offline, junto con los cambios de cÃ³digo recomendados para el siguiente bloque.
-
----
-
-## PolÃ­tica temporal UTC
-
-El backend adopta UTC como polÃ­tica temporal interna.
-
-Por compatibilidad, varios campos siguen usando `LocalDateTime`.
-
-En esta fase esos valores se interpretan como UTC y el contrato JSON pÃºblico no cambia.
-
-La polÃ­tica completa estÃ¡ documentada en [docs/time-policy.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/time-policy.md:1).
-
----
-
-## Resumen de Fase 1
-
-El cierre formal de la Fase 1 de hardening, incluyendo seguridad, observabilidad, lifecycle y polÃ­tica temporal, estÃ¡ resumido en [docs/phase-1-hardening-summary.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/phase-1-hardening-summary.md:1).
-
----
-
-## Swagger / OpenAPI
-
-En `local` y `dev`, Swagger UI esta disponible en `/swagger-ui.html` y el documento OpenAPI JSON en `/v3/api-docs`.
-
-En `prod`, Swagger/OpenAPI esta deshabilitado por seguridad segun la configuracion actual del backend.
-
-Uso esperado:
-
-- `POST /api/auth/login` es un endpoint publico para obtener JWT Bearer.
-- Los endpoints protegidos del backend usan `Authorization: Bearer <token>`.
-- `POST /api/device/locations` no usa JWT; usa autenticacion HMAC por headers `X-Device-Token`, `X-Device-Timestamp`, `X-Device-Nonce` y `X-Device-Signature`.
-- No deben cargarse secretos reales ni claves de dispositivos dentro de Swagger UI.
-
----
-
-## Matriz de permisos
-
-La matriz oficial de permisos y la politica actual de RBAC del backend estan documentadas en [docs/permissions-matrix.md](/C:/Users/ALEJANDRO/IdeaProjects/ganaderia4backend/docs/permissions-matrix.md:1).
-
----
-
-## TecnologÃ­as utilizadas
-
-- **Java 17**
-- **Spring Boot 4.0.3**
-- **Spring Security**
-- **JWT**
-- **Spring Data JPA**
-- **PostgreSQL**
-- **Flyway**
-- **Swagger / OpenAPI**
-- **Spring Boot Actuator**
-- **Micrometer + Prometheus**
-- **JUnit 5**
-- **Mockito**
-- **MockMvc**
-- **Testcontainers**
-- **Docker**
-- **GitHub Actions**
-- **Render**
-
----
+- `Dockerfile` multi-stage para construir y ejecutar la aplicación
+- workflow de CI principal con build, pruebas, cobertura y SpotBugs
+- workflow de análisis de dependencias con OWASP Dependency-Check
+- workflow de escaneo de contenedor con Trivy
+- despliegue automatizado por hook hacia Render desde el workflow principal
 
 ## Arquitectura general
 
-El proyecto sigue una arquitectura en capas:
+El backend sigue una arquitectura en capas y mantiene separación explícita de responsabilidades:
 
-- **controller**: expone endpoints REST
-- **service**: contiene lÃ³gica de negocio
-- **repository**: acceso a base de datos
-- **model**: entidades del dominio
-- **dto**: contratos de entrada y salida
-- **config**: seguridad, CORS y configuraciÃ³n general
-- **observability**: mÃ©tricas, correlation id y health
-- **notification**: servicios de notificaciÃ³n desacoplados
-- **pattern**: implementaciÃ³n de patrones de diseÃ±o usados por el flujo de monitoreo
+- `controller`: endpoints REST
+- `service`: lógica de negocio
+- `repository`: acceso a datos
+- `model`: entidades y enums del dominio
+- `dto`: contratos de entrada y salida
+- `config`: seguridad, OpenAPI, CORS, scheduling y configuración transversal
+- `security`: JWT, HMAC, anti-replay y protección de abuso
+- `observability`: métricas, correlación y health indicators
+- `notification`: dispatcher y canales base de notificación
+- `pattern`: implementaciones de patrones aplicados al flujo de monitoreo
 
----
+## Módulos y endpoints relevantes
 
-## MÃ³dulos del sistema
+Los módulos principales expuestos por el backend incluyen:
 
-### 1. AutenticaciÃ³n
-Permite iniciar sesiÃ³n y proteger el acceso al resto del sistema mediante JWT.
+- `/api/auth`
+- `/api/cows`
+- `/api/collars`
+- `/api/geofences`
+- `/api/locations`
+- `/api/alerts`
+- `/api/dashboard`
+- `/api/reports`
+- `/api/audit-logs`
+- `/api/device/locations`
+- `/actuator`
 
-### 2. Vacas
-Permite registrar, consultar y actualizar vacas.
+## Swagger / OpenAPI
 
-### 3. Collares
-Permite registrar, actualizar, habilitar, deshabilitar y reasignar collares a vacas.
+En perfiles `local` y `dev`:
 
-### 4. Geocercas
-Permite administrar Ã¡reas geogrÃ¡ficas vÃ¡lidas para monitoreo.
+- Swagger UI: `/swagger-ui.html`
+- OpenAPI JSON: `/v3/api-docs`
 
-### 5. Ubicaciones
-Permite registrar y consultar ubicaciones histÃ³ricas de las vacas reportadas por collares.
+En `prod`, Swagger/OpenAPI se encuentra deshabilitado por configuración actual.
 
-### 6. Alertas
-Permite consultar y gestionar alertas operativas, tanto manuales como automÃ¡ticas.
+Uso esperado:
 
-### 7. Reportes
-Permite consultar indicadores y exportar reportes operativos.
-
-### 8. Observabilidad
-Permite revisar health, mÃ©tricas y trazabilidad de requests.
-
-MÃ©tricas operativas principales:
-
-- `ganaderia.alerts.created` con tag `type`
-- `ganaderia.alerts.resolved` con tag `type`
-- `ganaderia.alerts.discarded` con tag `type`
-- `ganaderia.collars.marked_offline`
-- `ganaderia.device.requests.accepted`
-- `ganaderia.device.requests.rejected` con tag `reason`
-- `ganaderia.notifications.sent` con tags `channel` y `eventType`
-- `ganaderia.notifications.failed` con tags `channel` y `eventType`
-
-En `prod`, Actuator expone por defecto `health,info`. Para habilitar scraping operativo de mÃ©tricas sin tocar cÃ³digo:
-
-```env
-MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
-```
-
-Los endpoints `/actuator/metrics/**` y `/actuator/prometheus` requieren rol `ADMINISTRADOR`.
-
----
-
-## Roles del sistema
-
-Los roles principales del backend son:
-
-- `ADMINISTRADOR`
-- `SUPERVISOR`
-- `OPERADOR`
-- `TECNICO`
-
-La autorizaciÃ³n depende del endpoint y del mÃ©todo HTTP.
-
----
-
-## Requisitos previos
-
-Antes de ejecutar el proyecto necesitas:
-
-- Java 17
-- Maven Wrapper incluido en el proyecto
-- PostgreSQL
-- Docker
-- Git
-
----
+- los endpoints de usuario usan `Authorization: Bearer <token>`
+- `POST /api/device/locations` no usa JWT y requiere autenticación HMAC
+- no deben cargarse secretos reales en ejemplos o pruebas manuales desde Swagger UI
 
 ## Variables de entorno
 
-Ejemplo de variables usadas por el backend:
+Las siguientes variables están respaldadas por los archivos de configuración del proyecto. Los valores deben definirse según el entorno y **no** deben versionarse con secretos reales.
 
 ```env
-SPRING_PROFILES_ACTIVE=prod
-PORT=10000
+SPRING_PROFILES_ACTIVE=local
+PORT=8080
 
 DB_URL=jdbc:postgresql://localhost:5432/ganaderia4
 DB_USERNAME=postgres
-DB_PASSWORD=tu_password
+DB_PASSWORD=postgres
 
-JWT_SECRET=tu_clave_jwt_super_segura
+JWT_SECRET=replace-with-a-secure-jwt-secret
 JWT_EXPIRATION_MS=86400000
 
-DEVICE_SECRET_MASTER_KEY=tu_clave_maestra_dispositivos
+DEVICE_SECRET_MASTER_KEY=replace-with-a-secure-device-master-key
+DEVICE_AUTH_WINDOW_SECONDS=300
+DEVICE_HMAC_PEPPER=
 
 APP_CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+APP_BOOTSTRAP_ADMIN_NAME=
+APP_BOOTSTRAP_ADMIN_EMAIL=
+APP_BOOTSTRAP_ADMIN_PASSWORD=
+
 APP_DEVICE_MONITOR_OFFLINE_THRESHOLD_MINUTES=15
 APP_DEVICE_MONITOR_OFFLINE_CHECK_MS=60000
 
 APP_PAGINATION_DEFAULT_SIZE=20
 APP_PAGINATION_MAX_SIZE=100
 
+REPORT_ALERTS_CSV_MAX_ROWS=5000
+
 APP_NOTIFICATIONS_WEBHOOK_ENABLED=false
 APP_NOTIFICATIONS_WEBHOOK_URL=
 APP_NOTIFICATIONS_WEBHOOK_CONNECT_TIMEOUT=5s
 APP_NOTIFICATIONS_WEBHOOK_READ_TIMEOUT=5s
 APP_NOTIFICATIONS_WEBHOOK_SECRET=
+APP_NOTIFICATIONS_WEBHOOK_PROCESSOR_ENABLED=true
+APP_NOTIFICATIONS_WEBHOOK_PROCESSOR_FIXED_DELAY=15s
+APP_NOTIFICATIONS_WEBHOOK_PROCESSOR_BATCH_SIZE=20
+APP_NOTIFICATIONS_WEBHOOK_MAX_ATTEMPTS=3
+APP_NOTIFICATIONS_WEBHOOK_RETRY_BACKOFF=30s
 
-APP_BOOTSTRAP_ADMIN_NAME=
-APP_BOOTSTRAP_ADMIN_EMAIL=
-APP_BOOTSTRAP_ADMIN_PASSWORD=
+APP_ABUSE_PROTECTION_ENABLED=true
+APP_ABUSE_PROTECTION_TRUST_FORWARDED_HEADERS=false
+APP_ABUSE_PROTECTION_LOGIN_ENABLED=true
+APP_ABUSE_PROTECTION_LOGIN_WINDOW=15m
+APP_ABUSE_PROTECTION_LOGIN_MAX_ATTEMPTS=5
+APP_ABUSE_PROTECTION_LOGIN_BLOCK_DURATION=15m
+APP_ABUSE_PROTECTION_DEVICE_ENABLED=true
+APP_ABUSE_PROTECTION_DEVICE_WINDOW=1m
+APP_ABUSE_PROTECTION_DEVICE_MAX_ATTEMPTS=300
+APP_ABUSE_PROTECTION_DEVICE_BLOCK_DURATION=5m
 
-MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
 ```
 
-### Perfiles de Spring
+### Perfiles disponibles
 
-- `local`: perfil por defecto para desarrollo local. Usa PostgreSQL local en `localhost:5432/ganaderia4`, Swagger habilitado y secretos locales no aptos para producciÃ³n.
-- `dev`: perfil para entornos de desarrollo compartidos. Requiere `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY`.
-- `prod`: perfil de producciÃ³n. Requiere secretos por variables de entorno, mantiene Swagger apagado y expone por defecto solo `health,info` en Actuator.
-- `test`: perfil usado por las pruebas con Testcontainers.
+- `local`: perfil por defecto, pensado para desarrollo local con Swagger habilitado y valores por defecto para base de datos local.
+- `dev`: perfil para entorno compartido de desarrollo, requiere credenciales explícitas de base de datos y secretos.
+- `prod`: perfil de despliegue, usa `PORT=10000` por defecto, deshabilita Swagger y expone por defecto `health,info` en Actuator.
+- `test`: perfil usado durante la ejecución de pruebas.
 
-En `dev` y `prod`, `JWT_SECRET` y `DEVICE_SECRET_MASTER_KEY` deben tener al menos 32 bytes. Si faltan o son demasiado cortos, la aplicaciÃ³n falla al iniciar.
+## Ejecución local
 
----
+Requisitos previos:
 
-## EjecuciÃ³n local
+- Java 17
+- Maven Wrapper incluido en el proyecto
+- PostgreSQL
+- Docker disponible para pruebas de integración con Testcontainers
 
-Levantar PostgreSQL local con una base `ganaderia4` y credenciales por defecto `postgres/postgres`, o definir `DB_URL`, `DB_USERNAME` y `DB_PASSWORD`.
+Con base de datos local disponible:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Para crear un administrador inicial en una base vacÃ­a, definir `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes de iniciar.
+Si se necesita crear un administrador inicial sobre una base vacía, pueden definirse `APP_BOOTSTRAP_ADMIN_NAME`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` antes del arranque.
 
-El perfil `local` queda activo por defecto. Para usar otro perfil:
+Para levantar con otro perfil:
 
 ```bash
 SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 ```
 
-La validaciÃ³n de CI usa Java 17 y ejecuta:
+## Validación técnica
+
+La validación principal del proyecto se ejecuta con el siguiente comando:
 
 ```bash
 ./mvnw clean verify
 ```
 
----
+Este flujo ejecuta y verifica:
 
-## Docker
+- pruebas unitarias
+- pruebas de integración
+- reportes JaCoCo de unit, integration y merged coverage
+- umbrales mínimos de cobertura configurados en Maven
+- análisis estático con SpotBugs
 
-Construir imagen:
+Reglas de calidad verificadas en `pom.xml`:
+
+- Java `17+`
+- Maven `3.9.0+`
+- cobertura mínima combinada JaCoCo en `LINE=0.50`
+- cobertura mínima combinada JaCoCo en `BRANCH=0.35`
+
+Adicionalmente, el proyecto cuenta con pruebas que cubren áreas como:
+
+- autenticación y autorización
+- endpoint de dispositivos con HMAC
+- protección anti-replay
+- dashboard y reportes
+- observabilidad y métricas
+- pipeline base de notificaciones
+- persistencia y componentes de seguridad
+
+## CI/CD
+
+El repositorio incluye los siguientes workflows en `.github/workflows`:
+
+- `backend-ci.yml`: ejecuta `./mvnw clean verify`, publica artifacts de JaCoCo y SpotBugs, construye la imagen Docker y dispara despliegue por hook a Render cuando la rama es `develop`.
+- `dependency-check.yml`: ejecuta OWASP Dependency-Check con el perfil `security-scan`.
+- `container-scan.yml`: construye una imagen temporal y ejecuta escaneo de vulnerabilidades y configuración con Trivy.
+
+No se agrega badge en este README porque la URL exacta depende del repositorio remoto y aquí no está fijada de forma verificable.
+
+## Despliegue
+
+### Docker
+
+Construcción de imagen:
 
 ```bash
 docker build -t ganaderia4backend .
 ```
 
-Ejecutar el contenedor:
+Ejecución del contenedor:
 
 ```bash
 docker run -p 10000:10000 ^
   -e SPRING_PROFILES_ACTIVE=prod ^
   -e DB_URL=jdbc:postgresql://host.docker.internal:5432/ganaderia4 ^
   -e DB_USERNAME=postgres ^
-  -e DB_PASSWORD=TU_DB_PASSWORD ^
-  -e JWT_SECRET=TU_JWT_SECRET ^
-  -e DEVICE_SECRET_MASTER_KEY=TU_DEVICE_SECRET_MASTER_KEY ^
-  -e APP_BOOTSTRAP_ADMIN_NAME=GanaderoPro ^
+  -e DB_PASSWORD=YOUR_DB_PASSWORD ^
+  -e JWT_SECRET=YOUR_JWT_SECRET ^
+  -e DEVICE_SECRET_MASTER_KEY=YOUR_DEVICE_SECRET_MASTER_KEY ^
+  -e APP_BOOTSTRAP_ADMIN_NAME=GanaderiaAdmin ^
   -e APP_BOOTSTRAP_ADMIN_EMAIL=admin@ganaderia.com ^
-  -e APP_BOOTSTRAP_ADMIN_PASSWORD=TU_BOOTSTRAP_ADMIN_PASSWORD ^
+  -e APP_BOOTSTRAP_ADMIN_PASSWORD=YOUR_BOOTSTRAP_ADMIN_PASSWORD ^
   ganaderia4backend
 ```
+
+El `Dockerfile` actual:
+
+- usa build multi-stage con Maven y Eclipse Temurin 17
+- expone el puerto `10000`
+- define `HEALTHCHECK` contra `/actuator/health`
+- ejecuta la aplicación con usuario no root
+
+### Producción
+
+Según el workflow `backend-ci.yml`, el flujo de despliegue actual está integrado con Render mediante `RENDER_DEPLOY_HOOK_URL`. El despliegue se dispara solo después de pasar CI y construir la imagen Docker en la rama `develop`.
+
+## Migraciones y base de datos
+
+Las migraciones se gestionan con Flyway y actualmente existen scripts versionados desde `V1__init_schema.sql` hasta `V11__add_read_path_indexes.sql`, incluyendo cambios de auditoría, idempotencia de ubicaciones, protección anti-replay y soporte de notificaciones webhook.
+
+## Documentación complementaria
+
+Se mantienen documentos técnicos adicionales en [docs](docs):
+
+- [collar-lifecycle.md](docs/collar-lifecycle.md)
+- [operational-runbook.md](docs/operational-runbook.md)
+- [permissions-matrix.md](docs/permissions-matrix.md)
+- [phase-1-hardening-summary.md](docs/phase-1-hardening-summary.md)
+- [time-policy.md](docs/time-policy.md)
+
+## Limitaciones conocidas / próximos pasos
+
+Las siguientes observaciones están formuladas como límites o trabajo esperable, no como funcionalidades faltantes inventadas:
+
+- el README no documenta ejemplos completos de firma HMAC extremo a extremo; eso podría agregarse como guía operativa separada
+- no se observa en la raíz del proyecto un `docker-compose.yml`; el arranque de dependencias sigue siendo manual o externo al repositorio
+- Swagger/OpenAPI está deshabilitado en `prod` por configuración, por lo que la exploración interactiva de endpoints queda limitada a `local` y `dev`
+- el flujo de despliegue automatizado visible depende de un hook externo de Render; la infraestructura completa de producción no está descrita en este repositorio
+- las notificaciones cuentan con base de implementación y canal webhook configurable, pero este README no asume integraciones externas adicionales que no estén versionadas aquí
+
+## Resumen de cambios realizados
+
+- se reorganizó el README con una estructura más profesional y fácil de defender
+- se agregaron las secciones `Estado actual del proyecto`, `Funcionalidades implementadas`, `Validación técnica`, `Variables de entorno`, `Despliegue` y `Limitaciones conocidas / próximos pasos`
+- se ajustaron las afirmaciones para alinearlas con `pom.xml`, `Dockerfile`, `application*.properties`, controladores y workflows reales
+- se conservaron referencias útiles a la documentación técnica existente en `docs/`
