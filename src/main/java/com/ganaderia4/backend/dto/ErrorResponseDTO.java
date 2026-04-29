@@ -1,14 +1,28 @@
 package com.ganaderia4.backend.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.LocalDateTime;
 
+@Schema(description = "Contrato estandar de error REST del backend")
 public class ErrorResponseDTO {
 
+    @Schema(description = "Codigo HTTP devuelto por el backend", example = "400")
     private int status;
+
+    @Schema(description = "Razon HTTP asociada al estado", example = "Bad Request")
     private String error;
+
+    @Schema(description = "Codigo de error interno estable para integraciones", example = "BAD_REQUEST")
     private String code;
+
+    @Schema(description = "Mensaje legible del error", example = "El timestamp reportado no puede estar demasiado en el futuro")
     private String message;
+
+    @Schema(description = "Ruta del request que produjo el error", example = "/api/device/locations")
     private String path;
+
+    @Schema(description = "Fecha y hora del error con el contrato temporal actual", example = "2026-04-28T20:52:08")
     private LocalDateTime timestamp;
 
     public ErrorResponseDTO() {

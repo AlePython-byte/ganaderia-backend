@@ -182,6 +182,21 @@ El cierre formal de la Fase 1 de hardening, incluyendo seguridad, observabilidad
 
 ---
 
+## Swagger / OpenAPI
+
+En `local` y `dev`, Swagger UI esta disponible en `/swagger-ui.html` y el documento OpenAPI JSON en `/v3/api-docs`.
+
+En `prod`, Swagger/OpenAPI esta deshabilitado por seguridad segun la configuracion actual del backend.
+
+Uso esperado:
+
+- `POST /api/auth/login` es un endpoint publico para obtener JWT Bearer.
+- Los endpoints protegidos del backend usan `Authorization: Bearer <token>`.
+- `POST /api/device/locations` no usa JWT; usa autenticacion HMAC por headers `X-Device-Token`, `X-Device-Timestamp`, `X-Device-Nonce` y `X-Device-Signature`.
+- No deben cargarse secretos reales ni claves de dispositivos dentro de Swagger UI.
+
+---
+
 ## Tecnologías utilizadas
 
 - **Java 17**
