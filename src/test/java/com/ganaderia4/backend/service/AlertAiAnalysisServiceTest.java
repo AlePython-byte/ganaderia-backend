@@ -115,6 +115,24 @@ class AlertAiAnalysisServiceTest {
         assertTrue(response.getRecommendation().contains("mayor prioridad"));
     }
 
+    @Test
+    void shouldFallbackWhenClientReturnsGenericIntroductoryText() {
+        properties.setEnabled(true);
+        properties.setProvider("gemini");
+        properties.setGeminiApiKey("test-key");
+
+        when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.HIGH, 2));
+        when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
+                .thenReturn(List.of(priority("LOW_BATTERY")));
+        when(geminiAiClient.generateOperationalSummary(org.mockito.ArgumentMatchers.anyString()))
+                .thenThrow(new GeminiAiClient.GeminiAiClientException("unusable_plain_text"));
+
+        AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
+
+        assertEquals("RULE_BASED_FALLBACK", response.getSource());
+        assertTrue(response.isFallbackUsed());
+    }
+
     private AlertAnalysisSummaryDTO summary(AlertAnalysisRiskLevel riskLevel, long totalPendingAlerts) {
         return new AlertAnalysisSummaryDTO(
                 riskLevel,

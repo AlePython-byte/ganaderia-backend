@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,6 +20,10 @@ import java.util.regex.Pattern;
 public class GeminiAiClient {
 
     private static final Pattern JSON_CODE_FENCE = Pattern.compile("```(?:json)?\\s*(\\{.*?})\\s*```", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+    private static final Pattern GENERIC_INTRO_TEXT = Pattern.compile(
+            "^(here\\s+is\\s+the\\s+json(?:\\s+requested)?|here\\s+is\\s+the\\s+requested\\s+json|sure[,!]?\\s+here\\s+is|of\\s+course[,!]?|claro[,!]?|aqui\\s+esta\\s+el\\s+json|aqui\\s+tienes\\s+el\\s+json)\\b.*",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
 
     private final AiAnalysisProperties properties;
     private final ObjectMapper objectMapper;
@@ -116,6 +121,10 @@ public class GeminiAiClient {
             }
         }
 
+        if (!isUsefulPlainText(trimmed)) {
+            throw new GeminiAiClientException("unusable_plain_text");
+        }
+
         return new AiGeneratedSummary(trimmed, "");
     }
 
@@ -136,6 +145,31 @@ public class GeminiAiClient {
         }
 
         return null;
+    }
+
+    private boolean isUsefulPlainText(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            return false;
+        }
+
+        String collapsed = normalized.replaceAll("\\s+", " ").trim();
+        if (GENERIC_INTRO_TEXT.matcher(collapsed).matches()) {
+            return false;
+        }
+
+        String lower = collapsed.toLowerCase(Locale.ROOT);
+        if (lower.length() < 25) {
+            return false;
+        }
+
+        return lower.contains("alert")
+                || lower.contains("riesgo")
+                || lower.contains("collar")
+                || lower.contains("bater")
+                || lower.contains("geocerca")
+                || lower.contains("prior")
+                || lower.contains("operativ");
     }
 
     public record AiGeneratedSummary(String summary, String recommendation) {

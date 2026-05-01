@@ -114,6 +114,32 @@ class GeminiAiClientTest {
     }
 
     @Test
+    void shouldRejectGenericIntroductoryPlainText() {
+        String rawResponse = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "Here is the JSON requested"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        GeminiAiClient.GeminiAiClientException exception = assertThrows(
+                GeminiAiClient.GeminiAiClientException.class,
+                () -> geminiAiClient.parseResponseBody(rawResponse)
+        );
+
+        assertEquals("unusable_plain_text", exception.getMessage());
+    }
+
+    @Test
     void shouldRejectResponseWhenCandidatesAreMissing() {
         String rawResponse = "{\"candidates\":[]}";
 
