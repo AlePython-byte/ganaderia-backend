@@ -92,6 +92,29 @@ class AlertAiAnalysisServiceTest {
         assertEquals(AlertAnalysisRiskLevel.HIGH, response.getRiskLevel());
     }
 
+    @Test
+    void shouldUseAiSourceWhenClientReturnsPlainTextWithoutRecommendation() {
+        properties.setEnabled(true);
+        properties.setProvider("gemini");
+        properties.setGeminiApiKey("test-key");
+
+        when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.HIGH, 2));
+        when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
+                .thenReturn(List.of(priority("LOW_BATTERY")));
+        when(geminiAiClient.generateOperationalSummary(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new GeminiAiClient.AiGeneratedSummary(
+                        "Hay varias alertas pendientes que requieren atencion operativa.",
+                        ""
+                ));
+
+        AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
+
+        assertEquals("AI", response.getSource());
+        assertEquals(false, response.isFallbackUsed());
+        assertEquals("Hay varias alertas pendientes que requieren atencion operativa.", response.getSummary());
+        assertTrue(response.getRecommendation().contains("mayor prioridad"));
+    }
+
     private AlertAnalysisSummaryDTO summary(AlertAnalysisRiskLevel riskLevel, long totalPendingAlerts) {
         return new AlertAnalysisSummaryDTO(
                 riskLevel,

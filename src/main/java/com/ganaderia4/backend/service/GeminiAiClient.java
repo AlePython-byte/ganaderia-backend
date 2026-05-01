@@ -12,9 +12,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class GeminiAiClient {
+
+    private static final Pattern JSON_CODE_FENCE = Pattern.compile("```(?:json)?\\s*(\\{.*?})\\s*```", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     private final AiAnalysisProperties properties;
     private final ObjectMapper objectMapper;
@@ -42,7 +46,7 @@ public class GeminiAiClient {
                 throw new GeminiAiClientException("http_" + response.statusCode());
             }
 
-            return parseResponse(response.body());
+            return parseResponseBody(response.body());
         } catch (IOException ex) {
             throw new GeminiAiClientException("io_error", ex);
         } catch (InterruptedException ex) {
@@ -71,40 +75,67 @@ public class GeminiAiClient {
         return objectMapper.writeValueAsString(root);
     }
 
-    private AiGeneratedSummary parseResponse(String rawResponse) {
+    AiGeneratedSummary parseResponseBody(String rawResponse) {
         try {
             JsonNode root = objectMapper.readTree(rawResponse);
-            JsonNode textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
+            JsonNode candidatesNode = root.path("candidates");
+            if (!candidatesNode.isArray() || candidatesNode.isEmpty()) {
+                throw new GeminiAiClientException("missing_candidates");
+            }
+
+            JsonNode textNode = candidatesNode.path(0).path("content").path("parts").path(0).path("text");
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
                 throw new GeminiAiClientException("missing_text");
             }
 
-            String text = stripCodeFence(textNode.asText());
-            JsonNode summaryJson = objectMapper.readTree(text);
-            String summary = summaryJson.path("summary").asText("").trim();
-            String recommendation = summaryJson.path("recommendation").asText("").trim();
-
-            if (summary.isBlank() || recommendation.isBlank()) {
-                throw new GeminiAiClientException("invalid_payload");
-            }
-
-            return new AiGeneratedSummary(summary, recommendation);
+            return parseGeneratedText(textNode.asText());
         } catch (IOException ex) {
             throw new GeminiAiClientException("parse_error", ex);
         }
     }
 
-    private String stripCodeFence(String value) {
+    AiGeneratedSummary parseGeneratedText(String value) {
         String trimmed = value == null ? "" : value.trim();
-        if (trimmed.startsWith("```")) {
-            int firstLineBreak = trimmed.indexOf('\n');
-            int lastFence = trimmed.lastIndexOf("```");
-            if (firstLineBreak >= 0 && lastFence > firstLineBreak) {
-                return trimmed.substring(firstLineBreak + 1, lastFence).trim();
+        if (trimmed.isBlank()) {
+            throw new GeminiAiClientException("missing_text");
+        }
+
+        String normalizedText = extractCodeFenceJson(trimmed);
+        String jsonCandidate = extractJsonObject(normalizedText);
+        if (jsonCandidate != null) {
+            try {
+                JsonNode summaryJson = objectMapper.readTree(jsonCandidate);
+                String summary = summaryJson.path("summary").asText("").trim();
+                String recommendation = summaryJson.path("recommendation").asText("").trim();
+
+                if (!summary.isBlank()) {
+                    return new AiGeneratedSummary(summary, recommendation);
+                }
+            } catch (IOException ignored) {
+                // Fall through to plain-text handling.
             }
         }
 
-        return trimmed;
+        return new AiGeneratedSummary(trimmed, "");
+    }
+
+    private String extractCodeFenceJson(String value) {
+        Matcher matcher = JSON_CODE_FENCE.matcher(value);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+
+        return value;
+    }
+
+    private String extractJsonObject(String value) {
+        int start = value.indexOf('{');
+        int end = value.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return value.substring(start, end + 1).trim();
+        }
+
+        return null;
     }
 
     public record AiGeneratedSummary(String summary, String recommendation) {

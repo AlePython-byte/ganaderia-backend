@@ -56,7 +56,9 @@ public class AlertAiAnalysisService {
             AlertAiSummaryDTO response = new AlertAiSummaryDTO(
                     heuristicSummary.getRiskLevel(),
                     aiGeneratedSummary.summary(),
-                    aiGeneratedSummary.recommendation(),
+                    aiGeneratedSummary.recommendation() != null && !aiGeneratedSummary.recommendation().isBlank()
+                            ? aiGeneratedSummary.recommendation()
+                            : fallbackRecommendationFor(heuristicSummary, topPriorities),
                     SOURCE_AI,
                     false
             );
