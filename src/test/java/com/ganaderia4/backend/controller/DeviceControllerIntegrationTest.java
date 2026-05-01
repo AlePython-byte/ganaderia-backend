@@ -7,11 +7,15 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.ganaderia4.backend.dto.DeviceLocationRequestDTO;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
+import com.ganaderia4.backend.model.Alert;
+import com.ganaderia4.backend.model.AlertStatus;
+import com.ganaderia4.backend.model.AlertType;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.repository.AbuseRateLimitRepository;
+import com.ganaderia4.backend.repository.AlertRepository;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
@@ -35,11 +39,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -66,6 +72,9 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     private CollarRepository collarRepository;
 
     @Autowired
+    private AlertRepository alertRepository;
+
+    @Autowired
     private LocationRepository locationRepository;
 
     @Autowired
@@ -86,6 +95,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         abuseRateLimitRepository.deleteAll();
         deviceReplayNonceRepository.deleteAll();
+        alertRepository.deleteAll();
         locationRepository.deleteAll();
         collarRepository.deleteAll();
         cowRepository.deleteAll();
@@ -317,6 +327,64 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldHandleLowBatteryEndToEndFromDeviceIngestion() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-BATTERY-001", "Bateria");
+        Collar collar = createCollar("COLLAR-DEVICE-BATTERY-001", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
+        Instant firstRequestInstant = currentRequestInstant();
+        String firstBody = deviceLocationBody(1.610, -77.610, bodyTimestampFrom(firstRequestInstant).minusMinutes(1), 18);
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), firstBody, firstRequestInstant, randomNonce()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.collarToken").value(collar.getToken()))
+                .andExpect(jsonPath("$.cowToken").value(cow.getToken()));
+
+        Collar firstUpdatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(18, firstUpdatedCollar.getBatteryLevel());
+        assertEquals(1, locationRepository.count());
+        assertEquals(1, alertRepository.countByTypeAndStatus(AlertType.LOW_BATTERY, AlertStatus.PENDIENTE));
+
+        Alert pendingAlertAfterFirstRequest = alertRepository
+                .findByCowAndTypeAndStatus(cow, AlertType.LOW_BATTERY, AlertStatus.PENDIENTE)
+                .orElseThrow();
+        assertFalse(pendingAlertAfterFirstRequest.getMessage().isBlank());
+
+        abuseRateLimitRepository.deleteAll();
+
+        Instant secondRequestInstant = firstRequestInstant.plusSeconds(1);
+        String secondBody = deviceLocationBody(1.611, -77.611, bodyTimestampFrom(secondRequestInstant).minusSeconds(30), 17);
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), secondBody, secondRequestInstant, randomNonce()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.collarToken").value(collar.getToken()));
+
+        Collar secondUpdatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(17, secondUpdatedCollar.getBatteryLevel());
+        assertEquals(2, locationRepository.count());
+        assertEquals(1, alertRepository.countByTypeAndStatus(AlertType.LOW_BATTERY, AlertStatus.PENDIENTE));
+        assertEquals(1, alertRepository.countByType(AlertType.LOW_BATTERY));
+
+        abuseRateLimitRepository.deleteAll();
+
+        Instant thirdRequestInstant = secondRequestInstant.plusSeconds(1);
+        String thirdBody = deviceLocationBody(1.612, -77.612, bodyTimestampFrom(thirdRequestInstant).minusSeconds(30), 80);
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), thirdBody, thirdRequestInstant, randomNonce()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.collarToken").value(collar.getToken()));
+
+        Collar thirdUpdatedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(80, thirdUpdatedCollar.getBatteryLevel());
+        assertEquals(3, locationRepository.count());
+        assertEquals(0, alertRepository.countByTypeAndStatus(AlertType.LOW_BATTERY, AlertStatus.PENDIENTE));
+        assertEquals(1, alertRepository.countByTypeAndStatus(AlertType.LOW_BATTERY, AlertStatus.RESUELTA));
+
+        List<Alert> lowBatteryAlerts = alertRepository.findByType(AlertType.LOW_BATTERY);
+        assertEquals(1, lowBatteryAlerts.size());
+        assertEquals(AlertStatus.RESUELTA, lowBatteryAlerts.get(0).getStatus());
+    }
+
+    @Test
     void shouldRateLimitDeviceLocationRequests() throws Exception {
         Cow cow = createCow("VACA-DEVICE-RATE-LIMIT", "Rate limit");
         Collar collar = createCollar("COLLAR-DEVICE-RATE-LIMIT", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
@@ -388,10 +456,18 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     private String deviceLocationBody(double latitude,
                                       double longitude,
                                       LocalDateTime timestamp) throws Exception {
+        return deviceLocationBody(latitude, longitude, timestamp, null);
+    }
+
+    private String deviceLocationBody(double latitude,
+                                      double longitude,
+                                      LocalDateTime timestamp,
+                                      Integer batteryLevel) throws Exception {
         DeviceLocationRequestDTO request = new DeviceLocationRequestDTO();
         request.setLatitude(latitude);
         request.setLongitude(longitude);
         request.setTimestamp(timestamp.truncatedTo(ChronoUnit.SECONDS));
+        request.setBatteryLevel(batteryLevel);
         return deviceBodyObjectMapper.writeValueAsString(request);
     }
 
