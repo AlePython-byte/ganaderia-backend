@@ -1,6 +1,8 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
+import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertAnalysisRiskLevel;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.lenient;
@@ -120,6 +123,99 @@ class AlertAnalysisServiceTest {
         assertTrue(summary.getRecommendedActions().contains(
                 "Priorizar la atención usando la cola de alertas por prioridad."
         ));
+    }
+
+    @Test
+    void shouldReturnEmptyTopPrioritiesWhenThereAreNoPendingAlerts() {
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of());
+
+        List<AlertPriorityRecommendationDTO> response = alertAnalysisService.getTopPriorities(null);
+
+        assertTrue(response.isEmpty());
+    }
+
+    @Test
+    void shouldOrderTopPrioritiesByDescendingPriorityScore() {
+        Alert lowBattery = pendingAlert(1L, AlertType.LOW_BATTERY);
+        lowBattery.setId(10L);
+        Alert offline = pendingAlert(2L, AlertType.COLLAR_OFFLINE);
+        offline.setId(11L);
+        Alert exit = pendingAlert(3L, AlertType.EXIT_GEOFENCE);
+        exit.setId(12L);
+
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(List.of(lowBattery, offline, exit));
+        when(alertPriorityScorer.score(org.mockito.ArgumentMatchers.eq(lowBattery), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AlertPriorityAssessment(35, "LOW"));
+        when(alertPriorityScorer.score(org.mockito.ArgumentMatchers.eq(offline), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AlertPriorityAssessment(70, "HIGH"));
+        when(alertPriorityScorer.score(org.mockito.ArgumentMatchers.eq(exit), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AlertPriorityAssessment(55, "MEDIUM"));
+
+        List<AlertPriorityRecommendationDTO> response = alertAnalysisService.getTopPriorities(5);
+
+        assertEquals(3, response.size());
+        assertEquals(11L, response.get(0).getAlertId());
+        assertEquals("HIGH", response.get(0).getPriorityLabel());
+        assertEquals(12L, response.get(1).getAlertId());
+        assertEquals(10L, response.get(2).getAlertId());
+    }
+
+    @Test
+    void shouldUseDefaultLimitForTopPriorities() {
+        List<Alert> alerts = java.util.stream.IntStream.range(0, 6)
+                .mapToObj(i -> {
+                    Alert alert = pendingAlert((long) i + 1, AlertType.COLLAR_OFFLINE);
+                    alert.setId((long) i + 1);
+                    return alert;
+                })
+                .toList();
+
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(alerts);
+        when(alertPriorityScorer.score(org.mockito.ArgumentMatchers.any(Alert.class), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AlertPriorityAssessment(50, "MEDIUM"));
+
+        List<AlertPriorityRecommendationDTO> response = alertAnalysisService.getTopPriorities(null);
+
+        assertEquals(5, response.size());
+    }
+
+    @Test
+    void shouldRespectExplicitLimitForTopPriorities() {
+        List<Alert> alerts = java.util.stream.IntStream.range(0, 3)
+                .mapToObj(i -> {
+                    Alert alert = pendingAlert((long) i + 1, AlertType.COLLAR_OFFLINE);
+                    alert.setId((long) i + 1);
+                    return alert;
+                })
+                .toList();
+
+        when(alertRepository.findByStatus(AlertStatus.PENDIENTE)).thenReturn(alerts);
+        when(alertPriorityScorer.score(org.mockito.ArgumentMatchers.any(Alert.class), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new AlertPriorityAssessment(50, "MEDIUM"));
+
+        List<AlertPriorityRecommendationDTO> response = alertAnalysisService.getTopPriorities(1);
+
+        assertEquals(1, response.size());
+    }
+
+    @Test
+    void shouldRejectTopPrioritiesWhenLimitIsLessThanOne() {
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertAnalysisService.getTopPriorities(0)
+        );
+
+        assertEquals("El limit debe estar entre 1 y 20", exception.getMessage());
+    }
+
+    @Test
+    void shouldRejectTopPrioritiesWhenLimitExceedsMaximum() {
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> alertAnalysisService.getTopPriorities(21)
+        );
+
+        assertEquals("El limit debe estar entre 1 y 20", exception.getMessage());
     }
 
     private Alert pendingAlert(Long cowId, AlertType type) {

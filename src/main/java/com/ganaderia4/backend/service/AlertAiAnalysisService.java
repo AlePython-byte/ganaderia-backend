@@ -1,0 +1,160 @@
+package com.ganaderia4.backend.service;
+
+import com.ganaderia4.backend.config.AiAnalysisProperties;
+import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
+import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
+import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
+import com.ganaderia4.backend.model.AlertAnalysisRiskLevel;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Locale;
+
+@Service
+public class AlertAiAnalysisService {
+
+    private static final Logger log = LoggerFactory.getLogger(AlertAiAnalysisService.class);
+    private static final String SOURCE_AI = "AI";
+    private static final String SOURCE_RULE_BASED_FALLBACK = "RULE_BASED_FALLBACK";
+
+    private final AlertAnalysisService alertAnalysisService;
+    private final GeminiAiClient geminiAiClient;
+    private final AiAnalysisProperties properties;
+
+    public AlertAiAnalysisService(AlertAnalysisService alertAnalysisService,
+                                  GeminiAiClient geminiAiClient,
+                                  AiAnalysisProperties properties) {
+        this.alertAnalysisService = alertAnalysisService;
+        this.geminiAiClient = geminiAiClient;
+        this.properties = properties;
+    }
+
+    public AlertAiSummaryDTO getAiSummary() {
+        AlertAnalysisSummaryDTO heuristicSummary = alertAnalysisService.getSummary();
+        List<AlertPriorityRecommendationDTO> topPriorities =
+                alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT);
+
+        if (!properties.isEnabled()) {
+            return fallback("ai_disabled", heuristicSummary, topPriorities);
+        }
+
+        if (!"gemini".equalsIgnoreCase(properties.getProvider())) {
+            return fallback("unsupported_provider", heuristicSummary, topPriorities);
+        }
+
+        if (properties.getGeminiApiKey() == null || properties.getGeminiApiKey().isBlank()) {
+            return fallback("missing_api_key", heuristicSummary, topPriorities);
+        }
+
+        try {
+            GeminiAiClient.AiGeneratedSummary aiGeneratedSummary =
+                    geminiAiClient.generateOperationalSummary(buildPrompt(heuristicSummary, topPriorities));
+
+            AlertAiSummaryDTO response = new AlertAiSummaryDTO(
+                    heuristicSummary.getRiskLevel(),
+                    aiGeneratedSummary.summary(),
+                    aiGeneratedSummary.recommendation(),
+                    SOURCE_AI,
+                    false
+            );
+
+            log.info(
+                    "event=alert_ai_summary_generated requestId={} source={} fallbackUsed={} riskLevel={}",
+                    OperationalLogSanitizer.requestId(),
+                    SOURCE_AI,
+                    false,
+                    heuristicSummary.getRiskLevel()
+            );
+
+            return response;
+        } catch (GeminiAiClient.GeminiAiClientException ex) {
+            return fallback(ex.getMessage(), heuristicSummary, topPriorities);
+        }
+    }
+
+    private AlertAiSummaryDTO fallback(String reason,
+                                       AlertAnalysisSummaryDTO heuristicSummary,
+                                       List<AlertPriorityRecommendationDTO> topPriorities) {
+        log.warn(
+                "event=alert_ai_summary_fallback requestId={} reason={}",
+                OperationalLogSanitizer.requestId(),
+                OperationalLogSanitizer.safe(reason)
+        );
+
+        AlertAiSummaryDTO response = new AlertAiSummaryDTO(
+                heuristicSummary.getRiskLevel(),
+                fallbackSummaryFor(heuristicSummary),
+                fallbackRecommendationFor(heuristicSummary, topPriorities),
+                SOURCE_RULE_BASED_FALLBACK,
+                true
+        );
+
+        log.info(
+                "event=alert_ai_summary_generated requestId={} source={} fallbackUsed={} riskLevel={}",
+                OperationalLogSanitizer.requestId(),
+                SOURCE_RULE_BASED_FALLBACK,
+                true,
+                heuristicSummary.getRiskLevel()
+        );
+
+        return response;
+    }
+
+    private String buildPrompt(AlertAnalysisSummaryDTO heuristicSummary,
+                               List<AlertPriorityRecommendationDTO> topPriorities) {
+        StringBuilder prompt = new StringBuilder()
+                .append("Eres un asistente operativo para monitoreo ganadero.\n")
+                .append("Debes responder en espanol claro, breve y operativo.\n")
+                .append("No inventes alertas, vacas, collares, cantidades ni hechos que no aparezcan en los datos.\n")
+                .append("Usa solo la informacion entregada por el backend. Si faltan datos, responde con cautela.\n")
+                .append("No recomiendes acciones destructivas ni cambios automaticos en el sistema.\n")
+                .append("Devuelve solo JSON valido con este formato exacto: ")
+                .append("{\"summary\":\"...\",\"recommendation\":\"...\"}\n")
+                .append("Datos del backend:\n")
+                .append("- riskLevel: ").append(heuristicSummary.getRiskLevel()).append('\n')
+                .append("- totalPendingAlerts: ").append(heuristicSummary.getTotalPendingAlerts()).append('\n')
+                .append("- criticalSignals: ").append(String.join(" | ", heuristicSummary.getCriticalSignals())).append('\n')
+                .append("- recommendedActions: ").append(String.join(" | ", heuristicSummary.getRecommendedActions())).append('\n')
+                .append("- topPriorities:\n");
+
+        if (topPriorities.isEmpty()) {
+            prompt.append("  - sin casos pendientes\n");
+        } else {
+            for (AlertPriorityRecommendationDTO recommendation : topPriorities) {
+                prompt.append("  - alertType=").append(recommendation.getAlertType())
+                        .append(", priorityLabel=").append(recommendation.getPriorityLabel())
+                        .append(", priorityScore=").append(recommendation.getPriorityScore())
+                        .append(", reason=").append(recommendation.getReason())
+                        .append(", recommendedAction=").append(recommendation.getRecommendedAction())
+                        .append('\n');
+            }
+        }
+
+        return prompt.toString();
+    }
+
+    private String fallbackSummaryFor(AlertAnalysisSummaryDTO heuristicSummary) {
+        if (heuristicSummary.getRiskLevel() == AlertAnalysisRiskLevel.LOW) {
+            return "No hay alertas pendientes relevantes en este momento.";
+        }
+
+        return "Resumen generado con reglas internas porque la IA no esta configurada o no respondio correctamente.";
+    }
+
+    private String fallbackRecommendationFor(AlertAnalysisSummaryDTO heuristicSummary,
+                                             List<AlertPriorityRecommendationDTO> topPriorities) {
+        if (heuristicSummary.getRiskLevel() == AlertAnalysisRiskLevel.LOW || topPriorities.isEmpty()) {
+            return "No hay acciones criticas pendientes en este momento.";
+        }
+
+        AlertPriorityRecommendationDTO firstPriority = topPriorities.get(0);
+        String alertType = firstPriority.getAlertType() != null
+                ? firstPriority.getAlertType().toLowerCase(Locale.ROOT)
+                : "alertas";
+
+        return "Revise primero las alertas pendientes de mayor prioridad, comenzando por " + alertType + ".";
+    }
+}

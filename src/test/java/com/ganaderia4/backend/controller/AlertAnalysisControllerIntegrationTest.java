@@ -86,6 +86,67 @@ class AlertAnalysisControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.recommendedActions").isArray());
     }
 
+    @Test
+    void shouldRejectTopPrioritiesWhenTokenIsMissing() throws Exception {
+        mockMvc.perform(get("/api/alert-analysis/top-priorities"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/alert-analysis/top-priorities"));
+    }
+
+    @Test
+    void shouldAllowOperatorToGetTopPriorities() throws Exception {
+        Cow cow = createCow("VACA-AN-002", "Brisa");
+        createAlert(cow, AlertType.EXIT_GEOFENCE, AlertStatus.PENDIENTE, "Salida geocerca");
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "Collar sin reporte");
+
+        mockMvc.perform(get("/api/alert-analysis/top-priorities")
+                        .param("limit", "1")
+                        .header("Authorization", "Bearer " + loginAndGetToken("operador@test.com", "12345678")))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].alertStatus").value("PENDIENTE"))
+                .andExpect(jsonPath("$[0].priorityScore").isNumber())
+                .andExpect(jsonPath("$[0].reason").isString())
+                .andExpect(jsonPath("$[0].recommendedAction").isString());
+    }
+
+    @Test
+    void shouldRejectTopPrioritiesWhenLimitIsInvalid() throws Exception {
+        mockMvc.perform(get("/api/alert-analysis/top-priorities")
+                        .param("limit", "0")
+                        .header("Authorization", "Bearer " + loginAndGetToken("operador@test.com", "12345678")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El limit debe estar entre 1 y 20"))
+                .andExpect(jsonPath("$.path").value("/api/alert-analysis/top-priorities"));
+    }
+
+    @Test
+    void shouldRejectAiSummaryWhenTokenIsMissing() throws Exception {
+        mockMvc.perform(get("/api/alert-analysis/ai-summary"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/alert-analysis/ai-summary"));
+    }
+
+    @Test
+    void shouldAllowOperatorToGetAiSummaryWithFallbackWhenAiIsDisabled() throws Exception {
+        Cow cow = createCow("VACA-AN-003", "Canela");
+        createAlert(cow, AlertType.COLLAR_OFFLINE, AlertStatus.PENDIENTE, "Collar sin reporte");
+
+        mockMvc.perform(get("/api/alert-analysis/ai-summary")
+                        .header("Authorization", "Bearer " + loginAndGetToken("operador@test.com", "12345678")))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.riskLevel").value("HIGH"))
+                .andExpect(jsonPath("$.source").value("RULE_BASED_FALLBACK"))
+                .andExpect(jsonPath("$.fallbackUsed").value(true))
+                .andExpect(jsonPath("$.summary").isString())
+                .andExpect(jsonPath("$.recommendation").isString());
+    }
+
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {
         User user = new User();
         user.setName(name);

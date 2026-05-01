@@ -1,6 +1,8 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
+import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
+import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Alert;
 import com.ganaderia4.backend.model.AlertAnalysisRiskLevel;
 import com.ganaderia4.backend.model.AlertStatus;
@@ -22,6 +24,8 @@ import java.util.stream.Collectors;
 public class AlertAnalysisService {
 
     static final String CONFIDENCE_RULE_BASED = "RULE_BASED";
+    static final int DEFAULT_TOP_PRIORITIES_LIMIT = 5;
+    static final int MAX_TOP_PRIORITIES_LIMIT = 20;
 
     private static final Logger log = LoggerFactory.getLogger(AlertAnalysisService.class);
     private static final int HIGH_PENDING_VOLUME_THRESHOLD = 10;
@@ -65,6 +69,48 @@ public class AlertAnalysisService {
         );
 
         return summary;
+    }
+
+    public List<AlertPriorityRecommendationDTO> getTopPriorities(Integer limit) {
+        int resolvedLimit = resolveTopPrioritiesLimit(limit);
+        List<Alert> pendingAlerts = alertRepository.findByStatus(AlertStatus.PENDIENTE);
+        AlertPriorityScorer.AlertPriorityScoringContext scoringContext = alertPriorityScorer.buildContext(pendingAlerts);
+
+        List<AlertPriorityRecommendationDTO> recommendations = pendingAlerts.stream()
+                .map(alert -> toPriorityRecommendation(alert, alertPriorityScorer.score(alert, scoringContext)))
+                .sorted((left, right) -> {
+                    int byScore = Integer.compare(
+                            right.getPriorityScore() != null ? right.getPriorityScore() : Integer.MIN_VALUE,
+                            left.getPriorityScore() != null ? left.getPriorityScore() : Integer.MIN_VALUE
+                    );
+                    if (byScore != 0) {
+                        return byScore;
+                    }
+
+                    if (left.getCreatedAt() != null && right.getCreatedAt() != null) {
+                        int byCreatedAt = left.getCreatedAt().compareTo(right.getCreatedAt());
+                        if (byCreatedAt != 0) {
+                            return byCreatedAt;
+                        }
+                    }
+
+                    if (left.getAlertId() == null || right.getAlertId() == null) {
+                        return 0;
+                    }
+
+                    return Long.compare(left.getAlertId(), right.getAlertId());
+                })
+                .limit(resolvedLimit)
+                .toList();
+
+        log.info(
+                "event=alert_analysis_top_priorities_generated requestId={} returned={} limit={}",
+                OperationalLogSanitizer.requestId(),
+                recommendations.size(),
+                resolvedLimit
+        );
+
+        return recommendations;
     }
 
     private AlertHeuristicSnapshot buildSnapshot(List<Alert> pendingAlerts, List<Alert> recentPendingAlerts) {
@@ -193,6 +239,62 @@ public class AlertAnalysisService {
         return alerts.stream()
                 .filter(alert -> alert.getType() == type)
                 .count();
+    }
+
+    private int resolveTopPrioritiesLimit(Integer limit) {
+        int resolvedLimit = limit != null ? limit : DEFAULT_TOP_PRIORITIES_LIMIT;
+        if (resolvedLimit < 1 || resolvedLimit > MAX_TOP_PRIORITIES_LIMIT) {
+            throw new BadRequestException("El limit debe estar entre 1 y 20");
+        }
+
+        return resolvedLimit;
+    }
+
+    private AlertPriorityRecommendationDTO toPriorityRecommendation(Alert alert, AlertPriorityAssessment assessment) {
+        return new AlertPriorityRecommendationDTO(
+                alert.getId(),
+                alert.getType() != null ? alert.getType().name() : null,
+                alert.getStatus() != null ? alert.getStatus().name() : null,
+                assessment.priorityScore(),
+                assessment.priority(),
+                reasonFor(alert.getType()),
+                recommendedActionFor(alert.getType()),
+                alert.getCow() != null ? alert.getCow().getId() : null,
+                alert.getCow() != null ? OperationalLogSanitizer.maskToken(alert.getCow().getToken()) : "UNKNOWN",
+                alert.getCreatedAt()
+        );
+    }
+
+    private String reasonFor(AlertType alertType) {
+        if (alertType == AlertType.COLLAR_OFFLINE) {
+            return "El collar no reporta actividad reciente y puede dejar sin monitoreo al animal.";
+        }
+
+        if (alertType == AlertType.LOW_BATTERY) {
+            return "El collar presenta batería baja y podría dejar de reportar próximamente.";
+        }
+
+        if (alertType == AlertType.EXIT_GEOFENCE) {
+            return "El animal tiene una alerta pendiente de salida de geocerca.";
+        }
+
+        return "La alerta requiere revisión operativa.";
+    }
+
+    private String recommendedActionFor(AlertType alertType) {
+        if (alertType == AlertType.COLLAR_OFFLINE) {
+            return "Revisar conectividad, batería y estado físico del collar.";
+        }
+
+        if (alertType == AlertType.LOW_BATTERY) {
+            return "Programar recarga o reemplazo de batería del collar.";
+        }
+
+        if (alertType == AlertType.EXIT_GEOFENCE) {
+            return "Verificar la ubicación física del animal y revisar la configuración de la geocerca.";
+        }
+
+        return "Revisar el detalle de la alerta en la cola de prioridades.";
     }
 
     private record AlertHeuristicSnapshot(
