@@ -109,6 +109,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/alerts/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
 
+                        .requestMatchers(HttpMethod.GET, "/api/alert-analysis/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
+
                         .requestMatchers(HttpMethod.PUT, "/api/alerts/**")
                         .hasRole("ADMINISTRADOR")
 
