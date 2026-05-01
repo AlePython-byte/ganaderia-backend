@@ -385,6 +385,48 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectDeviceLocationWhenBatteryLevelIsNegative() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-BATTERY-NEG", "Bateria negativa");
+        Collar collar = createCollar("COLLAR-DEVICE-BATTERY-NEG", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
+        int initialBatteryLevel = collar.getBatteryLevel();
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.620, -77.620, bodyTimestampFrom(requestInstant).minusMinutes(1), -1);
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El batteryLevel no puede ser menor a 0"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
+
+        Collar unchangedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(initialBatteryLevel, unchangedCollar.getBatteryLevel());
+        assertEquals(0, locationRepository.count());
+        assertEquals(0, alertRepository.countByType(AlertType.LOW_BATTERY));
+    }
+
+    @Test
+    void shouldRejectDeviceLocationWhenBatteryLevelExceedsOneHundred() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-BATTERY-HIGH", "Bateria alta");
+        Collar collar = createCollar("COLLAR-DEVICE-BATTERY-HIGH", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
+        int initialBatteryLevel = collar.getBatteryLevel();
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(1.621, -77.621, bodyTimestampFrom(requestInstant).minusMinutes(1), 101);
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El batteryLevel no puede ser mayor a 100"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
+
+        Collar unchangedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(initialBatteryLevel, unchangedCollar.getBatteryLevel());
+        assertEquals(0, locationRepository.count());
+        assertEquals(0, alertRepository.countByType(AlertType.LOW_BATTERY));
+    }
+
+    @Test
     void shouldRateLimitDeviceLocationRequests() throws Exception {
         Cow cow = createCow("VACA-DEVICE-RATE-LIMIT", "Rate limit");
         Collar collar = createCollar("COLLAR-DEVICE-RATE-LIMIT", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
