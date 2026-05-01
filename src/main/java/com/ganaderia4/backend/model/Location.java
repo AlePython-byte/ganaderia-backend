@@ -27,6 +27,9 @@ public class Location {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
+    @Column(name = "gps_accuracy")
+    private Double gpsAccuracy;
+
     @ManyToOne
     @JoinColumn(name = "cow_id", nullable = false)
     private Cow cow;
@@ -77,6 +80,14 @@ public class Location {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public Double getGpsAccuracy() {
+        return gpsAccuracy;
+    }
+
+    public void setGpsAccuracy(Double gpsAccuracy) {
+        this.gpsAccuracy = gpsAccuracy;
     }
 
     public Cow getCow() {

@@ -29,6 +29,9 @@ public class DeviceLocationRequestDTO {
     @Max(value = 100, message = "El batteryLevel no puede ser mayor a 100")
     private Integer batteryLevel;
 
+    @DecimalMin(value = "0.0", message = "El gpsAccuracy no puede ser menor a 0")
+    private Double gpsAccuracy;
+
     public DeviceLocationRequestDTO() {
     }
 
@@ -62,5 +65,13 @@ public class DeviceLocationRequestDTO {
 
     public void setBatteryLevel(Integer batteryLevel) {
         this.batteryLevel = batteryLevel;
+    }
+
+    public Double getGpsAccuracy() {
+        return gpsAccuracy;
+    }
+
+    public void setGpsAccuracy(Double gpsAccuracy) {
+        this.gpsAccuracy = gpsAccuracy;
     }
 }

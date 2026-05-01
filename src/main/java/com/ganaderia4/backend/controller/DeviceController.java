@@ -144,7 +144,8 @@ public class DeviceController {
                                       "latitude": 1.214,
                                       "longitude": -77.281,
                                       "timestamp": "2026-04-28T20:52:08",
-                                      "batteryLevel": 18
+                                      "batteryLevel": 18,
+                                      "gpsAccuracy": 4.5
                                     }
                                             """
                             )
@@ -176,6 +177,7 @@ public class DeviceController {
         payloadDTO.setLon(requestDTO.getLongitude());
         payloadDTO.setReportedAt(requestDTO.getTimestamp());
         payloadDTO.setBatteryLevel(requestDTO.getBatteryLevel());
+        payloadDTO.setGpsAccuracy(requestDTO.getGpsAccuracy());
 
         LocationResponseDTO response = locationService.registerLocationFromDevice(payloadDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

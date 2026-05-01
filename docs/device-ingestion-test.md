@@ -41,7 +41,8 @@ Detalles relevantes del código actual:
   "latitude": 1.214,
   "longitude": -77.281,
   "timestamp": "2026-04-29T10:10:45",
-  "batteryLevel": 18
+  "batteryLevel": 18,
+  "gpsAccuracy": 4.5
 }
 ```
 
@@ -50,8 +51,8 @@ Notas:
 - `timestamp` del body no lleva offset ni sufijo `Z`.
 - El script usa UTC sin sufijo `Z` tambien en el body para evitar desfases entre Windows local, Docker y Render.
 - `batteryLevel` es opcional. Si se envía, debe estar entre `0` y `100`.
-- `gpsAccuracy` no es aceptado actualmente por este endpoint.
-- El script PowerShell envía `BatteryLevel` solo cuando se proporciona y sigue tratando `GpsAccuracy` como metadato local no enviado.
+- `gpsAccuracy` es opcional. Si se envía, debe ser mayor o igual a `0` y representa precisión en metros.
+- El script PowerShell envía `BatteryLevel` y `GpsAccuracy` solo cuando se proporcionan.
 
 ## Datos requeridos
 
@@ -63,6 +64,7 @@ Para una prueba real y aceptada por el backend se necesita:
 - `latitude`
 - `longitude`
 - `batteryLevel` opcional
+- `gpsAccuracy` opcional
 
 ## Precondiciones mínimas para que la solicitud sea aceptada
 
@@ -153,7 +155,7 @@ Opcionales:
 - `BatteryLevel`
 - `GpsAccuracy`
 
-`BatteryLevel` se envía al backend solo cuando se proporciona. `GpsAccuracy` sigue sin enviarse porque el DTO productivo no lo acepta.
+`BatteryLevel` y `GpsAccuracy` se envían al backend solo cuando se proporcionan.
 
 ## Ejecución
 
@@ -185,7 +187,7 @@ Opcionales en el script:
 - `BatteryLevel`
 - `GpsAccuracy`
 
-`BatteryLevel` se puede enviar opcionalmente. `GpsAccuracy` no se envía al backend en la versión actual del endpoint.
+`BatteryLevel` y `GpsAccuracy` se pueden enviar opcionalmente.
 
 ## Errores comunes
 

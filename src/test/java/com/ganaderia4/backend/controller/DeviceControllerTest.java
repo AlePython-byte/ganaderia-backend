@@ -146,6 +146,36 @@ class DeviceControllerTest {
     }
 
     @Test
+    void shouldAuthenticateSignedDeviceRequestWithGpsAccuracyInSignedBody() throws Exception {
+        LocationResponseDTO response = new LocationResponseDTO();
+        response.setId(12L);
+        response.setCowToken("VACA-001");
+        response.setCollarToken("COLLAR-001");
+
+        when(locationService.registerLocationFromDevice(any(DeviceLocationPayloadDTO.class)))
+                .thenReturn(response);
+
+        String body = """
+                {
+                  "latitude": 1.214,
+                  "longitude": -77.281,
+                  "timestamp": "2026-04-18T10:00:00",
+                  "gpsAccuracy": 4.5
+                }
+                """;
+
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(12));
+
+        ArgumentCaptor<DeviceLocationPayloadDTO> captor = ArgumentCaptor.forClass(DeviceLocationPayloadDTO.class);
+        verify(locationService).registerLocationFromDevice(captor.capture());
+
+        DeviceLocationPayloadDTO payload = captor.getValue();
+        assertEquals(4.5, payload.getGpsAccuracy());
+    }
+
+    @Test
     void shouldRejectUnsignedDeviceRequestBeforeCallingLocationService() throws Exception {
         String body = """
                 {
@@ -206,6 +236,23 @@ class DeviceControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("El batteryLevel no puede ser mayor a 100"));
+    }
+
+    @Test
+    void shouldRejectDeviceRequestWhenGpsAccuracyIsNegative() throws Exception {
+        String body = """
+                {
+                  "latitude": 1.214,
+                  "longitude": -77.281,
+                  "timestamp": "2026-04-18T10:00:00",
+                  "gpsAccuracy": -0.1
+                }
+                """;
+
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El gpsAccuracy no puede ser menor a 0"));
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token, String secret, String body) throws Exception {

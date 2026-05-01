@@ -7,6 +7,7 @@ import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactoryProvider;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
@@ -17,6 +18,8 @@ import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -32,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class LocationServiceTest {
 
     @Mock
@@ -61,6 +64,9 @@ class LocationServiceTest {
 
     @Mock
     private AlertService alertService;
+
+    @Spy
+    private GpsAccuracyClassifier gpsAccuracyClassifier = new GpsAccuracyClassifier();
 
     @Spy
     private PaginationService paginationService = new PaginationService(new PaginationProperties());
@@ -169,9 +175,86 @@ class LocationServiceTest {
         LocationResponseDTO response = locationService.registerLocationFromDevice(payload);
 
         assertNotNull(response);
+        verify(locationRepository, never()).findById(any());
         verify(collarRepository, never()).findByToken(any());
         verify(alertService, never()).createLowBatteryAlert(any());
         verify(alertService, never()).resolvePendingLowBatteryAlert(any(), any());
+    }
+
+    @Test
+    void shouldPersistGpsAccuracyWhenProvidedInDeviceTelemetry() {
+        DeviceLocationPayloadDTO payload = new DeviceLocationPayloadDTO();
+        payload.setDeviceToken("COL-001");
+        payload.setLat(1.214);
+        payload.setLon(-77.281);
+        payload.setReportedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        payload.setGpsAccuracy(4.5);
+
+        @SuppressWarnings("unchecked")
+        LocationProcessingFactory<DeviceLocationPayloadDTO> deviceFactory = mock(LocationProcessingFactory.class);
+        LocationValidationChain deviceValidationChain = mock(LocationValidationChain.class);
+        LocationCommand command = new LocationCommand("COL-001", payload.getLat(), payload.getLon(), payload.getReportedAt());
+
+        LocationResponseDTO responseDTO = new LocationResponseDTO();
+        responseDTO.setId(55L);
+        responseDTO.setCowToken("VACA-001");
+        responseDTO.setCollarToken("COL-001");
+
+        Location persistedLocation = new Location();
+        persistedLocation.setId(55L);
+
+        when(locationProcessingFactoryProvider.<DeviceLocationPayloadDTO>getFactory("DEVICE")).thenReturn(deviceFactory);
+        when(deviceFactory.createCommand(payload)).thenReturn(command);
+        when(deviceFactory.getValidationChain()).thenReturn(deviceValidationChain);
+        when(monitoringFacade.processLocation(command, deviceValidationChain)).thenReturn(responseDTO);
+        when(locationRepository.findById(55L)).thenReturn(Optional.of(persistedLocation));
+
+        locationService.registerLocationFromDevice(payload);
+
+        assertEquals(4.5, persistedLocation.getGpsAccuracy());
+        verify(locationRepository).save(persistedLocation);
+        verify(collarRepository, never()).findByToken(any());
+    }
+
+    @Test
+    void shouldLogLowGpsAccuracyWhenTelemetryQualityIsLow(CapturedOutput output) {
+        DeviceLocationPayloadDTO payload = new DeviceLocationPayloadDTO();
+        payload.setDeviceToken("COL-001");
+        payload.setLat(1.214);
+        payload.setLon(-77.281);
+        payload.setReportedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        payload.setGpsAccuracy(30.1);
+
+        @SuppressWarnings("unchecked")
+        LocationProcessingFactory<DeviceLocationPayloadDTO> deviceFactory = mock(LocationProcessingFactory.class);
+        LocationValidationChain deviceValidationChain = mock(LocationValidationChain.class);
+        LocationCommand command = new LocationCommand("COL-001", payload.getLat(), payload.getLon(), payload.getReportedAt());
+
+        LocationResponseDTO responseDTO = new LocationResponseDTO();
+        responseDTO.setId(55L);
+        responseDTO.setCowToken("VACA-001");
+        responseDTO.setCollarToken("COL-001");
+
+        Location persistedLocation = new Location();
+        persistedLocation.setId(55L);
+
+        when(locationProcessingFactoryProvider.<DeviceLocationPayloadDTO>getFactory("DEVICE")).thenReturn(deviceFactory);
+        when(deviceFactory.createCommand(payload)).thenReturn(command);
+        when(deviceFactory.getValidationChain()).thenReturn(deviceValidationChain);
+        when(monitoringFacade.processLocation(command, deviceValidationChain)).thenReturn(responseDTO);
+        when(locationRepository.findById(55L)).thenReturn(Optional.of(persistedLocation));
+
+        locationService.registerLocationFromDevice(payload);
+
+        String logs = output.getOut() + output.getErr();
+        verify(locationRepository).save(persistedLocation);
+        assertEquals(30.1, persistedLocation.getGpsAccuracy());
+        org.junit.jupiter.api.Assertions.assertTrue(logs.contains("event=gps_accuracy_low"));
+        org.junit.jupiter.api.Assertions.assertTrue(logs.contains("requestId=-"));
+        org.junit.jupiter.api.Assertions.assertTrue(logs.contains("locationId=55"));
+        org.junit.jupiter.api.Assertions.assertTrue(logs.contains("gpsAccuracy=30.1"));
+        org.junit.jupiter.api.Assertions.assertTrue(logs.contains("quality=LOW"));
+        org.junit.jupiter.api.Assertions.assertFalse(logs.contains("COL-001"));
     }
 
     @Test
@@ -260,6 +343,26 @@ class LocationServiceTest {
 
         assertEquals("El batteryLevel debe estar entre 0 y 100", exception.getMessage());
         verify(monitoringFacade, never()).processLocation(any(), any());
+        verify(collarRepository, never()).findByToken(any());
+    }
+
+    @Test
+    void shouldRejectDevicePayloadWhenGpsAccuracyIsNegative() {
+        DeviceLocationPayloadDTO payload = new DeviceLocationPayloadDTO();
+        payload.setDeviceToken("COL-001");
+        payload.setLat(1.214);
+        payload.setLon(-77.281);
+        payload.setReportedAt(LocalDateTime.now());
+        payload.setGpsAccuracy(-0.1);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> locationService.registerLocationFromDevice(payload)
+        );
+
+        assertEquals("El gpsAccuracy no puede ser menor a 0", exception.getMessage());
+        verify(monitoringFacade, never()).processLocation(any(), any());
+        verify(locationRepository, never()).findById(any());
         verify(collarRepository, never()).findByToken(any());
     }
 }

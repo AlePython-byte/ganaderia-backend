@@ -6,6 +6,7 @@ import com.ganaderia4.backend.dto.LocationResponseDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.GpsAccuracyQuality;
 import com.ganaderia4.backend.model.Location;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
@@ -45,6 +46,7 @@ public class LocationService {
     private final AuditLogService auditLogService;
     private final PaginationService paginationService;
     private final AlertService alertService;
+    private final GpsAccuracyClassifier gpsAccuracyClassifier;
 
     public LocationService(LocationRepository locationRepository,
                            CowRepository cowRepository,
@@ -53,7 +55,8 @@ public class LocationService {
                            LocationProcessingFactoryProvider locationProcessingFactoryProvider,
                            AuditLogService auditLogService,
                            PaginationService paginationService,
-                           AlertService alertService) {
+                           AlertService alertService,
+                           GpsAccuracyClassifier gpsAccuracyClassifier) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
         this.collarRepository = collarRepository;
@@ -62,6 +65,7 @@ public class LocationService {
         this.auditLogService = auditLogService;
         this.paginationService = paginationService;
         this.alertService = alertService;
+        this.gpsAccuracyClassifier = gpsAccuracyClassifier;
     }
 
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
@@ -92,6 +96,7 @@ public class LocationService {
 
         LocationCommand command = factory.createCommand(payloadDTO);
         LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
+        updateLocationTelemetry(response.getId(), payloadDTO);
         updateBatteryTelemetry(payloadDTO);
 
         log.info(
@@ -234,6 +239,37 @@ public class LocationService {
             );
             throw new BadRequestException("El batteryLevel debe estar entre 0 y 100");
         }
+
+        if (payloadDTO.getGpsAccuracy() != null && payloadDTO.getGpsAccuracy() < 0.0) {
+            log.warn(
+                    "event=device_location_rejected requestId={} reason=gps_accuracy_out_of_range device={}",
+                    OperationalLogSanitizer.requestId(),
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
+            );
+            throw new BadRequestException("El gpsAccuracy no puede ser menor a 0");
+        }
+    }
+
+    private void updateLocationTelemetry(Long locationId, DeviceLocationPayloadDTO payloadDTO) {
+        if (locationId == null || payloadDTO.getGpsAccuracy() == null) {
+            return;
+        }
+
+        locationRepository.findById(locationId).ifPresent(location -> {
+            location.setGpsAccuracy(payloadDTO.getGpsAccuracy());
+            locationRepository.save(location);
+
+            GpsAccuracyQuality quality = gpsAccuracyClassifier.classify(payloadDTO.getGpsAccuracy());
+            if (quality == GpsAccuracyQuality.LOW) {
+                log.info(
+                        "event=gps_accuracy_low requestId={} locationId={} gpsAccuracy={} quality={}",
+                        OperationalLogSanitizer.requestId(),
+                        location.getId(),
+                        payloadDTO.getGpsAccuracy(),
+                        quality
+                );
+            }
+        });
     }
 
     private void updateBatteryTelemetry(DeviceLocationPayloadDTO payloadDTO) {

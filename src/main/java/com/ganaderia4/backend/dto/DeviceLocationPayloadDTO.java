@@ -9,6 +9,7 @@ public class DeviceLocationPayloadDTO {
     private Double lon;
     private LocalDateTime reportedAt;
     private Integer batteryLevel;
+    private Double gpsAccuracy;
 
     public DeviceLocationPayloadDTO() {
     }
@@ -51,5 +52,13 @@ public class DeviceLocationPayloadDTO {
 
     public void setBatteryLevel(Integer batteryLevel) {
         this.batteryLevel = batteryLevel;
+    }
+
+    public Double getGpsAccuracy() {
+        return gpsAccuracy;
+    }
+
+    public void setGpsAccuracy(Double gpsAccuracy) {
+        this.gpsAccuracy = gpsAccuracy;
     }
 }

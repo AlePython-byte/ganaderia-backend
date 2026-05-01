@@ -126,6 +126,32 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldPersistGpsAccuracyFromDeviceIngestion() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-GPS-001", "Precision");
+        Collar collar = createCollar("COLLAR-DEVICE-GPS-001", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(
+                1.215,
+                -77.282,
+                bodyTimestampFrom(requestInstant).minusMinutes(1),
+                null,
+                4.5
+        );
+
+        MvcResult result = mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.collarToken").value(collar.getToken()))
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
+        Location savedLocation = locationRepository.findById(json.get("id").asLong()).orElseThrow();
+
+        assertEquals(1, locationRepository.count());
+        assertEquals(4.5, savedLocation.getGpsAccuracy());
+    }
+
+    @Test
     void shouldRejectLocationFromDisabledActiveCollar() throws Exception {
         Cow cow = createCow("VACA-DEVICE-DISABLED", "Mora");
         Collar collar = createCollar("COLLAR-DEVICE-DISABLED", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA, false);
@@ -427,6 +453,33 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldRejectDeviceLocationWhenGpsAccuracyIsNegative() throws Exception {
+        Cow cow = createCow("VACA-DEVICE-GPS-NEG", "Precision invalida");
+        Collar collar = createCollar("COLLAR-DEVICE-GPS-NEG", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
+
+        int initialBatteryLevel = collar.getBatteryLevel();
+        Instant requestInstant = currentRequestInstant();
+        String body = deviceLocationBody(
+                1.622,
+                -77.622,
+                bodyTimestampFrom(requestInstant).minusMinutes(1),
+                null,
+                -0.1
+        );
+
+        mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El gpsAccuracy no puede ser menor a 0"))
+                .andExpect(jsonPath("$.path").value(DEVICE_LOCATION_PATH));
+
+        Collar unchangedCollar = collarRepository.findById(collar.getId()).orElseThrow();
+        assertEquals(initialBatteryLevel, unchangedCollar.getBatteryLevel());
+        assertEquals(0, locationRepository.count());
+        assertEquals(0, alertRepository.countByType(AlertType.LOW_BATTERY));
+    }
+
+    @Test
     void shouldRateLimitDeviceLocationRequests() throws Exception {
         Cow cow = createCow("VACA-DEVICE-RATE-LIMIT", "Rate limit");
         Collar collar = createCollar("COLLAR-DEVICE-RATE-LIMIT", cow, CollarStatus.ACTIVO, DeviceSignalStatus.MEDIA);
@@ -498,18 +551,27 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
     private String deviceLocationBody(double latitude,
                                       double longitude,
                                       LocalDateTime timestamp) throws Exception {
-        return deviceLocationBody(latitude, longitude, timestamp, null);
+        return deviceLocationBody(latitude, longitude, timestamp, null, null);
     }
 
     private String deviceLocationBody(double latitude,
                                       double longitude,
                                       LocalDateTime timestamp,
                                       Integer batteryLevel) throws Exception {
+        return deviceLocationBody(latitude, longitude, timestamp, batteryLevel, null);
+    }
+
+    private String deviceLocationBody(double latitude,
+                                      double longitude,
+                                      LocalDateTime timestamp,
+                                      Integer batteryLevel,
+                                      Double gpsAccuracy) throws Exception {
         DeviceLocationRequestDTO request = new DeviceLocationRequestDTO();
         request.setLatitude(latitude);
         request.setLongitude(longitude);
         request.setTimestamp(timestamp.truncatedTo(ChronoUnit.SECONDS));
         request.setBatteryLevel(batteryLevel);
+        request.setGpsAccuracy(gpsAccuracy);
         return deviceBodyObjectMapper.writeValueAsString(request);
     }
 
