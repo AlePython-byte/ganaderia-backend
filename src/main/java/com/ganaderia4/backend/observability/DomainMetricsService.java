@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.observability;
 
 import com.ganaderia4.backend.model.AlertType;
+import com.ganaderia4.backend.model.GpsAccuracyQuality;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class DomainMetricsService {
     private static final String NOTIFICATIONS_FAILED = "ganaderia.notifications.failed";
     private static final String NOTIFICATIONS_QUEUED = "ganaderia.notifications.queued";
     private static final String NOTIFICATIONS_RETRIED = "ganaderia.notifications.retried";
+    private static final String GPS_ACCURACY_QUALITY_COUNT = "ganaderia.gps.accuracy.quality.count";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -75,6 +77,18 @@ public class DomainMetricsService {
 
     public void incrementNotificationRetried(String channel, String eventType) {
         counterWithNotificationTags(NOTIFICATIONS_RETRIED, channel, eventType).increment();
+    }
+
+    public void incrementGpsAccuracyQuality(GpsAccuracyQuality quality) {
+        String qualityValue = quality != null ? quality.name() : GpsAccuracyQuality.UNKNOWN.name();
+        String key = GPS_ACCURACY_QUALITY_COUNT + "|quality=" + qualityValue;
+
+        counters.computeIfAbsent(key, ignored ->
+                Counter.builder(GPS_ACCURACY_QUALITY_COUNT)
+                        .description("Contador de calidad GPS de telemetria recibida")
+                        .tag("quality", qualityValue)
+                        .register(meterRegistry)
+        ).increment();
     }
 
     private Counter counterWithAlertType(String metricName, AlertType type) {

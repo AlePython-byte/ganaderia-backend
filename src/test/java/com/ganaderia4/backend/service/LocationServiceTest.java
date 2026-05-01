@@ -7,7 +7,9 @@ import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.Cow;
+import com.ganaderia4.backend.model.GpsAccuracyQuality;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactoryProvider;
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
@@ -64,6 +66,9 @@ class LocationServiceTest {
 
     @Mock
     private AlertService alertService;
+
+    @Mock
+    private DomainMetricsService domainMetricsService;
 
     @Spy
     private GpsAccuracyClassifier gpsAccuracyClassifier = new GpsAccuracyClassifier();
@@ -175,6 +180,7 @@ class LocationServiceTest {
         LocationResponseDTO response = locationService.registerLocationFromDevice(payload);
 
         assertNotNull(response);
+        verify(domainMetricsService).incrementGpsAccuracyQuality(GpsAccuracyQuality.UNKNOWN);
         verify(locationRepository, never()).findById(any());
         verify(collarRepository, never()).findByToken(any());
         verify(alertService, never()).createLowBatteryAlert(any());
@@ -212,8 +218,43 @@ class LocationServiceTest {
         locationService.registerLocationFromDevice(payload);
 
         assertEquals(4.5, persistedLocation.getGpsAccuracy());
+        verify(domainMetricsService).incrementGpsAccuracyQuality(GpsAccuracyQuality.GOOD);
         verify(locationRepository).save(persistedLocation);
         verify(collarRepository, never()).findByToken(any());
+    }
+
+    @Test
+    void shouldIncrementModerateGpsAccuracyMetricWhenTelemetryQualityIsModerate() {
+        DeviceLocationPayloadDTO payload = new DeviceLocationPayloadDTO();
+        payload.setDeviceToken("COL-001");
+        payload.setLat(1.214);
+        payload.setLon(-77.281);
+        payload.setReportedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        payload.setGpsAccuracy(20.0);
+
+        @SuppressWarnings("unchecked")
+        LocationProcessingFactory<DeviceLocationPayloadDTO> deviceFactory = mock(LocationProcessingFactory.class);
+        LocationValidationChain deviceValidationChain = mock(LocationValidationChain.class);
+        LocationCommand command = new LocationCommand("COL-001", payload.getLat(), payload.getLon(), payload.getReportedAt());
+
+        LocationResponseDTO responseDTO = new LocationResponseDTO();
+        responseDTO.setId(56L);
+        responseDTO.setCowToken("VACA-001");
+        responseDTO.setCollarToken("COL-001");
+
+        Location persistedLocation = new Location();
+        persistedLocation.setId(56L);
+
+        when(locationProcessingFactoryProvider.<DeviceLocationPayloadDTO>getFactory("DEVICE")).thenReturn(deviceFactory);
+        when(deviceFactory.createCommand(payload)).thenReturn(command);
+        when(deviceFactory.getValidationChain()).thenReturn(deviceValidationChain);
+        when(monitoringFacade.processLocation(command, deviceValidationChain)).thenReturn(responseDTO);
+        when(locationRepository.findById(56L)).thenReturn(Optional.of(persistedLocation));
+
+        locationService.registerLocationFromDevice(payload);
+
+        verify(domainMetricsService).incrementGpsAccuracyQuality(GpsAccuracyQuality.MODERATE);
+        verify(locationRepository).save(persistedLocation);
     }
 
     @Test
@@ -247,6 +288,7 @@ class LocationServiceTest {
         locationService.registerLocationFromDevice(payload);
 
         String logs = output.getOut() + output.getErr();
+        verify(domainMetricsService).incrementGpsAccuracyQuality(GpsAccuracyQuality.LOW);
         verify(locationRepository).save(persistedLocation);
         assertEquals(30.1, persistedLocation.getGpsAccuracy());
         org.junit.jupiter.api.Assertions.assertTrue(logs.contains("event=gps_accuracy_low"));

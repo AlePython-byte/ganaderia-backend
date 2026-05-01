@@ -8,6 +8,7 @@ import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.GpsAccuracyQuality;
 import com.ganaderia4.backend.model.Location;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactory;
 import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessingFactoryProvider;
@@ -47,6 +48,7 @@ public class LocationService {
     private final PaginationService paginationService;
     private final AlertService alertService;
     private final GpsAccuracyClassifier gpsAccuracyClassifier;
+    private final DomainMetricsService domainMetricsService;
 
     public LocationService(LocationRepository locationRepository,
                            CowRepository cowRepository,
@@ -56,7 +58,8 @@ public class LocationService {
                            AuditLogService auditLogService,
                            PaginationService paginationService,
                            AlertService alertService,
-                           GpsAccuracyClassifier gpsAccuracyClassifier) {
+                           GpsAccuracyClassifier gpsAccuracyClassifier,
+                           DomainMetricsService domainMetricsService) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
         this.collarRepository = collarRepository;
@@ -66,6 +69,7 @@ public class LocationService {
         this.paginationService = paginationService;
         this.alertService = alertService;
         this.gpsAccuracyClassifier = gpsAccuracyClassifier;
+        this.domainMetricsService = domainMetricsService;
     }
 
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
@@ -251,6 +255,9 @@ public class LocationService {
     }
 
     private void updateLocationTelemetry(Long locationId, DeviceLocationPayloadDTO payloadDTO) {
+        GpsAccuracyQuality quality = gpsAccuracyClassifier.classify(payloadDTO.getGpsAccuracy());
+        domainMetricsService.incrementGpsAccuracyQuality(quality);
+
         if (locationId == null || payloadDTO.getGpsAccuracy() == null) {
             return;
         }
@@ -259,7 +266,6 @@ public class LocationService {
             location.setGpsAccuracy(payloadDTO.getGpsAccuracy());
             locationRepository.save(location);
 
-            GpsAccuracyQuality quality = gpsAccuracyClassifier.classify(payloadDTO.getGpsAccuracy());
             if (quality == GpsAccuracyQuality.LOW) {
                 log.info(
                         "event=gps_accuracy_low requestId={} locationId={} gpsAccuracy={} quality={}",
