@@ -51,6 +51,10 @@ $bodyObject = [ordered]@{
     timestamp = $bodyTimestamp
 }
 
+if ($null -ne $BatteryLevel) {
+    $bodyObject["batteryLevel"] = $BatteryLevel
+}
+
 $bodyJson = $bodyObject | ConvertTo-Json -Compress
 
 # Canonical request format from DeviceRequestAuthenticationService:
@@ -82,12 +86,12 @@ Write-Host "Nonce: $nonce"
 Write-Host "Body: $bodyJson"
 
 if ($null -ne $BatteryLevel -or $null -ne $GpsAccuracy) {
-    Write-Host "Note: BatteryLevel and GpsAccuracy are accepted by this script as operator metadata only."
-    Write-Host "The current DeviceLocationRequestDTO does not accept those fields, so they are not sent."
     if ($null -ne $BatteryLevel) {
-        Write-Host "BatteryLevel (not sent): $BatteryLevel"
+        Write-Host "BatteryLevel (sent): $BatteryLevel"
     }
     if ($null -ne $GpsAccuracy) {
+        Write-Host "Note: GpsAccuracy is accepted by this script as operator metadata only."
+        Write-Host "The current DeviceLocationRequestDTO does not accept that field, so it is not sent."
         Write-Host "GpsAccuracy (not sent): $GpsAccuracy"
     }
 }

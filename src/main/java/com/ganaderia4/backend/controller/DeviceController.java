@@ -140,11 +140,12 @@ public class DeviceController {
                             examples = @ExampleObject(
                                     name = "DeviceLocationRequest",
                                     value = """
-                                            {
-                                              "latitude": 1.214,
-                                              "longitude": -77.281,
-                                              "timestamp": "2026-04-28T20:52:08"
-                                            }
+                                    {
+                                      "latitude": 1.214,
+                                      "longitude": -77.281,
+                                      "timestamp": "2026-04-28T20:52:08",
+                                      "batteryLevel": 18
+                                    }
                                             """
                             )
                     )
@@ -174,6 +175,7 @@ public class DeviceController {
         payloadDTO.setLat(requestDTO.getLatitude());
         payloadDTO.setLon(requestDTO.getLongitude());
         payloadDTO.setReportedAt(requestDTO.getTimestamp());
+        payloadDTO.setBatteryLevel(requestDTO.getBatteryLevel());
 
         LocationResponseDTO response = locationService.registerLocationFromDevice(payloadDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

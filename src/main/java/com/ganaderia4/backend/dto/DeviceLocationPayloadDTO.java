@@ -8,6 +8,7 @@ public class DeviceLocationPayloadDTO {
     private Double lat;
     private Double lon;
     private LocalDateTime reportedAt;
+    private Integer batteryLevel;
 
     public DeviceLocationPayloadDTO() {
     }
@@ -42,5 +43,13 @@ public class DeviceLocationPayloadDTO {
 
     public void setReportedAt(LocalDateTime reportedAt) {
         this.reportedAt = reportedAt;
+    }
+
+    public Integer getBatteryLevel() {
+        return batteryLevel;
+    }
+
+    public void setBatteryLevel(Integer batteryLevel) {
+        this.batteryLevel = batteryLevel;
     }
 }

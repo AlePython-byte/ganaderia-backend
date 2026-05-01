@@ -13,6 +13,7 @@ import com.ganaderia4.backend.pattern.abstractfactory.location.LocationProcessin
 import com.ganaderia4.backend.pattern.adapter.location.LocationCommand;
 import com.ganaderia4.backend.pattern.builder.LocationResponseDTOBuilder;
 import com.ganaderia4.backend.pattern.facade.MonitoringFacade;
+import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.LocationRepository;
 import org.slf4j.Logger;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -37,23 +39,29 @@ public class LocationService {
 
     private final LocationRepository locationRepository;
     private final CowRepository cowRepository;
+    private final CollarRepository collarRepository;
     private final MonitoringFacade monitoringFacade;
     private final LocationProcessingFactoryProvider locationProcessingFactoryProvider;
     private final AuditLogService auditLogService;
     private final PaginationService paginationService;
+    private final AlertService alertService;
 
     public LocationService(LocationRepository locationRepository,
                            CowRepository cowRepository,
+                           CollarRepository collarRepository,
                            MonitoringFacade monitoringFacade,
                            LocationProcessingFactoryProvider locationProcessingFactoryProvider,
                            AuditLogService auditLogService,
-                           PaginationService paginationService) {
+                           PaginationService paginationService,
+                           AlertService alertService) {
         this.locationRepository = locationRepository;
         this.cowRepository = cowRepository;
+        this.collarRepository = collarRepository;
         this.monitoringFacade = monitoringFacade;
         this.locationProcessingFactoryProvider = locationProcessingFactoryProvider;
         this.auditLogService = auditLogService;
         this.paginationService = paginationService;
+        this.alertService = alertService;
     }
 
     public LocationResponseDTO registerLocation(LocationRequestDTO requestDTO) {
@@ -75,6 +83,7 @@ public class LocationService {
         return response;
     }
 
+    @Transactional
     public LocationResponseDTO registerLocationFromDevice(DeviceLocationPayloadDTO payloadDTO) {
         validateDevicePayload(payloadDTO);
 
@@ -83,6 +92,7 @@ public class LocationService {
 
         LocationCommand command = factory.createCommand(payloadDTO);
         LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
+        updateBatteryTelemetry(payloadDTO);
 
         log.info(
                 "event=device_location_registered requestId={} device={} cow={} locationId={} reportedAt={}",
@@ -215,6 +225,32 @@ public class LocationService {
             );
             throw new BadRequestException("El timestamp reportado es demasiado antiguo para ser procesado");
         }
+
+        if (payloadDTO.getBatteryLevel() != null && (payloadDTO.getBatteryLevel() < 0 || payloadDTO.getBatteryLevel() > 100)) {
+            log.warn(
+                    "event=device_location_rejected requestId={} reason=battery_level_out_of_range device={}",
+                    OperationalLogSanitizer.requestId(),
+                    OperationalLogSanitizer.maskToken(payloadDTO.getDeviceToken())
+            );
+            throw new BadRequestException("El batteryLevel debe estar entre 0 y 100");
+        }
+    }
+
+    private void updateBatteryTelemetry(DeviceLocationPayloadDTO payloadDTO) {
+        if (payloadDTO.getBatteryLevel() == null) {
+            return;
+        }
+
+        collarRepository.findByToken(payloadDTO.getDeviceToken()).ifPresent(collar -> {
+            collar.setBatteryLevel(payloadDTO.getBatteryLevel());
+            collarRepository.save(collar);
+
+            if (payloadDTO.getBatteryLevel() <= AlertService.LOW_BATTERY_ALERT_THRESHOLD) {
+                alertService.createLowBatteryAlert(collar);
+            } else if (payloadDTO.getBatteryLevel() > AlertService.LOW_BATTERY_RECOVERY_THRESHOLD) {
+                alertService.resolvePendingLowBatteryAlert(collar, payloadDTO.getReportedAt());
+            }
+        });
     }
 
     private LocationResponseDTO mapToResponseDTO(Location location) {

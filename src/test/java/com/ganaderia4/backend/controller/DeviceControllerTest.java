@@ -116,6 +116,36 @@ class DeviceControllerTest {
     }
 
     @Test
+    void shouldAuthenticateSignedDeviceRequestWithBatteryLevelInSignedBody() throws Exception {
+        LocationResponseDTO response = new LocationResponseDTO();
+        response.setId(11L);
+        response.setCowToken("VACA-001");
+        response.setCollarToken("COLLAR-001");
+
+        when(locationService.registerLocationFromDevice(any(DeviceLocationPayloadDTO.class)))
+                .thenReturn(response);
+
+        String body = """
+                {
+                  "latitude": 1.214,
+                  "longitude": -77.281,
+                  "timestamp": "2026-04-18T10:00:00",
+                  "batteryLevel": 18
+                }
+                """;
+
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(11));
+
+        ArgumentCaptor<DeviceLocationPayloadDTO> captor = ArgumentCaptor.forClass(DeviceLocationPayloadDTO.class);
+        verify(locationService).registerLocationFromDevice(captor.capture());
+
+        DeviceLocationPayloadDTO payload = captor.getValue();
+        assertEquals(18, payload.getBatteryLevel());
+    }
+
+    @Test
     void shouldRejectUnsignedDeviceRequestBeforeCallingLocationService() throws Exception {
         String body = """
                 {
@@ -159,6 +189,23 @@ class DeviceControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message").value("Nonce de dispositivo ya utilizado"));
+    }
+
+    @Test
+    void shouldRejectDeviceRequestWhenBatteryLevelIsGreaterThanOneHundred() throws Exception {
+        String body = """
+                {
+                  "latitude": 1.214,
+                  "longitude": -77.281,
+                  "timestamp": "2026-04-18T10:00:00",
+                  "batteryLevel": 101
+                }
+                """;
+
+        mockMvc.perform(signedDeviceLocationRequest(DEVICE_TOKEN, DEVICE_SECRET, body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("El batteryLevel no puede ser mayor a 100"));
     }
 
     private MockHttpServletRequestBuilder signedDeviceLocationRequest(String token, String secret, String body) throws Exception {

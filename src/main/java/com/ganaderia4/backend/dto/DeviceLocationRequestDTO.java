@@ -3,6 +3,8 @@ package com.ganaderia4.backend.dto;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
@@ -22,6 +24,10 @@ public class DeviceLocationRequestDTO {
     @NotNull(message = "El timestamp es obligatorio")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime timestamp;
+
+    @Min(value = 0, message = "El batteryLevel no puede ser menor a 0")
+    @Max(value = 100, message = "El batteryLevel no puede ser mayor a 100")
+    private Integer batteryLevel;
 
     public DeviceLocationRequestDTO() {
     }
@@ -48,5 +54,13 @@ public class DeviceLocationRequestDTO {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public Integer getBatteryLevel() {
+        return batteryLevel;
+    }
+
+    public void setBatteryLevel(Integer batteryLevel) {
+        this.batteryLevel = batteryLevel;
     }
 }

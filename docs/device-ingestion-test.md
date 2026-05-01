@@ -34,13 +34,14 @@ Detalles relevantes del código actual:
 
 ## Body JSON real del endpoint
 
-`DeviceLocationRequestDTO` acepta actualmente solo estos campos:
+`DeviceLocationRequestDTO` acepta actualmente estos campos:
 
 ```json
 {
   "latitude": 1.214,
   "longitude": -77.281,
-  "timestamp": "2026-04-29T10:10:45"
+  "timestamp": "2026-04-29T10:10:45",
+  "batteryLevel": 18
 }
 ```
 
@@ -48,8 +49,9 @@ Notas:
 
 - `timestamp` del body no lleva offset ni sufijo `Z`.
 - El script usa UTC sin sufijo `Z` tambien en el body para evitar desfases entre Windows local, Docker y Render.
-- El backend no acepta actualmente `batteryLevel` ni `gpsAccuracy` en este endpoint.
-- El script PowerShell recibe `BatteryLevel` y `GpsAccuracy` solo como metadatos locales para la prueba, pero no los envía.
+- `batteryLevel` es opcional. Si se envía, debe estar entre `0` y `100`.
+- `gpsAccuracy` no es aceptado actualmente por este endpoint.
+- El script PowerShell envía `BatteryLevel` solo cuando se proporciona y sigue tratando `GpsAccuracy` como metadato local no enviado.
 
 ## Datos requeridos
 
@@ -60,6 +62,7 @@ Para una prueba real y aceptada por el backend se necesita:
 - `DeviceSecret` derivado real del collar
 - `latitude`
 - `longitude`
+- `batteryLevel` opcional
 
 ## Precondiciones mínimas para que la solicitud sea aceptada
 
@@ -150,7 +153,7 @@ Opcionales:
 - `BatteryLevel`
 - `GpsAccuracy`
 
-Los dos opcionales no se envían al backend en la versión actual del endpoint, porque el DTO productivo no los acepta.
+`BatteryLevel` se envía al backend solo cuando se proporciona. `GpsAccuracy` sigue sin enviarse porque el DTO productivo no lo acepta.
 
 ## Ejecución
 
@@ -182,7 +185,7 @@ Opcionales en el script:
 - `BatteryLevel`
 - `GpsAccuracy`
 
-Esos dos últimos no se envían al backend en la versión actual del endpoint.
+`BatteryLevel` se puede enviar opcionalmente. `GpsAccuracy` no se envía al backend en la versión actual del endpoint.
 
 ## Errores comunes
 
