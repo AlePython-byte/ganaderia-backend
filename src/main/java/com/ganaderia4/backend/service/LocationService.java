@@ -101,6 +101,7 @@ public class LocationService {
         LocationCommand command = factory.createCommand(payloadDTO);
         LocationResponseDTO response = monitoringFacade.processLocation(command, factory.getValidationChain());
         updateLocationTelemetry(response.getId(), payloadDTO);
+        response.setGpsAccuracy(payloadDTO.getGpsAccuracy());
         updateBatteryTelemetry(payloadDTO);
 
         log.info(
@@ -300,6 +301,7 @@ public class LocationService {
                 .id(location.getId())
                 .latitude(location.getLatitude())
                 .longitude(location.getLongitude())
+                .gpsAccuracy(location.getGpsAccuracy())
                 .timestamp(location.getTimestamp())
                 .cowId(location.getCow().getId())
                 .cowToken(location.getCow().getToken())

@@ -142,6 +142,7 @@ class DeviceControllerIntegrationTest extends AbstractIntegrationTest {
         MvcResult result = mockMvc.perform(signedDeviceLocationRequest(collar.getToken(), body, requestInstant, randomNonce()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.collarToken").value(collar.getToken()))
+                .andExpect(jsonPath("$.gpsAccuracy").value(4.5))
                 .andReturn();
 
         JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());

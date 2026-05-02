@@ -7,6 +7,7 @@ public class LocationResponseDTO {
     private Long id;
     private Double latitude;
     private Double longitude;
+    private Double gpsAccuracy;
     private LocalDateTime timestamp;
     private Long cowId;
     private String cowToken;
@@ -17,10 +18,11 @@ public class LocationResponseDTO {
     }
 
     public LocationResponseDTO(Long id, Double latitude, Double longitude, LocalDateTime timestamp,
-                               Long cowId, String cowToken, String cowName, String collarToken) {
+                               Double gpsAccuracy, Long cowId, String cowToken, String cowName, String collarToken) {
         this.id = id;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.gpsAccuracy = gpsAccuracy;
         this.timestamp = timestamp;
         this.cowId = cowId;
         this.cowToken = cowToken;
@@ -50,6 +52,14 @@ public class LocationResponseDTO {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public Double getGpsAccuracy() {
+        return gpsAccuracy;
+    }
+
+    public void setGpsAccuracy(Double gpsAccuracy) {
+        this.gpsAccuracy = gpsAccuracy;
     }
 
     public LocalDateTime getTimestamp() {

@@ -9,6 +9,7 @@ public class LocationResponseDTOBuilder {
     private Long id;
     private Double latitude;
     private Double longitude;
+    private Double gpsAccuracy;
     private LocalDateTime timestamp;
     private Long cowId;
     private String cowToken;
@@ -27,6 +28,11 @@ public class LocationResponseDTOBuilder {
 
     public LocationResponseDTOBuilder longitude(Double longitude) {
         this.longitude = longitude;
+        return this;
+    }
+
+    public LocationResponseDTOBuilder gpsAccuracy(Double gpsAccuracy) {
+        this.gpsAccuracy = gpsAccuracy;
         return this;
     }
 
@@ -60,6 +66,7 @@ public class LocationResponseDTOBuilder {
         dto.setId(id);
         dto.setLatitude(latitude);
         dto.setLongitude(longitude);
+        dto.setGpsAccuracy(gpsAccuracy);
         dto.setTimestamp(timestamp);
         dto.setCowId(cowId);
         dto.setCowToken(cowToken);

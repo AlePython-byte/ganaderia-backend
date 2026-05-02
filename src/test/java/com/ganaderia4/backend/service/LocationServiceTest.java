@@ -26,12 +26,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -180,6 +184,7 @@ class LocationServiceTest {
         LocationResponseDTO response = locationService.registerLocationFromDevice(payload);
 
         assertNotNull(response);
+        assertNull(response.getGpsAccuracy());
         verify(domainMetricsService).incrementGpsAccuracyQuality(GpsAccuracyQuality.UNKNOWN);
         verify(locationRepository, never()).findById(any());
         verify(collarRepository, never()).findByToken(any());
@@ -215,12 +220,72 @@ class LocationServiceTest {
         when(monitoringFacade.processLocation(command, deviceValidationChain)).thenReturn(responseDTO);
         when(locationRepository.findById(55L)).thenReturn(Optional.of(persistedLocation));
 
-        locationService.registerLocationFromDevice(payload);
+        LocationResponseDTO response = locationService.registerLocationFromDevice(payload);
 
         assertEquals(4.5, persistedLocation.getGpsAccuracy());
+        assertEquals(4.5, response.getGpsAccuracy());
         verify(domainMetricsService).incrementGpsAccuracyQuality(GpsAccuracyQuality.GOOD);
         verify(locationRepository).save(persistedLocation);
         verify(collarRepository, never()).findByToken(any());
+    }
+
+    @Test
+    void shouldExposeGpsAccuracyInLastLocationResponse() {
+        Cow cow = new Cow();
+        cow.setId(1L);
+        cow.setToken("VACA-001");
+        cow.setName("Luna");
+
+        Collar collar = new Collar();
+        collar.setToken("COL-001");
+
+        Location location = new Location();
+        location.setId(55L);
+        location.setLatitude(1.214);
+        location.setLongitude(-77.281);
+        location.setGpsAccuracy(4.5);
+        location.setTimestamp(LocalDateTime.of(2026, 5, 1, 10, 0));
+        location.setCow(cow);
+        location.setCollar(collar);
+
+        when(cowRepository.findById(1L)).thenReturn(Optional.of(cow));
+        when(locationRepository.findTopByCowOrderByTimestampDesc(cow)).thenReturn(Optional.of(location));
+
+        LocationResponseDTO response = locationService.getLastLocationByCow(1L);
+
+        assertEquals(4.5, response.getGpsAccuracy());
+        assertEquals("VACA-001", response.getCowToken());
+        assertEquals("COL-001", response.getCollarToken());
+    }
+
+    @Test
+    void shouldKeepNullGpsAccuracyInLocationHistoryResponse() {
+        Cow cow = new Cow();
+        cow.setId(1L);
+        cow.setToken("VACA-001");
+        cow.setName("Luna");
+
+        Collar collar = new Collar();
+        collar.setToken("COL-001");
+
+        Location location = new Location();
+        location.setId(56L);
+        location.setLatitude(1.215);
+        location.setLongitude(-77.282);
+        location.setGpsAccuracy(null);
+        location.setTimestamp(LocalDateTime.of(2026, 5, 1, 11, 0));
+        location.setCow(cow);
+        location.setCollar(collar);
+
+        when(cowRepository.findById(1L)).thenReturn(Optional.of(cow));
+        when(locationRepository.findByCowOrderByTimestampDesc(eq(cow), any()))
+                .thenReturn(new PageImpl<>(List.of(location)));
+
+        Page<LocationResponseDTO> response = locationService.getLocationHistoryByCow(1L, 0, 20);
+
+        assertEquals(1, response.getTotalElements());
+        assertNull(response.getContent().get(0).getGpsAccuracy());
+        assertEquals("VACA-001", response.getContent().get(0).getCowToken());
     }
 
     @Test

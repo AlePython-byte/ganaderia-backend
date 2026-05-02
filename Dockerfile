@@ -10,7 +10,7 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre
 
 ENV SPRING_PROFILES_ACTIVE=prod
-ENV PORT=10000
+ENV SERVER_PORT=10000
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
@@ -29,6 +29,6 @@ USER app
 EXPOSE 10000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl --fail --silent "http://localhost:${PORT:-10000}/actuator/health" > /dev/null || exit 1
+    CMD curl --fail --silent "http://localhost:${SERVER_PORT:-${PORT:-8080}}/actuator/health" > /dev/null || exit 1
 
-ENTRYPOINT ["sh", "-c", "java -Dserver.port=${PORT:-10000} -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java -Dserver.port=${SERVER_PORT:-${PORT:-8080}} -jar app.jar"]
