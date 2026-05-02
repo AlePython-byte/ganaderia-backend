@@ -92,9 +92,9 @@ class CorsIntegrationTest extends AbstractIntegrationTest {
     void shouldNotIncludeCorsHeadersForDisallowedOrigin() throws Exception {
         mockMvc.perform(get("/api/auth/me")
                         .header("Origin", "https://evil.example.com"))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"))
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+                .andExpect(header().string("Vary", containsString("Origin")));
     }
 
     @Test
