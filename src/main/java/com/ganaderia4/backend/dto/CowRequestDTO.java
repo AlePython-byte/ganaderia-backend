@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 
 public class CowRequestDTO {
 
-    @NotBlank(message = "El token es obligatorio")
     @Size(max = 50, message = "El token no puede superar 50 caracteres")
     private String token;
 

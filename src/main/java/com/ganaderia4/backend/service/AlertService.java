@@ -83,7 +83,7 @@ public class AlertService {
                 savedAlert.getId(),
                 "SYSTEM",
                 "SYSTEM",
-                "Alerta automática por salida de geocerca para vaca " + cow.getToken(),
+                "Alerta automÃ¡tica por salida de geocerca para vaca " + cow.getToken(),
                 true
         );
 
@@ -116,8 +116,8 @@ public class AlertService {
                 ? collar.getLastSeenAt().toString()
                 : "sin registros previos";
 
-        alert.setMessage("El collar " + collar.getToken() + " no ha reportado ubicación recientemente. Último reporte: " + lastSeenText);
-        alert.setObservations("Alerta operativa generada automáticamente por falta de reporte del dispositivo");
+        alert.setMessage("El collar " + collar.getToken() + " no ha reportado ubicaciÃ³n recientemente. Ãšltimo reporte: " + lastSeenText);
+        alert.setObservations("Alerta operativa generada automÃ¡ticamente por falta de reporte del dispositivo");
 
         Alert savedAlert = alertRepository.save(alert);
 
@@ -127,7 +127,7 @@ public class AlertService {
                 savedAlert.getId(),
                 "SYSTEM",
                 "SYSTEM",
-                "Alerta automática por collar offline " + collar.getToken(),
+                "Alerta automÃ¡tica por collar offline " + collar.getToken(),
                 true
         );
 
@@ -170,7 +170,7 @@ public class AlertService {
                 savedAlert.getId(),
                 "SYSTEM",
                 "SYSTEM",
-                "Alerta automática por batería baja del collar " + collar.getToken(),
+                "Alerta automÃ¡tica por baterÃ­a baja del collar " + collar.getToken(),
                 true
         );
 
@@ -277,7 +277,7 @@ public class AlertService {
                 "ALERT",
                 updatedAlert.getId(),
                 "API",
-                "Actualización de alerta " + updatedAlert.getId(),
+                "ActualizaciÃ³n de alerta " + updatedAlert.getId(),
                 true
         );
 
@@ -309,7 +309,7 @@ public class AlertService {
                 "ALERT",
                 updatedAlert.getId(),
                 "API",
-                "Resolución manual de alerta " + updatedAlert.getId(),
+                "ResoluciÃ³n manual de alerta " + updatedAlert.getId(),
                 true
         );
 
@@ -359,7 +359,7 @@ public class AlertService {
                     alert.setStatus(AlertStatus.RESUELTA);
 
                     String automaticObservation =
-                            "Alerta resuelta automáticamente: la vaca volvió a estar dentro de la geocerca el " + recoveredAt;
+                            "Alerta resuelta automÃ¡ticamente: la vaca volviÃ³ a estar dentro de la geocerca el " + recoveredAt;
 
                     alert.setObservations(mergeObservations(alert.getObservations(), automaticObservation));
 
@@ -371,7 +371,7 @@ public class AlertService {
                             updatedAlert.getId(),
                             "SYSTEM",
                             "SYSTEM",
-                            "Resolución automática de alerta de salida de geocerca para vaca " + cow.getToken(),
+                            "ResoluciÃ³n automÃ¡tica de alerta de salida de geocerca para vaca " + cow.getToken(),
                             true
                     );
 
@@ -397,8 +397,8 @@ public class AlertService {
                     alert.setStatus(AlertStatus.RESUELTA);
 
                     String automaticObservation =
-                            "Alerta resuelta automáticamente: el collar " + collar.getToken()
-                                    + " volvió a reportar ubicación el " + recoveredAt;
+                            "Alerta resuelta automÃ¡ticamente: el collar " + collar.getToken()
+                                    + " volviÃ³ a reportar ubicaciÃ³n el " + recoveredAt;
 
                     alert.setObservations(mergeObservations(alert.getObservations(), automaticObservation));
 
@@ -410,7 +410,7 @@ public class AlertService {
                             updatedAlert.getId(),
                             "SYSTEM",
                             "SYSTEM",
-                            "Resolución automática de alerta de collar offline " + collar.getToken(),
+                            "ResoluciÃ³n automÃ¡tica de alerta de collar offline " + collar.getToken(),
                             true
                     );
 
@@ -441,8 +441,8 @@ public class AlertService {
                     alert.setStatus(AlertStatus.RESUELTA);
 
                     String automaticObservation =
-                            "Alerta resuelta automáticamente: el collar " + collar.getToken()
-                                    + " recuperó batería saludable (" + batteryLevel + "%) el " + recoveredAt;
+                            "Alerta resuelta automÃ¡ticamente: el collar " + collar.getToken()
+                                    + " recuperÃ³ baterÃ­a saludable (" + batteryLevel + "%) el " + recoveredAt;
 
                     alert.setObservations(mergeObservations(alert.getObservations(), automaticObservation));
 
@@ -454,7 +454,7 @@ public class AlertService {
                             updatedAlert.getId(),
                             "SYSTEM",
                             "SYSTEM",
-                            "Resolución automática de alerta de batería baja del collar " + collar.getToken(),
+                            "ResoluciÃ³n automÃ¡tica de alerta de baterÃ­a baja del collar " + collar.getToken(),
                             true
                     );
 
@@ -475,7 +475,7 @@ public class AlertService {
         }
 
         NotificationMessage notificationMessage = NotificationMessage.builder()
-                .eventType("ALERT_CREATED")
+                .eventType(resolveNotificationEventType(alert))
                 .title(buildNotificationTitle(alert))
                 .message(alert.getMessage())
                 .severity(resolveNotificationSeverity(alert))
@@ -495,10 +495,16 @@ public class AlertService {
                 || alert.getType() == AlertType.LOW_BATTERY;
     }
 
+    private String resolveNotificationEventType(Alert alert) {
+        return alert.getType() == AlertType.LOW_BATTERY
+                ? "ALERT_CREATED"
+                : "CRITICAL_ALERT_CREATED";
+    }
+
     private String buildNotificationTitle(Alert alert) {
         return alert.getType() == AlertType.LOW_BATTERY
                 ? "Nueva alerta operativa"
-                : "Nueva alerta crÃ­tica";
+                : "Nueva alerta crítica";
     }
 
     private String resolveNotificationSeverity(Alert alert) {
@@ -555,18 +561,18 @@ public class AlertService {
 
     private String buildLowBatteryMessage(Collar collar, int batteryLevel) {
         if (batteryLevel <= CRITICAL_BATTERY_ALERT_THRESHOLD) {
-            return "El collar " + collar.getToken() + " reporta batería crítica (" + batteryLevel + "%).";
+            return "El collar " + collar.getToken() + " reporta baterÃ­a crÃ­tica (" + batteryLevel + "%).";
         }
 
-        return "El collar " + collar.getToken() + " reporta batería baja (" + batteryLevel + "%).";
+        return "El collar " + collar.getToken() + " reporta baterÃ­a baja (" + batteryLevel + "%).";
     }
 
     private String buildLowBatteryObservation(int batteryLevel) {
         if (batteryLevel <= CRITICAL_BATTERY_ALERT_THRESHOLD) {
-            return "Alerta operativa generada automáticamente por batería crítica del dispositivo";
+            return "Alerta operativa generada automÃ¡ticamente por baterÃ­a crÃ­tica del dispositivo";
         }
 
-        return "Alerta operativa generada automáticamente por batería baja del dispositivo";
+        return "Alerta operativa generada automÃ¡ticamente por baterÃ­a baja del dispositivo";
     }
 
     private Specification<Alert> buildSpecification(AlertStatus status, AlertType type) {

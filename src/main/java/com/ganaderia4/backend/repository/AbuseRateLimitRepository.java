@@ -35,4 +35,13 @@ public interface AbuseRateLimitRepository extends JpaRepository<AbuseRateLimitEn
     @Query("DELETE FROM AbuseRateLimitEntry entry WHERE entry.scope = :scope AND entry.abuseKey = :abuseKey")
     int deleteByScopeAndAbuseKey(@Param("scope") String scope,
                                  @Param("abuseKey") String abuseKey);
+
+    @Modifying
+    @Query("""
+            DELETE FROM AbuseRateLimitEntry entry
+            WHERE entry.updatedAt <= :cutoff
+              AND (entry.blockedUntil IS NULL OR entry.blockedUntil <= :now)
+            """)
+    int deleteInactiveEntries(@Param("cutoff") Instant cutoff,
+                              @Param("now") Instant now);
 }

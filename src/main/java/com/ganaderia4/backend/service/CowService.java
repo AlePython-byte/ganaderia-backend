@@ -14,12 +14,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class CowService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "token", "internalCode", "name", "status");
+    private static final String GENERATED_TOKEN_PREFIX = "COW-";
+    private static final Pattern GENERATED_TOKEN_PATTERN = Pattern.compile("^COW-(\\d+)$");
 
     private final CowRepository cowRepository;
     private final AuditLogService auditLogService;
@@ -35,18 +39,14 @@ public class CowService {
 
     @Transactional
     public CowResponseDTO createCow(CowRequestDTO requestDTO) {
-        if (cowRepository.findByToken(requestDTO.getToken()).isPresent()) {
-            throw new ConflictException("Ya existe una vaca con ese token");
-        }
-
         if (requestDTO.getInternalCode() != null && !requestDTO.getInternalCode().isBlank()) {
             if (cowRepository.findByInternalCode(requestDTO.getInternalCode()).isPresent()) {
-                throw new ConflictException("Ya existe una vaca con ese código interno");
+                throw new ConflictException("Ya existe una vaca con ese codigo interno");
             }
         }
 
         Cow cow = new Cow();
-        cow.setToken(requestDTO.getToken().trim());
+        cow.setToken(generateCowToken());
         cow.setInternalCode(normalizeNullable(requestDTO.getInternalCode()));
         cow.setName(requestDTO.getName().trim());
         cow.setStatus(requestDTO.getStatus());
@@ -59,7 +59,7 @@ public class CowService {
                 "COW",
                 savedCow.getId(),
                 "API",
-                "Creación de vaca con token " + savedCow.getToken(),
+                "Creacion de vaca con token " + savedCow.getToken(),
                 true
         );
 
@@ -71,20 +71,23 @@ public class CowService {
         Cow cow = cowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
-        String newToken = requestDTO.getToken().trim();
+        String requestedToken = normalizeNullable(requestDTO.getToken());
+        String newToken = requestedToken != null ? requestedToken : cow.getToken();
         String newInternalCode = normalizeNullable(requestDTO.getInternalCode());
 
-        cowRepository.findByToken(newToken)
-                .filter(existingCow -> !existingCow.getId().equals(cow.getId()))
-                .ifPresent(existingCow -> {
-                    throw new ConflictException("Ya existe otra vaca con ese token");
-                });
+        if (requestedToken != null) {
+            cowRepository.findByToken(newToken)
+                    .filter(existingCow -> !existingCow.getId().equals(cow.getId()))
+                    .ifPresent(existingCow -> {
+                        throw new ConflictException("Ya existe otra vaca con ese token");
+                    });
+        }
 
         if (newInternalCode != null) {
             cowRepository.findByInternalCode(newInternalCode)
                     .filter(existingCow -> !existingCow.getId().equals(cow.getId()))
                     .ifPresent(existingCow -> {
-                        throw new ConflictException("Ya existe otra vaca con ese código interno");
+                        throw new ConflictException("Ya existe otra vaca con ese codigo interno");
                     });
         }
 
@@ -101,7 +104,7 @@ public class CowService {
                 "COW",
                 updatedCow.getId(),
                 "API",
-                "Actualización de vaca con token " + updatedCow.getToken(),
+                "Actualizacion de vaca con token " + updatedCow.getToken(),
                 true
         );
 
@@ -151,6 +154,33 @@ public class CowService {
             return null;
         }
         return value.trim();
+    }
+
+    private String generateCowToken() {
+        int nextSequence = cowRepository.findAllTokens().stream()
+                .map(this::extractGeneratedTokenSequence)
+                .filter(sequence -> sequence > 0)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+
+        return GENERATED_TOKEN_PREFIX + String.format("%03d", nextSequence);
+    }
+
+    private int extractGeneratedTokenSequence(String token) {
+        if (token == null) {
+            return -1;
+        }
+
+        Matcher matcher = GENERATED_TOKEN_PATTERN.matcher(token.trim());
+        if (!matcher.matches()) {
+            return -1;
+        }
+
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     private CowResponseDTO mapToResponseDTO(Cow cow) {

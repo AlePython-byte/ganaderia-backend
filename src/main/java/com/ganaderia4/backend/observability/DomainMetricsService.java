@@ -24,6 +24,7 @@ public class DomainMetricsService {
     private static final String NOTIFICATIONS_RETRIED = "ganaderia.notifications.retried";
     private static final String GPS_ACCURACY_QUALITY_COUNT = "ganaderia.gps.accuracy.quality.count";
     private static final String DEVICE_REPLAY_NONCE_CLEANUP_DELETED_COUNT = "ganaderia.device.replay_nonce.cleanup.deleted.count";
+    private static final String ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT = "ganaderia.abuse.rate_limit.cleanup.deleted.count";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -100,6 +101,18 @@ public class DomainMetricsService {
         counters.computeIfAbsent(DEVICE_REPLAY_NONCE_CLEANUP_DELETED_COUNT, ignored ->
                 Counter.builder(DEVICE_REPLAY_NONCE_CLEANUP_DELETED_COUNT)
                         .description("Cantidad de nonces anti-replay eliminados por limpiezas programadas")
+                        .register(meterRegistry)
+        ).increment(deletedCount);
+    }
+
+    public void incrementAbuseRateLimitCleanupDeleted(long deletedCount) {
+        if (deletedCount <= 0) {
+            return;
+        }
+
+        counters.computeIfAbsent(ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT, ignored ->
+                Counter.builder(ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT)
+                        .description("Cantidad de entradas de abuse rate limit eliminadas por limpiezas programadas")
                         .register(meterRegistry)
         ).increment(deletedCount);
     }
