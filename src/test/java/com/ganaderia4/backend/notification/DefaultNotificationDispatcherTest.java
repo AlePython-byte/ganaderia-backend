@@ -18,6 +18,8 @@ class DefaultNotificationDispatcherTest {
         NotificationService serviceB = mock(NotificationService.class);
         when(serviceA.getChannel()).thenReturn(NotificationChannel.LOG);
         when(serviceB.getChannel()).thenReturn(NotificationChannel.LOG);
+        when(serviceA.send(any(NotificationMessage.class))).thenReturn(NotificationSendResult.SENT);
+        when(serviceB.send(any(NotificationMessage.class))).thenReturn(NotificationSendResult.SENT);
 
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
@@ -56,6 +58,7 @@ class DefaultNotificationDispatcherTest {
 
         when(failingService.getChannel()).thenReturn(NotificationChannel.LOG);
         when(successfulService.getChannel()).thenReturn(NotificationChannel.LOG);
+        when(successfulService.send(any(NotificationMessage.class))).thenReturn(NotificationSendResult.SENT);
         doThrow(new RuntimeException("fallo simulado"))
                 .when(failingService)
                 .send(any(NotificationMessage.class));
@@ -105,6 +108,7 @@ class DefaultNotificationDispatcherTest {
 
         when(loggingService.getChannel()).thenReturn(NotificationChannel.LOG);
         when(webhookService.getChannel()).thenReturn(NotificationChannel.WEBHOOK);
+        when(loggingService.send(any(NotificationMessage.class))).thenReturn(NotificationSendResult.SENT);
         doThrow(new NotificationPersistenceException("persistencia webhook fallida"))
                 .when(webhookService)
                 .send(any(NotificationMessage.class));
@@ -152,6 +156,51 @@ class DefaultNotificationDispatcherTest {
         dispatcher.dispatch(null);
 
         verify(service, never()).send(any());
+    }
+
+    @Test
+    void shouldNotCountSkippedNotificationsAsSent() {
+        NotificationService emailService = mock(NotificationService.class);
+        NotificationService loggingService = mock(NotificationService.class);
+
+        when(emailService.getChannel()).thenReturn(NotificationChannel.EMAIL);
+        when(loggingService.getChannel()).thenReturn(NotificationChannel.LOG);
+        when(emailService.send(any(NotificationMessage.class))).thenReturn(NotificationSendResult.SKIPPED);
+        when(loggingService.send(any(NotificationMessage.class))).thenReturn(NotificationSendResult.SENT);
+
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+        DefaultNotificationDispatcher dispatcher =
+                new DefaultNotificationDispatcher(
+                        List.of(emailService, loggingService),
+                        new DomainMetricsService(meterRegistry)
+                );
+
+        NotificationMessage message = NotificationMessage.builder()
+                .eventType("CRITICAL_ALERT_CREATED")
+                .title("Nueva alerta critica")
+                .message("Mensaje de prueba")
+                .severity("HIGH")
+                .build();
+
+        dispatcher.dispatch(message);
+
+        assertEquals(
+                0.0,
+                meterRegistry.counter(
+                        "ganaderia.notifications.sent",
+                        "channel", "EMAIL",
+                        "eventType", "CRITICAL_ALERT_CREATED"
+                ).count()
+        );
+        assertEquals(
+                1.0,
+                meterRegistry.counter(
+                        "ganaderia.notifications.sent",
+                        "channel", "LOG",
+                        "eventType", "CRITICAL_ALERT_CREATED"
+                ).count()
+        );
     }
 
     @Test

@@ -44,9 +44,9 @@ public class WebhookNotificationService implements NotificationService {
     }
 
     @Override
-    public void send(NotificationMessage notificationMessage) {
+    public NotificationSendResult send(NotificationMessage notificationMessage) {
         if (notificationMessage == null) {
-            return;
+            return NotificationSendResult.SKIPPED;
         }
 
         try {
@@ -60,6 +60,7 @@ public class WebhookNotificationService implements NotificationService {
             WebhookNotificationDelivery savedDelivery = webhookNotificationDeliveryRepository.save(delivery);
             domainMetricsService.incrementNotificationQueued(getChannel().name(), notificationMessage.getEventType());
             logQueued(savedDelivery, notificationMessage);
+            return NotificationSendResult.SENT;
         } catch (NotificationPersistenceException ex) {
             logPersistenceFailure(notificationMessage, ex);
             throw ex;

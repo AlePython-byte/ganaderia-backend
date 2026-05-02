@@ -53,7 +53,7 @@ class DomainMetricsIntegrationTest extends AbstractIntegrationTest {
                 }
 
                 @Override
-                public void send(NotificationMessage notificationMessage) {
+                public com.ganaderia4.backend.notification.NotificationSendResult send(NotificationMessage notificationMessage) {
                     throw new RuntimeException("fallo simulado de canal");
                 }
             };

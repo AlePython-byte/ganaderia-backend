@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,10 +25,11 @@ class LoggingNotificationServiceTest {
                 .metadata("alertType", "COLLAR_OFFLINE")
                 .build();
 
-        service.send(message);
+        NotificationSendResult result = service.send(message);
 
         String logs = output.getOut();
 
+        assertEquals(NotificationSendResult.SENT, result);
         assertTrue(logs.contains("event=notification_logged"));
         assertTrue(logs.contains("requestId=-"));
         assertTrue(logs.contains("channel=LOG"));

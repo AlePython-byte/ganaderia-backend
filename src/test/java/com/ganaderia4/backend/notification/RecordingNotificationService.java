@@ -14,10 +14,13 @@ public class RecordingNotificationService implements NotificationService {
     }
 
     @Override
-    public void send(NotificationMessage notificationMessage) {
+    public NotificationSendResult send(NotificationMessage notificationMessage) {
         if (notificationMessage != null) {
             sentMessages.add(notificationMessage);
+            return NotificationSendResult.SENT;
         }
+
+        return NotificationSendResult.SKIPPED;
     }
 
     public List<NotificationMessage> getSentMessages() {

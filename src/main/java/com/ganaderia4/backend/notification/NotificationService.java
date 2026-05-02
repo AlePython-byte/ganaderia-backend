@@ -4,5 +4,5 @@ public interface NotificationService {
 
     NotificationChannel getChannel();
 
-    void send(NotificationMessage notificationMessage);
+    NotificationSendResult send(NotificationMessage notificationMessage);
 }

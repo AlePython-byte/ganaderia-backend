@@ -36,8 +36,9 @@ public class DefaultNotificationDispatcher implements NotificationDispatcher {
         for (NotificationService notificationService : notificationServices) {
             String channel = resolveChannel(notificationService);
             try {
-                notificationService.send(notificationMessage);
-                if (notificationService.getChannel() != NotificationChannel.WEBHOOK) {
+                NotificationSendResult result = notificationService.send(notificationMessage);
+                if (result == NotificationSendResult.SENT
+                        && notificationService.getChannel() != NotificationChannel.WEBHOOK) {
                     domainMetricsService.incrementNotificationSent(channel, notificationMessage.getEventType());
                 }
             } catch (NotificationPersistenceException ex) {

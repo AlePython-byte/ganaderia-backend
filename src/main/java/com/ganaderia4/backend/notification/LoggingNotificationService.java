@@ -16,9 +16,9 @@ public class LoggingNotificationService implements NotificationService {
     }
 
     @Override
-    public void send(NotificationMessage notificationMessage) {
+    public NotificationSendResult send(NotificationMessage notificationMessage) {
         if (notificationMessage == null) {
-            return;
+            return NotificationSendResult.SKIPPED;
         }
 
         logger.info(
@@ -30,5 +30,7 @@ public class LoggingNotificationService implements NotificationService {
                 OperationalLogSanitizer.metadataKeys(notificationMessage.getMetadata()),
                 notificationMessage.getMetadata().size()
         );
+
+        return NotificationSendResult.SENT;
     }
 }

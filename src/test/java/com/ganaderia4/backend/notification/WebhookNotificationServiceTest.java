@@ -57,8 +57,9 @@ class WebhookNotificationServiceTest {
                 .metadata("cowToken", "VACA-001")
                 .build();
 
-        service.send(message);
+        NotificationSendResult result = service.send(message);
 
+        assertEquals(NotificationSendResult.SENT, result);
         ArgumentCaptor<WebhookNotificationDelivery> captor = ArgumentCaptor.forClass(WebhookNotificationDelivery.class);
         verify(repository).save(captor.capture());
 
@@ -136,8 +137,9 @@ class WebhookNotificationServiceTest {
                 new DomainMetricsService(new SimpleMeterRegistry())
         );
 
-        service.send(null);
+        NotificationSendResult result = service.send(null);
 
+        assertEquals(NotificationSendResult.SKIPPED, result);
         verify(repository, never()).save(any());
     }
 
