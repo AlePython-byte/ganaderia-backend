@@ -120,7 +120,10 @@ class AlertServiceTest {
         verify(alertFactory).createAlert(AlertType.EXIT_GEOFENCE, cow, location);
         verify(alertRepository).save(alertToCreate);
         verify(domainMetricsService).incrementAlertCreated(AlertType.EXIT_GEOFENCE);
-        verify(notificationDispatcher).dispatch(any(NotificationMessage.class));
+        ArgumentCaptor<NotificationMessage> notificationCaptor = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(notificationDispatcher).dispatch(notificationCaptor.capture());
+        assertEquals("HIGH", notificationCaptor.getValue().getSeverity());
+        assertEquals("EXIT_GEOFENCE", notificationCaptor.getValue().getMetadata().get("alertType"));
     }
 
     @Test
@@ -177,7 +180,10 @@ class AlertServiceTest {
 
         verify(alertRepository).save(any(Alert.class));
         verify(domainMetricsService).incrementAlertCreated(AlertType.COLLAR_OFFLINE);
-        verify(notificationDispatcher).dispatch(any(NotificationMessage.class));
+        ArgumentCaptor<NotificationMessage> notificationCaptor = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(notificationDispatcher).dispatch(notificationCaptor.capture());
+        assertEquals("HIGH", notificationCaptor.getValue().getSeverity());
+        assertEquals("COLLAR_OFFLINE", notificationCaptor.getValue().getMetadata().get("alertType"));
     }
 
     @Test
@@ -239,7 +245,10 @@ class AlertServiceTest {
         assertTrue(created.getMessage().contains("COLLAR-LOW-001"));
         assertTrue(created.getMessage().contains("20%"));
         verify(domainMetricsService).incrementAlertCreated(AlertType.LOW_BATTERY);
-        verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
+        ArgumentCaptor<NotificationMessage> notificationCaptor = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(notificationDispatcher).dispatch(notificationCaptor.capture());
+        assertEquals("MEDIUM", notificationCaptor.getValue().getSeverity());
+        assertEquals("LOW_BATTERY", notificationCaptor.getValue().getMetadata().get("alertType"));
     }
 
     @Test
@@ -269,6 +278,7 @@ class AlertServiceTest {
         assertNull(result);
         verify(alertRepository, never()).save(any(Alert.class));
         verify(domainMetricsService, never()).incrementAlertCreated(AlertType.LOW_BATTERY);
+        verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
     }
 
     @Test
@@ -326,6 +336,7 @@ class AlertServiceTest {
         assertEquals(AlertStatus.RESUELTA, resolved.getStatus());
         assertTrue(resolved.getObservations().contains("30%"));
         verify(domainMetricsService).incrementAlertResolved(AlertType.LOW_BATTERY);
+        verify(notificationDispatcher, never()).dispatch(any(NotificationMessage.class));
     }
 
     @Test

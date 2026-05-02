@@ -88,7 +88,7 @@ public class AlertService {
         );
 
         domainMetricsService.incrementAlertCreated(savedAlert.getType());
-        sendCriticalAlertNotification(savedAlert);
+        sendAlertNotification(savedAlert);
 
         return savedAlert;
     }
@@ -132,7 +132,7 @@ public class AlertService {
         );
 
         domainMetricsService.incrementAlertCreated(savedAlert.getType());
-        sendCriticalAlertNotification(savedAlert);
+        sendAlertNotification(savedAlert);
 
         return savedAlert;
     }
@@ -175,6 +175,7 @@ public class AlertService {
         );
 
         domainMetricsService.incrementAlertCreated(savedAlert.getType());
+        sendAlertNotification(savedAlert);
         return savedAlert;
     }
 
@@ -464,20 +465,20 @@ public class AlertService {
                 .orElse(null);
     }
 
-    private void sendCriticalAlertNotification(Alert alert) {
+    private void sendAlertNotification(Alert alert) {
         if (alert == null || alert.getType() == null || alert.getCow() == null) {
             return;
         }
 
-        if (alert.getType() != AlertType.COLLAR_OFFLINE && alert.getType() != AlertType.EXIT_GEOFENCE) {
+        if (!shouldDispatchNotification(alert)) {
             return;
         }
 
         NotificationMessage notificationMessage = NotificationMessage.builder()
-                .eventType("CRITICAL_ALERT_CREATED")
-                .title("Nueva alerta crítica")
+                .eventType("ALERT_CREATED")
+                .title(buildNotificationTitle(alert))
                 .message(alert.getMessage())
-                .severity("HIGH")
+                .severity(resolveNotificationSeverity(alert))
                 .metadata("alertId", String.valueOf(alert.getId()))
                 .metadata("alertType", alert.getType().name())
                 .metadata("cowId", String.valueOf(alert.getCow().getId()))
@@ -486,6 +487,22 @@ public class AlertService {
                 .build();
 
         notificationDispatcher.dispatch(notificationMessage);
+    }
+
+    private boolean shouldDispatchNotification(Alert alert) {
+        return alert.getType() == AlertType.COLLAR_OFFLINE
+                || alert.getType() == AlertType.EXIT_GEOFENCE
+                || alert.getType() == AlertType.LOW_BATTERY;
+    }
+
+    private String buildNotificationTitle(Alert alert) {
+        return alert.getType() == AlertType.LOW_BATTERY
+                ? "Nueva alerta operativa"
+                : "Nueva alerta crÃ­tica";
+    }
+
+    private String resolveNotificationSeverity(Alert alert) {
+        return alert.getType() == AlertType.LOW_BATTERY ? "MEDIUM" : "HIGH";
     }
 
     private void recordStatusTransition(AlertStatus previousStatus, Alert alert) {
