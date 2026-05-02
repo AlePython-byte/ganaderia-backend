@@ -31,17 +31,20 @@ class EmailNotificationServiceTest {
     void shouldSkipWhenEmailNotificationsAreDisabled(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(false, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
                 List.of(providerClient),
-                new AlertEmailTemplateBuilder()
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
         );
 
         NotificationSendResult result = service.send(sampleMessage());
 
         assertEquals(NotificationSendResult.SKIPPED, result);
         verify(providerClient, never()).send(any());
+        verifyNoInteractions(recipientResolver);
         assertTrue(output.getOut().contains("event=email_notification_skipped"));
         assertTrue(output.getOut().contains("reason=disabled"));
     }
@@ -50,17 +53,20 @@ class EmailNotificationServiceTest {
     void shouldSkipWhenApiKeyIsMissing(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "", "alerts@ganaderia.test", "ops@ganaderia.test"),
                 List.of(providerClient),
-                new AlertEmailTemplateBuilder()
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
         );
 
         NotificationSendResult result = service.send(sampleMessage());
 
         assertEquals(NotificationSendResult.SKIPPED, result);
         verify(providerClient, never()).send(any());
+        verifyNoInteractions(recipientResolver);
         assertTrue(output.getOut().contains("reason=missing_api_key"));
     }
 
@@ -68,47 +74,65 @@ class EmailNotificationServiceTest {
     void shouldSkipWhenFromIsMissing(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "", "ops@ganaderia.test"),
                 List.of(providerClient),
-                new AlertEmailTemplateBuilder()
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
         );
 
         NotificationSendResult result = service.send(sampleMessage());
 
         assertEquals(NotificationSendResult.SKIPPED, result);
         verify(providerClient, never()).send(any());
+        verifyNoInteractions(recipientResolver);
         assertTrue(output.getOut().contains("reason=missing_from"));
     }
 
     @Test
-    void shouldSkipWhenToIsMissing(CapturedOutput output) {
+    void shouldSkipWhenNoRecipientsCanBeResolved(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(List.of(), com.ganaderia4.backend.model.NotificationSeverity.MEDIUM, false)
+        );
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", ""),
                 List.of(providerClient),
-                new AlertEmailTemplateBuilder()
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
         );
 
         NotificationSendResult result = service.send(sampleMessage());
 
         assertEquals(NotificationSendResult.SKIPPED, result);
         verify(providerClient, never()).send(any());
-        assertTrue(output.getOut().contains("reason=missing_to"));
+        verify(recipientResolver).resolveRecipients(any(NotificationMessage.class));
+        assertTrue(output.getOut().contains("reason=no_recipients"));
     }
 
     @Test
     void shouldCallProviderWhenEmailIsEnabledAndConfigured(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(
+                        List.of("admin@test.com", "supervisor@test.com"),
+                        com.ganaderia4.backend.model.NotificationSeverity.HIGH,
+                        false
+                )
+        );
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
                 List.of(providerClient),
-                new AlertEmailTemplateBuilder()
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
         );
 
         NotificationSendResult result = service.send(sampleMessage());
@@ -119,18 +143,50 @@ class EmailNotificationServiceTest {
         EmailNotificationRequest request = captor.getValue();
         assertEquals(NotificationSendResult.SENT, result);
         assertEquals("alerts@ganaderia.test", request.from());
-        assertEquals("ops@ganaderia.test", request.to());
+        assertEquals(List.of("admin@test.com", "supervisor@test.com"), request.to());
         assertEquals("[Ganaderia 4.0] HIGH - Collar offline", request.subject());
         assertTrue(request.textBody().contains("Tipo: Collar offline"));
         assertTrue(request.htmlBody().contains("<html"));
+        assertTrue(output.getOut().contains("event=email_notification_recipients_resolved"));
         assertTrue(output.getOut().contains("event=email_notification_send_requested"));
         assertTrue(output.getOut().contains("event=email_notification_sent"));
+    }
+
+    @Test
+    void shouldUseGlobalFallbackWhenResolverReportsIt(CapturedOutput output) {
+        EmailProviderClient providerClient = mock(EmailProviderClient.class);
+        when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(
+                        List.of("fallback@test.com"),
+                        com.ganaderia4.backend.model.NotificationSeverity.HIGH,
+                        true
+                )
+        );
+
+        EmailNotificationService service = new EmailNotificationService(
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "fallback@test.com"),
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
+        );
+
+        NotificationSendResult result = service.send(sampleMessage());
+
+        assertEquals(NotificationSendResult.SENT, result);
+        verify(providerClient).send(argThat(request -> request.to().equals(List.of("fallback@test.com"))));
+        assertTrue(output.getOut().contains("event=email_notification_global_fallback_used"));
     }
 
     @Test
     void shouldUseTemplateBuilderOutput() {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(List.of("admin@test.com"), com.ganaderia4.backend.model.NotificationSeverity.HIGH, false)
+        );
         AlertEmailTemplateBuilder templateBuilder = mock(AlertEmailTemplateBuilder.class);
         when(templateBuilder.build(any(NotificationMessage.class))).thenReturn(
                 new EmailNotificationContent("subject-x", "text-x", "html-x")
@@ -139,13 +195,16 @@ class EmailNotificationServiceTest {
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
                 List.of(providerClient),
-                templateBuilder
+                templateBuilder,
+                recipientResolver
         );
 
         service.send(sampleMessage());
 
         verify(templateBuilder).build(any(NotificationMessage.class));
         verify(providerClient).send(argThat(request ->
+                request.to().equals(List.of("admin@test.com"))
+                        &&
                 "subject-x".equals(request.subject())
                         && "text-x".equals(request.textBody())
                         && "html-x".equals(request.htmlBody())
@@ -157,11 +216,16 @@ class EmailNotificationServiceTest {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
         doThrow(new EmailNotificationException("http_500")).when(providerClient).send(any());
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(List.of("admin@test.com"), com.ganaderia4.backend.model.NotificationSeverity.HIGH, false)
+        );
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
                 List.of(providerClient),
-                new AlertEmailTemplateBuilder()
+                new AlertEmailTemplateBuilder(),
+                recipientResolver
         );
 
         EmailNotificationException ex = assertThrows(

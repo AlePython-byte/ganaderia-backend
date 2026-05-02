@@ -20,10 +20,12 @@ public class EmailNotificationService implements NotificationService {
     private final EmailNotificationProperties properties;
     private final Map<String, EmailProviderClient> providerClients;
     private final AlertEmailTemplateBuilder templateBuilder;
+    private final EmailNotificationRecipientResolver recipientResolver;
 
     public EmailNotificationService(EmailNotificationProperties properties,
                                     List<EmailProviderClient> providerClients,
-                                    AlertEmailTemplateBuilder templateBuilder) {
+                                    AlertEmailTemplateBuilder templateBuilder,
+                                    EmailNotificationRecipientResolver recipientResolver) {
         this.properties = properties;
         this.providerClients = providerClients.stream()
                 .filter(Objects::nonNull)
@@ -32,6 +34,7 @@ public class EmailNotificationService implements NotificationService {
                         client -> client
                 ));
         this.templateBuilder = templateBuilder;
+        this.recipientResolver = recipientResolver;
     }
 
     @Override
@@ -58,14 +61,25 @@ public class EmailNotificationService implements NotificationService {
             return NotificationSendResult.SKIPPED;
         }
 
+        EmailNotificationRecipientsResolution recipientsResolution = recipientResolver.resolveRecipients(notificationMessage);
+        if (recipientsResolution.recipients().isEmpty()) {
+            logSkipped("no_recipients", recipientsResolution.severity());
+            return NotificationSendResult.SKIPPED;
+        }
+
+        logRecipientsResolved(recipientsResolution);
         EmailNotificationContent content = templateBuilder.build(notificationMessage);
         EmailNotificationRequest request = new EmailNotificationRequest(
                 properties.getFrom().trim(),
-                properties.getTo().trim(),
+                recipientsResolution.recipients(),
                 content.subject(),
                 content.textBody(),
                 content.htmlBody()
         );
+
+        if (recipientsResolution.globalFallbackUsed()) {
+            logGlobalFallbackUsed();
+        }
 
         logSendRequested(provider);
 
@@ -92,22 +106,40 @@ public class EmailNotificationService implements NotificationService {
             return "missing_from";
         }
 
-        if (isBlank(properties.getTo())) {
-            return "missing_to";
-        }
-
         if (isBlank(properties.getProvider())) {
             return "missing_provider";
         }
 
         return null;
     }
+
     private void logSkipped(String reason) {
+        logSkipped(reason, null);
+    }
+
+    private void logSkipped(String reason, com.ganaderia4.backend.model.NotificationSeverity severity) {
         logger.info(
-                "event=email_notification_skipped requestId={} reason={} provider={}",
+                "event=email_notification_skipped requestId={} reason={} provider={} severity={}",
                 OperationalLogSanitizer.requestId(),
                 OperationalLogSanitizer.safe(reason),
-                OperationalLogSanitizer.safe(properties.getProvider())
+                OperationalLogSanitizer.safe(properties.getProvider()),
+                OperationalLogSanitizer.safe(severity != null ? severity.name() : "-")
+        );
+    }
+
+    private void logRecipientsResolved(EmailNotificationRecipientsResolution resolution) {
+        logger.info(
+                "event=email_notification_recipients_resolved requestId={} recipients={} severity={}",
+                OperationalLogSanitizer.requestId(),
+                resolution.recipients().size(),
+                OperationalLogSanitizer.safe(resolution.severity().name())
+        );
+    }
+
+    private void logGlobalFallbackUsed() {
+        logger.info(
+                "event=email_notification_global_fallback_used requestId={} reason=no_preference_recipients",
+                OperationalLogSanitizer.requestId()
         );
     }
 

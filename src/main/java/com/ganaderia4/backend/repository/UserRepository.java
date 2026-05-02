@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 import java.util.List;
+import com.ganaderia4.backend.model.Role;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
@@ -15,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByActive(Boolean active);
 
     Page<User> findByActive(Boolean active, Pageable pageable);
+
+    List<User> findByActiveTrueAndRoleIn(List<Role> roles);
 }

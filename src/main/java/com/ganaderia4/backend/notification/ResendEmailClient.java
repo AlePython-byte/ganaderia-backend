@@ -73,9 +73,11 @@ public class ResendEmailClient implements EmailProviderClient {
     private String buildRequestBody(EmailNotificationRequest request) throws JsonProcessingException {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("from", request.from());
-        root.put("to", request.to());
         root.put("subject", request.subject());
         root.put("text", request.textBody());
+        if (request.to() != null && !request.to().isEmpty()) {
+            root.set("to", objectMapper.valueToTree(request.to()));
+        }
         if (request.htmlBody() != null && !request.htmlBody().isBlank()) {
             root.put("html", request.htmlBody());
         }

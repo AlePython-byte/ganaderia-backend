@@ -53,7 +53,7 @@ class ResendEmailClientTest {
         ResendEmailClient client = new ResendEmailClient(properties, objectMapper);
         client.send(new EmailNotificationRequest(
                 "alerts@ganaderia.test",
-                "ops@ganaderia.test",
+                java.util.List.of("ops@ganaderia.test", "admin@ganaderia.test"),
                 "[Ganaderia 4.0] Alerta operativa",
                 "Mensaje de prueba",
                 "<html><body><p>Mensaje de prueba</p></body></html>"
@@ -63,7 +63,8 @@ class ResendEmailClientTest {
         assertEquals("Bearer resend-api-key", authorizationHeader.get());
         assertEquals("application/json", contentTypeHeader.get());
         assertEquals("alerts@ganaderia.test", payload.get("from").asText());
-        assertEquals("ops@ganaderia.test", payload.get("to").asText());
+        assertEquals("ops@ganaderia.test", payload.get("to").get(0).asText());
+        assertEquals("admin@ganaderia.test", payload.get("to").get(1).asText());
         assertEquals("[Ganaderia 4.0] Alerta operativa", payload.get("subject").asText());
         assertEquals("Mensaje de prueba", payload.get("text").asText());
         assertEquals("<html><body><p>Mensaje de prueba</p></body></html>", payload.get("html").asText());
