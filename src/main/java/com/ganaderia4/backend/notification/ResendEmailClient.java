@@ -76,6 +76,9 @@ public class ResendEmailClient implements EmailProviderClient {
         root.put("to", request.to());
         root.put("subject", request.subject());
         root.put("text", request.textBody());
+        if (request.htmlBody() != null && !request.htmlBody().isBlank()) {
+            root.put("html", request.htmlBody());
+        }
         return objectMapper.writeValueAsString(root);
     }
 

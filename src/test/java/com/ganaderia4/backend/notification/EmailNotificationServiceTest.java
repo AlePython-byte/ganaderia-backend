@@ -34,7 +34,8 @@ class EmailNotificationServiceTest {
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(false, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
-                List.of(providerClient)
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder()
         );
 
         NotificationSendResult result = service.send(sampleMessage());
@@ -52,7 +53,8 @@ class EmailNotificationServiceTest {
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "", "alerts@ganaderia.test", "ops@ganaderia.test"),
-                List.of(providerClient)
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder()
         );
 
         NotificationSendResult result = service.send(sampleMessage());
@@ -69,7 +71,8 @@ class EmailNotificationServiceTest {
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "", "ops@ganaderia.test"),
-                List.of(providerClient)
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder()
         );
 
         NotificationSendResult result = service.send(sampleMessage());
@@ -86,7 +89,8 @@ class EmailNotificationServiceTest {
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", ""),
-                List.of(providerClient)
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder()
         );
 
         NotificationSendResult result = service.send(sampleMessage());
@@ -103,7 +107,8 @@ class EmailNotificationServiceTest {
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
-                List.of(providerClient)
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder()
         );
 
         NotificationSendResult result = service.send(sampleMessage());
@@ -115,10 +120,36 @@ class EmailNotificationServiceTest {
         assertEquals(NotificationSendResult.SENT, result);
         assertEquals("alerts@ganaderia.test", request.from());
         assertEquals("ops@ganaderia.test", request.to());
-        assertEquals("[Ganaderia 4.0] Alerta operativa", request.subject());
-        assertTrue(request.textBody().contains("Evento: CRITICAL_ALERT_CREATED"));
+        assertEquals("[Ganaderia 4.0] HIGH - Collar offline", request.subject());
+        assertTrue(request.textBody().contains("Tipo: Collar offline"));
+        assertTrue(request.htmlBody().contains("<html"));
         assertTrue(output.getOut().contains("event=email_notification_send_requested"));
         assertTrue(output.getOut().contains("event=email_notification_sent"));
+    }
+
+    @Test
+    void shouldUseTemplateBuilderOutput() {
+        EmailProviderClient providerClient = mock(EmailProviderClient.class);
+        when(providerClient.getProviderName()).thenReturn("resend");
+        AlertEmailTemplateBuilder templateBuilder = mock(AlertEmailTemplateBuilder.class);
+        when(templateBuilder.build(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationContent("subject-x", "text-x", "html-x")
+        );
+
+        EmailNotificationService service = new EmailNotificationService(
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
+                List.of(providerClient),
+                templateBuilder
+        );
+
+        service.send(sampleMessage());
+
+        verify(templateBuilder).build(any(NotificationMessage.class));
+        verify(providerClient).send(argThat(request ->
+                "subject-x".equals(request.subject())
+                        && "text-x".equals(request.textBody())
+                        && "html-x".equals(request.htmlBody())
+        ));
     }
 
     @Test
@@ -129,7 +160,8 @@ class EmailNotificationServiceTest {
 
         EmailNotificationService service = new EmailNotificationService(
                 emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
-                List.of(providerClient)
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder()
         );
 
         EmailNotificationException ex = assertThrows(

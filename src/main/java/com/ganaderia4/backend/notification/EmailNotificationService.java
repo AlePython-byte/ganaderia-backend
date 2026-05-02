@@ -16,13 +16,14 @@ import java.util.stream.Collectors;
 public class EmailNotificationService implements NotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailNotificationService.class);
-    private static final String DEFAULT_SUBJECT = "[Ganaderia 4.0] Alerta operativa";
 
     private final EmailNotificationProperties properties;
     private final Map<String, EmailProviderClient> providerClients;
+    private final AlertEmailTemplateBuilder templateBuilder;
 
     public EmailNotificationService(EmailNotificationProperties properties,
-                                    List<EmailProviderClient> providerClients) {
+                                    List<EmailProviderClient> providerClients,
+                                    AlertEmailTemplateBuilder templateBuilder) {
         this.properties = properties;
         this.providerClients = providerClients.stream()
                 .filter(Objects::nonNull)
@@ -30,6 +31,7 @@ public class EmailNotificationService implements NotificationService {
                         client -> normalize(client.getProviderName()),
                         client -> client
                 ));
+        this.templateBuilder = templateBuilder;
     }
 
     @Override
@@ -56,11 +58,13 @@ public class EmailNotificationService implements NotificationService {
             return NotificationSendResult.SKIPPED;
         }
 
+        EmailNotificationContent content = templateBuilder.build(notificationMessage);
         EmailNotificationRequest request = new EmailNotificationRequest(
                 properties.getFrom().trim(),
                 properties.getTo().trim(),
-                DEFAULT_SUBJECT,
-                buildTextBody(notificationMessage)
+                content.subject(),
+                content.textBody(),
+                content.htmlBody()
         );
 
         logSendRequested(provider);
@@ -98,35 +102,6 @@ public class EmailNotificationService implements NotificationService {
 
         return null;
     }
-
-    private String buildTextBody(NotificationMessage notificationMessage) {
-        StringBuilder body = new StringBuilder()
-                .append("Se genero una alerta operativa en Ganaderia 4.0.").append(System.lineSeparator()).append(System.lineSeparator())
-                .append("Evento: ").append(safeLine(notificationMessage.getEventType())).append(System.lineSeparator())
-                .append("Severidad: ").append(safeLine(notificationMessage.getSeverity())).append(System.lineSeparator())
-                .append("Titulo: ").append(safeLine(notificationMessage.getTitle())).append(System.lineSeparator())
-                .append("Mensaje: ").append(safeLine(notificationMessage.getMessage())).append(System.lineSeparator())
-                .append("Fecha: ").append(notificationMessage.getCreatedAt()).append(System.lineSeparator());
-
-        if (!notificationMessage.getMetadata().isEmpty()) {
-            body.append("Metadata: ");
-            body.append(notificationMessage.getMetadata().entrySet().stream()
-                    .map(entry -> safeLine(entry.getKey()) + "=" + safeLine(entry.getValue()))
-                    .collect(Collectors.joining(", ")));
-            body.append(System.lineSeparator());
-        }
-
-        return body.toString();
-    }
-
-    private String safeLine(String value) {
-        if (value == null || value.isBlank()) {
-            return "-";
-        }
-
-        return value.replaceAll("[\\r\\n\\t]+", " ").trim();
-    }
-
     private void logSkipped(String reason) {
         logger.info(
                 "event=email_notification_skipped requestId={} reason={} provider={}",

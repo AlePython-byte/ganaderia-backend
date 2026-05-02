@@ -1,8 +1,6 @@
 package com.ganaderia4.backend.notification;
 
-public record EmailNotificationRequest(
-        String from,
-        String to,
+public record EmailNotificationContent(
         String subject,
         String textBody,
         String htmlBody
