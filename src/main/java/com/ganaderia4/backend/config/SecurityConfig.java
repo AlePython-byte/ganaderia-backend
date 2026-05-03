@@ -69,6 +69,8 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(
                                 "/api/auth/login",
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password",
                                 "/healthz",
                                 "/actuator/health",
                                 "/actuator/health/**",

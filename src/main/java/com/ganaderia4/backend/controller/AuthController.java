@@ -2,11 +2,16 @@ package com.ganaderia4.backend.controller;
 
 import com.ganaderia4.backend.config.OpenApiConfig;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
+import com.ganaderia4.backend.dto.ForgotPasswordRequestDTO;
+import com.ganaderia4.backend.dto.ForgotPasswordResponseDTO;
 import com.ganaderia4.backend.dto.LoginRequestDTO;
 import com.ganaderia4.backend.dto.LoginResponseDTO;
+import com.ganaderia4.backend.dto.ResetPasswordRequestDTO;
+import com.ganaderia4.backend.dto.ResetPasswordResponseDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
 import com.ganaderia4.backend.security.ClientIpResolver;
 import com.ganaderia4.backend.service.AuthService;
+import com.ganaderia4.backend.service.AuthPasswordResetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,10 +35,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthPasswordResetService authPasswordResetService;
     private final ClientIpResolver clientIpResolver;
 
-    public AuthController(AuthService authService, ClientIpResolver clientIpResolver) {
+    public AuthController(AuthService authService,
+                          AuthPasswordResetService authPasswordResetService,
+                          ClientIpResolver clientIpResolver) {
         this.authService = authService;
+        this.authPasswordResetService = authPasswordResetService;
         this.clientIpResolver = clientIpResolver;
     }
 
@@ -64,6 +73,47 @@ public class AuthController {
     public LoginResponseDTO login(@Valid @RequestBody LoginRequestDTO requestDTO,
                                   HttpServletRequest httpServletRequest) {
         return authService.login(requestDTO, clientIpResolver.resolve(httpServletRequest));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(
+            summary = "Solicitar recuperacion de contrasena",
+            description = "Endpoint publico que acepta un correo y responde siempre con un mensaje generico para no revelar si el usuario existe."
+    )
+    @SecurityRequirements
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Solicitud aceptada"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Solicitud invalida o payload mal formado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
+            )
+    })
+    public ForgotPasswordResponseDTO forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO requestDTO,
+                                                    HttpServletRequest httpServletRequest) {
+        return authPasswordResetService.forgotPassword(
+                requestDTO,
+                clientIpResolver.resolve(httpServletRequest),
+                httpServletRequest.getHeader("User-Agent")
+        );
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(
+            summary = "Resetear contrasena con token",
+            description = "Endpoint publico que valida un token de recuperacion vigente y actualiza la contrasena del usuario."
+    )
+    @SecurityRequirements
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Contrasena actualizada correctamente"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Token invalido, expirado, usado o payload mal formado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
+            )
+    })
+    public ResetPasswordResponseDTO resetPassword(@Valid @RequestBody ResetPasswordRequestDTO requestDTO) {
+        return authPasswordResetService.resetPassword(requestDTO);
     }
 
     @GetMapping("/me")

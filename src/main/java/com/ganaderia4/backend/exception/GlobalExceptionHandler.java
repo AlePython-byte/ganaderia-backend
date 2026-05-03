@@ -3,6 +3,7 @@ package com.ganaderia4.backend.exception;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import com.ganaderia4.backend.service.InvalidPasswordResetTokenException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,6 +160,19 @@ public class GlobalExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED,
                 ApiErrorCode.BAD_REQUEST,
                 "Método HTTP no permitido para este endpoint",
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(InvalidPasswordResetTokenException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidPasswordResetTokenException(
+            InvalidPasswordResetTokenException ex,
+            HttpServletRequest request) {
+        logHandled(HttpStatus.BAD_REQUEST, "bad_request", request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ApiErrorCode.BAD_REQUEST,
+                "El token de recuperación es inválido o expiró.",
                 request.getRequestURI()
         );
     }
