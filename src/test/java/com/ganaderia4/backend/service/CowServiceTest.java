@@ -7,6 +7,7 @@ import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.CowRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -140,5 +142,55 @@ class CowServiceTest {
 
         assertEquals("Ya existe una vaca con ese codigo interno", exception.getMessage());
         verify(cowRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRetryCreateCowWhenGeneratedTokenConflicts() {
+        when(cowRepository.findByInternalCode("INT-001")).thenReturn(Optional.empty());
+        when(cowRepository.findAllTokens()).thenReturn(List.of("COW-001"), List.of("COW-001", "COW-002"));
+        when(cowRepository.save(any(Cow.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint on identifier"))
+                .thenAnswer(invocation -> {
+                    Cow cow = invocation.getArgument(0);
+                    cow.setId(4L);
+                    return cow;
+                });
+
+        CowResponseDTO response = cowService.createCow(request);
+
+        assertEquals("COW-003", response.getToken());
+        verify(cowRepository, times(2)).save(any(Cow.class));
+        verify(cowRepository, times(2)).findAllTokens();
+    }
+
+    @Test
+    void shouldNotRetryCreateCowWhenPersistenceErrorIsNotTokenConflict() {
+        when(cowRepository.findByInternalCode("INT-001")).thenReturn(Optional.empty());
+        when(cowRepository.findAllTokens()).thenReturn(List.of());
+        when(cowRepository.save(any(Cow.class)))
+                .thenThrow(new DataIntegrityViolationException("violates foreign key constraint"));
+
+        assertThrows(DataIntegrityViolationException.class, () -> cowService.createCow(request));
+
+        verify(cowRepository).save(any(Cow.class));
+        verify(cowRepository).findAllTokens();
+    }
+
+    @Test
+    void shouldFailCreateCowWhenGeneratedTokenConflictsExhaustRetries() {
+        when(cowRepository.findByInternalCode("INT-001")).thenReturn(Optional.empty());
+        when(cowRepository.findAllTokens()).thenReturn(
+                List.of("COW-001"),
+                List.of("COW-001", "COW-002"),
+                List.of("COW-001", "COW-002", "COW-003")
+        );
+        when(cowRepository.save(any(Cow.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint on identifier"));
+
+        ConflictException exception = assertThrows(ConflictException.class, () -> cowService.createCow(request));
+
+        assertEquals("No fue posible generar un token unico para la vaca", exception.getMessage());
+        verify(cowRepository, times(3)).save(any(Cow.class));
+        verify(cowRepository, times(3)).findAllTokens();
     }
 }

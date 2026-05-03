@@ -4,6 +4,7 @@ import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.dto.CollarRequestDTO;
 import com.ganaderia4.backend.dto.DeviceSecretResponseDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
+import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
@@ -12,6 +13,7 @@ import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
 import com.ganaderia4.backend.security.DeviceSigningSecretService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -95,6 +98,65 @@ class CollarServiceTest {
         var response = collarService.createCollar(requestDTO);
 
         assertEquals("COLLAR-002", response.getToken());
+    }
+
+    @Test
+    void shouldRetryCreateCollarWhenGeneratedTokenConflicts() {
+        CollarRequestDTO requestDTO = new CollarRequestDTO();
+        requestDTO.setStatus(CollarStatus.ACTIVO);
+
+        when(collarRepository.findAllTokens()).thenReturn(
+                java.util.List.of("COLLAR-001"),
+                java.util.List.of("COLLAR-001", "COLLAR-002")
+        );
+        when(collarRepository.save(any(Collar.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint on identifier"))
+                .thenAnswer(invocation -> {
+                    Collar collar = invocation.getArgument(0);
+                    collar.setId(12L);
+                    return collar;
+                });
+
+        var response = collarService.createCollar(requestDTO);
+
+        assertEquals("COLLAR-003", response.getToken());
+        verify(collarRepository, times(2)).save(any(Collar.class));
+        verify(collarRepository, times(2)).findAllTokens();
+    }
+
+    @Test
+    void shouldNotRetryCreateCollarWhenPersistenceErrorIsNotTokenConflict() {
+        CollarRequestDTO requestDTO = new CollarRequestDTO();
+        requestDTO.setStatus(CollarStatus.ACTIVO);
+
+        when(collarRepository.findAllTokens()).thenReturn(java.util.List.of());
+        when(collarRepository.save(any(Collar.class)))
+                .thenThrow(new DataIntegrityViolationException("violates unique constraint on cow_id"));
+
+        assertThrows(DataIntegrityViolationException.class, () -> collarService.createCollar(requestDTO));
+
+        verify(collarRepository).save(any(Collar.class));
+        verify(collarRepository).findAllTokens();
+    }
+
+    @Test
+    void shouldFailCreateCollarWhenGeneratedTokenConflictsExhaustRetries() {
+        CollarRequestDTO requestDTO = new CollarRequestDTO();
+        requestDTO.setStatus(CollarStatus.ACTIVO);
+
+        when(collarRepository.findAllTokens()).thenReturn(
+                java.util.List.of("COLLAR-001"),
+                java.util.List.of("COLLAR-001", "COLLAR-002"),
+                java.util.List.of("COLLAR-001", "COLLAR-002", "COLLAR-003")
+        );
+        when(collarRepository.save(any(Collar.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint on identifier"));
+
+        ConflictException exception = assertThrows(ConflictException.class, () -> collarService.createCollar(requestDTO));
+
+        assertEquals("No fue posible generar un token unico para el collar", exception.getMessage());
+        verify(collarRepository, times(3)).save(any(Collar.class));
+        verify(collarRepository, times(3)).findAllTokens();
     }
 
     @Test

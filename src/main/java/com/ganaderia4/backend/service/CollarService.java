@@ -17,6 +17,7 @@ import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.security.DeviceSigningSecretService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class CollarService {
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "id", "token", "status", "batteryLevel", "lastSeenAt", "signalStatus", "enabled"
     );
+    private static final int MAX_TOKEN_GENERATION_ATTEMPTS = 3;
     private static final String GENERATED_TOKEN_PREFIX = "COLLAR-";
     private static final Pattern GENERATED_TOKEN_PATTERN = Pattern.compile("^COLLAR-(\\d+)$");
 
@@ -62,30 +64,17 @@ public class CollarService {
 
     @Transactional
     public CollarResponseDTO createCollar(CollarRequestDTO requestDTO) {
-        Collar collar = new Collar();
-        collar.setToken(generateCollarToken());
-        collar.setStatus(requestDTO.getStatus());
-
+        Cow cow = null;
         if (requestDTO.getCowId() != null) {
-            Cow cow = cowRepository.findById(requestDTO.getCowId())
+            cow = cowRepository.findById(requestDTO.getCowId())
                     .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
 
             if (collarRepository.findByCow(cow).isPresent()) {
                 throw new ConflictException("La vaca ya tiene un collar asociado");
             }
-
-            collar.setCow(cow);
         }
 
-        collar.setBatteryLevel(requestDTO.getBatteryLevel());
-        collar.setLastSeenAt(requestDTO.getLastSeenAt());
-        collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : DeviceSignalStatus.SIN_SENAL);
-        collar.setFirmwareVersion(normalizeNullable(requestDTO.getFirmwareVersion()));
-        collar.setGpsAccuracy(requestDTO.getGpsAccuracy());
-        collar.setEnabled(requestDTO.getEnabled() != null ? requestDTO.getEnabled() : true);
-        collar.setNotes(normalizeNullable(requestDTO.getNotes()));
-
-        Collar savedCollar = collarRepository.save(collar);
+        Collar savedCollar = createCollarWithGeneratedTokenAndRetry(requestDTO, cow);
 
         auditLogService.logWithCurrentActor(
                 "CREATE_COLLAR",
@@ -97,6 +86,35 @@ public class CollarService {
         );
 
         return mapToResponseDTO(savedCollar);
+    }
+
+    private Collar createCollarWithGeneratedTokenAndRetry(CollarRequestDTO requestDTO, Cow cow) {
+        for (int attempt = 1; attempt <= MAX_TOKEN_GENERATION_ATTEMPTS; attempt++) {
+            Collar collar = new Collar();
+            collar.setToken(generateCollarToken());
+            collar.setStatus(requestDTO.getStatus());
+            collar.setCow(cow);
+            collar.setBatteryLevel(requestDTO.getBatteryLevel());
+            collar.setLastSeenAt(requestDTO.getLastSeenAt());
+            collar.setSignalStatus(requestDTO.getSignalStatus() != null ? requestDTO.getSignalStatus() : DeviceSignalStatus.SIN_SENAL);
+            collar.setFirmwareVersion(normalizeNullable(requestDTO.getFirmwareVersion()));
+            collar.setGpsAccuracy(requestDTO.getGpsAccuracy());
+            collar.setEnabled(requestDTO.getEnabled() != null ? requestDTO.getEnabled() : true);
+            collar.setNotes(normalizeNullable(requestDTO.getNotes()));
+
+            try {
+                return collarRepository.save(collar);
+            } catch (DataIntegrityViolationException ex) {
+                if (!isGeneratedTokenConflict(ex)) {
+                    throw ex;
+                }
+                if (attempt == MAX_TOKEN_GENERATION_ATTEMPTS) {
+                    throw new ConflictException("No fue posible generar un token unico para el collar");
+                }
+            }
+        }
+
+        throw new IllegalStateException("No fue posible generar un token para el collar");
     }
 
     @Transactional
@@ -358,6 +376,22 @@ public class CollarService {
         } catch (NumberFormatException ex) {
             return -1;
         }
+    }
+
+    private boolean isGeneratedTokenConflict(DataIntegrityViolationException ex) {
+        Throwable cause = ex;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("identifier")
+                        && (normalized.contains("duplicate") || normalized.contains("unique"))) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private CollarResponseDTO mapToResponseDTO(Collar collar) {

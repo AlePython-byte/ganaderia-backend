@@ -7,6 +7,7 @@ import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.CowRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class CowService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "token", "internalCode", "name", "status");
+    private static final int MAX_TOKEN_GENERATION_ATTEMPTS = 3;
     private static final String GENERATED_TOKEN_PREFIX = "COW-";
     private static final Pattern GENERATED_TOKEN_PATTERN = Pattern.compile("^COW-(\\d+)$");
 
@@ -45,14 +47,7 @@ public class CowService {
             }
         }
 
-        Cow cow = new Cow();
-        cow.setToken(generateCowToken());
-        cow.setInternalCode(normalizeNullable(requestDTO.getInternalCode()));
-        cow.setName(requestDTO.getName().trim());
-        cow.setStatus(requestDTO.getStatus());
-        cow.setObservations(normalizeNullable(requestDTO.getObservations()));
-
-        Cow savedCow = cowRepository.save(cow);
+        Cow savedCow = createCowWithGeneratedTokenAndRetry(requestDTO);
 
         auditLogService.logWithCurrentActor(
                 "CREATE_COW",
@@ -64,6 +59,30 @@ public class CowService {
         );
 
         return mapToResponseDTO(savedCow);
+    }
+
+    private Cow createCowWithGeneratedTokenAndRetry(CowRequestDTO requestDTO) {
+        for (int attempt = 1; attempt <= MAX_TOKEN_GENERATION_ATTEMPTS; attempt++) {
+            Cow cow = new Cow();
+            cow.setToken(generateCowToken());
+            cow.setInternalCode(normalizeNullable(requestDTO.getInternalCode()));
+            cow.setName(requestDTO.getName().trim());
+            cow.setStatus(requestDTO.getStatus());
+            cow.setObservations(normalizeNullable(requestDTO.getObservations()));
+
+            try {
+                return cowRepository.save(cow);
+            } catch (DataIntegrityViolationException ex) {
+                if (!isGeneratedTokenConflict(ex)) {
+                    throw ex;
+                }
+                if (attempt == MAX_TOKEN_GENERATION_ATTEMPTS) {
+                    throw new ConflictException("No fue posible generar un token unico para la vaca");
+                }
+            }
+        }
+
+        throw new IllegalStateException("No fue posible generar un token para la vaca");
     }
 
     @Transactional
@@ -181,6 +200,22 @@ public class CowService {
         } catch (NumberFormatException ex) {
             return -1;
         }
+    }
+
+    private boolean isGeneratedTokenConflict(DataIntegrityViolationException ex) {
+        Throwable cause = ex;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("identifier")
+                        && (normalized.contains("duplicate") || normalized.contains("unique"))) {
+                    return true;
+                }
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private CowResponseDTO mapToResponseDTO(Cow cow) {
