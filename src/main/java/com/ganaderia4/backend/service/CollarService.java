@@ -12,7 +12,11 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
+import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.security.DeviceSigningSecretService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -25,23 +29,28 @@ import java.util.stream.Collectors;
 @Service
 public class CollarService {
 
+    private static final Logger log = LoggerFactory.getLogger(CollarService.class);
+
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "id", "token", "status", "batteryLevel", "lastSeenAt", "signalStatus", "enabled"
     );
 
     private final CollarRepository collarRepository;
     private final CowRepository cowRepository;
+    private final DeviceReplayNonceRepository deviceReplayNonceRepository;
     private final AuditLogService auditLogService;
     private final DeviceSigningSecretService deviceSigningSecretService;
     private final PaginationService paginationService;
 
     public CollarService(CollarRepository collarRepository,
                          CowRepository cowRepository,
+                         DeviceReplayNonceRepository deviceReplayNonceRepository,
                          AuditLogService auditLogService,
                          DeviceSigningSecretService deviceSigningSecretService,
                          PaginationService paginationService) {
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
+        this.deviceReplayNonceRepository = deviceReplayNonceRepository;
         this.auditLogService = auditLogService;
         this.deviceSigningSecretService = deviceSigningSecretService;
         this.paginationService = paginationService;
@@ -188,22 +197,52 @@ public class CollarService {
     @Transactional
     public DeviceSecretResponseDTO rotateDeviceSecret(Long id) {
         Collar collar = collarRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+                .orElseThrow(() -> {
+                    log.warn(
+                            "event=collar_secret_rotation_failed requestId={} collarId={} reason={}",
+                            OperationalLogSanitizer.requestIdOr("scheduled"),
+                            id,
+                            "collar_not_found"
+                    );
+                    return new ResourceNotFoundException("Collar no encontrado");
+                });
 
         collar.rotateDeviceSecretSalt();
         Collar updatedCollar = collarRepository.save(collar);
+        int deletedNonces = deviceReplayNonceRepository.deleteByDeviceToken(updatedCollar.getToken());
 
         auditLogService.logWithCurrentActor(
-                "ROTATE_COLLAR_DEVICE_SECRET",
+                "ROTATE_COLLAR_SECRET",
                 "COLLAR",
                 updatedCollar.getId(),
                 "API",
-                "Rotacion de secreto HMAC de collar " + updatedCollar.getToken(),
+                "Rotacion de secreto HMAC de collar " + OperationalLogSanitizer.maskToken(updatedCollar.getToken()),
                 true
         );
 
         String deviceSecret = deviceSigningSecretService.resolveSigningSecret(updatedCollar.getToken())
-                .orElseThrow(() -> new IllegalStateException("No fue posible derivar el secreto del dispositivo"));
+                .orElseThrow(() -> {
+                    log.warn(
+                            "event=collar_secret_rotation_failed requestId={} collarId={} reason={}",
+                            OperationalLogSanitizer.requestIdOr("scheduled"),
+                            updatedCollar.getId(),
+                            "secret_derivation_failed"
+                    );
+                    return new IllegalStateException("No fue posible derivar el secreto del dispositivo");
+                });
+
+        log.info(
+                "event=collar_secret_rotation_nonces_invalidated requestId={} collarId={} deleted={}",
+                OperationalLogSanitizer.requestIdOr("scheduled"),
+                updatedCollar.getId(),
+                deletedNonces
+        );
+        log.info(
+                "event=collar_secret_rotation_completed requestId={} collarId={} device={}",
+                OperationalLogSanitizer.requestIdOr("scheduled"),
+                updatedCollar.getId(),
+                OperationalLogSanitizer.maskToken(updatedCollar.getToken())
+        );
 
         return new DeviceSecretResponseDTO(updatedCollar.getToken(), deviceSecret);
     }

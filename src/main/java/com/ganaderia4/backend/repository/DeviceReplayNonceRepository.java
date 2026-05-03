@@ -19,6 +19,10 @@ public interface DeviceReplayNonceRepository extends JpaRepository<DeviceReplayN
     int deleteByCreatedAtLessThanEqual(@Param("cutoff") Instant cutoff);
 
     @Modifying
+    @Query("DELETE FROM DeviceReplayNonce nonce WHERE nonce.deviceToken = :deviceToken")
+    int deleteByDeviceToken(@Param("deviceToken") String deviceToken);
+
+    @Modifying
     @Query(
             value = """
                     INSERT INTO device_replay_nonces (device_token, nonce, expires_at, created_at)

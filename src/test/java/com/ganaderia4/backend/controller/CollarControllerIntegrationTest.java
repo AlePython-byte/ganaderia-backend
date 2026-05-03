@@ -2,13 +2,16 @@ package com.ganaderia4.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ganaderia4.backend.model.DeviceReplayNonce;
 import com.ganaderia4.backend.dto.LoginRequestDTO;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
 import com.ganaderia4.backend.model.Role;
 import com.ganaderia4.backend.model.User;
 import com.ganaderia4.backend.repository.CollarRepository;
+import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
 import com.ganaderia4.backend.repository.UserRepository;
+import com.ganaderia4.backend.security.DeviceSigningSecretService;
 import com.ganaderia4.backend.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -36,12 +44,19 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
     private CollarRepository collarRepository;
 
     @Autowired
+    private DeviceReplayNonceRepository deviceReplayNonceRepository;
+
+    @Autowired
+    private DeviceSigningSecretService deviceSigningSecretService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
+        deviceReplayNonceRepository.deleteAll();
         collarRepository.deleteAll();
         userRepository.deleteAll();
 
@@ -99,11 +114,31 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldAllowAdminToRotateDeviceSecret() throws Exception {
         Collar savedCollar = createCollar("COLLAR-ROTATE-001");
+        String oldSalt = savedCollar.getDeviceSecretSalt();
+        String oldSecret = deviceSigningSecretService.resolveSigningSecret(savedCollar.getToken()).orElseThrow();
+        deviceReplayNonceRepository.save(new DeviceReplayNonce(
+                savedCollar.getToken(),
+                "nonce-1",
+                Instant.now().plusSeconds(300),
+                Instant.now()
+        ));
         String token = loginAndGetToken("admin@test.com", "12345678");
 
-        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId())
+        MvcResult result = mockMvc.perform(patch("/api/collars/{id}/rotate-secret", savedCollar.getId())
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deviceToken").value("COLLAR-ROTATE-001"))
+                .andExpect(jsonPath("$.deviceSecret").isString())
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
+        String rotatedSecret = json.get("deviceSecret").asText();
+
+        Collar rotatedCollar = collarRepository.findById(savedCollar.getId()).orElseThrow();
+        assertNotEquals(oldSalt, rotatedCollar.getDeviceSecretSalt());
+        assertNotEquals(oldSecret, rotatedSecret);
+        assertNotEquals(rotatedCollar.getDeviceSecretSalt(), rotatedSecret);
+        assertTrue(deviceReplayNonceRepository.findAll().isEmpty());
     }
 
     @Test
@@ -150,6 +185,17 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId() + "/rotate-secret"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenRotatingSecretForUnknownCollar() throws Exception {
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(patch("/api/collars/{id}/rotate-secret", 999999L)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Collar no encontrado"));
     }
 
     private Collar createCollar(String collarToken) {
