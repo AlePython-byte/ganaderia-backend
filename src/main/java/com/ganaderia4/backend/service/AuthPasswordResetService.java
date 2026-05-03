@@ -28,13 +28,16 @@ public class AuthPasswordResetService {
 
     private final UserRepository userRepository;
     private final PasswordResetTokenService passwordResetTokenService;
+    private final PasswordResetEmailService passwordResetEmailService;
     private final PasswordEncoder passwordEncoder;
 
     public AuthPasswordResetService(UserRepository userRepository,
                                     PasswordResetTokenService passwordResetTokenService,
+                                    PasswordResetEmailService passwordResetEmailService,
                                     PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordResetTokenService = passwordResetTokenService;
+        this.passwordResetEmailService = passwordResetEmailService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -46,7 +49,21 @@ public class AuthPasswordResetService {
         Optional<User> userOptional = userRepository.findByEmailIgnoreCase(normalizedEmail);
 
         if (userOptional.isPresent() && Boolean.TRUE.equals(userOptional.get().getActive())) {
-            passwordResetTokenService.generateToken(userOptional.get(), requestIp, userAgent);
+            PasswordResetTokenIssueResult issuedToken =
+                    passwordResetTokenService.generateToken(userOptional.get(), requestIp, userAgent);
+            passwordResetEmailService.sendPasswordResetEmail(userOptional.get(), issuedToken);
+        } else if (userOptional.isEmpty()) {
+            log.info(
+                    "event=password_reset_email_skipped requestId={} reason=unknown_user email={}",
+                    OperationalLogSanitizer.requestId(),
+                    OperationalLogSanitizer.maskEmail(normalizedEmail)
+            );
+        } else {
+            log.info(
+                    "event=password_reset_email_skipped requestId={} reason=inactive_user email={}",
+                    OperationalLogSanitizer.requestId(),
+                    OperationalLogSanitizer.maskEmail(normalizedEmail)
+            );
         }
 
         log.info(
