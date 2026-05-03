@@ -7,6 +7,7 @@ import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Collar;
 import com.ganaderia4.backend.model.CollarStatus;
+import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
@@ -57,6 +58,65 @@ class CollarServiceTest {
 
     @InjectMocks
     private CollarService collarService;
+
+    @Test
+    void shouldGenerateCollarTokenWhenCreatingWithoutToken() {
+        CollarRequestDTO requestDTO = new CollarRequestDTO();
+        requestDTO.setStatus(CollarStatus.ACTIVO);
+        requestDTO.setSignalStatus(DeviceSignalStatus.MEDIA);
+        requestDTO.setEnabled(true);
+
+        when(collarRepository.findAllTokens()).thenReturn(java.util.List.of("COLLAR-001", "LEGACY-ABC"));
+        when(collarRepository.save(any(Collar.class))).thenAnswer(invocation -> {
+            Collar collar = invocation.getArgument(0);
+            collar.setId(10L);
+            return collar;
+        });
+
+        var response = collarService.createCollar(requestDTO);
+
+        assertEquals("COLLAR-002", response.getToken());
+        verify(collarRepository).findAllTokens();
+    }
+
+    @Test
+    void shouldIgnoreIncomingTokenWhenCreatingCollar() {
+        CollarRequestDTO requestDTO = new CollarRequestDTO();
+        requestDTO.setToken("FRONTEND-TOKEN");
+        requestDTO.setStatus(CollarStatus.ACTIVO);
+
+        when(collarRepository.findAllTokens()).thenReturn(java.util.List.of("COLLAR-001"));
+        when(collarRepository.save(any(Collar.class))).thenAnswer(invocation -> {
+            Collar collar = invocation.getArgument(0);
+            collar.setId(11L);
+            return collar;
+        });
+
+        var response = collarService.createCollar(requestDTO);
+
+        assertEquals("COLLAR-002", response.getToken());
+    }
+
+    @Test
+    void shouldKeepCurrentTokenWhenUpdatingWithoutToken() {
+        Collar collar = new Collar();
+        collar.setId(1L);
+        collar.setToken("COLLAR-001");
+        collar.setStatus(CollarStatus.ACTIVO);
+        collar.setEnabled(true);
+
+        CollarRequestDTO requestDTO = new CollarRequestDTO();
+        requestDTO.setStatus(CollarStatus.INACTIVO);
+        requestDTO.setEnabled(true);
+
+        when(collarRepository.findById(1L)).thenReturn(Optional.of(collar));
+        when(collarRepository.save(any(Collar.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = collarService.updateCollar(1L, requestDTO);
+
+        assertEquals("COLLAR-001", response.getToken());
+        assertEquals("INACTIVO", response.getStatus());
+    }
 
     @Test
     void shouldRejectChangingCollarTokenThroughGeneralUpdate() {

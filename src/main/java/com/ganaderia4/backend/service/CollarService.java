@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +36,8 @@ public class CollarService {
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "id", "token", "status", "batteryLevel", "lastSeenAt", "signalStatus", "enabled"
     );
+    private static final String GENERATED_TOKEN_PREFIX = "COLLAR-";
+    private static final Pattern GENERATED_TOKEN_PATTERN = Pattern.compile("^COLLAR-(\\d+)$");
 
     private final CollarRepository collarRepository;
     private final CowRepository cowRepository;
@@ -58,12 +62,8 @@ public class CollarService {
 
     @Transactional
     public CollarResponseDTO createCollar(CollarRequestDTO requestDTO) {
-        if (collarRepository.findByToken(requestDTO.getToken()).isPresent()) {
-            throw new ConflictException("Ya existe un collar con ese token");
-        }
-
         Collar collar = new Collar();
-        collar.setToken(requestDTO.getToken().trim());
+        collar.setToken(generateCollarToken());
         collar.setStatus(requestDTO.getStatus());
 
         if (requestDTO.getCowId() != null) {
@@ -104,7 +104,11 @@ public class CollarService {
         Collar collar = collarRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
 
-        String newToken = requestDTO.getToken().trim();
+        String newToken = normalizeNullable(requestDTO.getToken());
+        if (newToken == null) {
+            newToken = collar.getToken();
+        }
+
         if (!collar.getToken().equals(newToken)) {
             throw new BadRequestException("El token del collar es un identificador publico estable y no puede modificarse");
         }
@@ -327,6 +331,33 @@ public class CollarService {
             return null;
         }
         return value.trim();
+    }
+
+    private String generateCollarToken() {
+        int nextSequence = collarRepository.findAllTokens().stream()
+                .map(this::extractGeneratedTokenSequence)
+                .filter(sequence -> sequence > 0)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+
+        return GENERATED_TOKEN_PREFIX + String.format("%03d", nextSequence);
+    }
+
+    private int extractGeneratedTokenSequence(String token) {
+        if (token == null) {
+            return -1;
+        }
+
+        Matcher matcher = GENERATED_TOKEN_PATTERN.matcher(token.trim());
+        if (!matcher.matches()) {
+            return -1;
+        }
+
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     private CollarResponseDTO mapToResponseDTO(Collar collar) {

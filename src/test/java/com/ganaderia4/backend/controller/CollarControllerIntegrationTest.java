@@ -67,7 +67,7 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldRejectCreatingCollarWhenTokenFormatIsInvalid() throws Exception {
+    void shouldIgnoreIncomingTokenWithInvalidFormatWhenCreatingCollar() throws Exception {
         String token = loginAndGetToken("admin@test.com", "12345678");
 
         mockMvc.perform(post("/api/collars")
@@ -79,10 +79,46 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
                                   "status": "ACTIVO"
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.message").value("El token del collar solo puede contener letras, numeros, punto, guion y guion bajo"))
-                .andExpect(jsonPath("$.path").value("/api/collars"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("COLLAR-001"))
+                .andExpect(jsonPath("$.status").value("ACTIVO"));
+    }
+
+    @Test
+    void shouldCreateCollarWithoutTokenAndGenerateBackendIdentifier() throws Exception {
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(post("/api/collars")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "ACTIVO",
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("COLLAR-001"))
+                .andExpect(jsonPath("$.status").value("ACTIVO"));
+    }
+
+    @Test
+    void shouldIgnoreIncomingTokenWhenCreatingCollar() throws Exception {
+        createCollar("COLLAR-001");
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(post("/api/collars")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "CLIENT-SHOULD-BE-IGNORED",
+                                  "status": "ACTIVO",
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("COLLAR-002"));
     }
 
     @Test
@@ -109,6 +145,26 @@ class CollarControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("El token del collar es un identificador publico estable y no puede modificarse"))
                 .andExpect(jsonPath("$.path").value("/api/collars/" + savedCollar.getId()));
+    }
+
+    @Test
+    void shouldKeepCurrentTokenWhenUpdatingCollarWithoutToken() throws Exception {
+        Collar savedCollar = createCollar("COLLAR-001");
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        mockMvc.perform(put("/api/collars/{id}", savedCollar.getId())
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "ACTIVO",
+                                  "enabled": true,
+                                  "notes": "actualizado"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("COLLAR-001"))
+                .andExpect(jsonPath("$.notes").value("actualizado"));
     }
 
     @Test
