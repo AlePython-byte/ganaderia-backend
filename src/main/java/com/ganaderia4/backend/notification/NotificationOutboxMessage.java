@@ -138,6 +138,20 @@ public class NotificationOutboxMessage {
         setUpdatedAt(processedAt);
     }
 
+    public void recoverStuckProcessingAsFailed(Instant recoveredAt) {
+        setStatus(NotificationOutboxStatus.FAILED);
+        setNextAttemptAt(recoveredAt);
+        setLastError("processing_timeout");
+        setUpdatedAt(recoveredAt);
+    }
+
+    public void recoverStuckProcessingAsDead(Instant recoveredAt) {
+        setStatus(NotificationOutboxStatus.DEAD);
+        setFailedAt(recoveredAt);
+        setLastError("processing_timeout");
+        setUpdatedAt(recoveredAt);
+    }
+
     public Long getId() {
         return id;
     }

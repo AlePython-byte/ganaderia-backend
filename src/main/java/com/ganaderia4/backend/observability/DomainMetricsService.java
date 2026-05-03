@@ -32,6 +32,8 @@ public class DomainMetricsService {
     private static final String NOTIFICATION_OUTBOX_EMAIL_SENT_COUNT = "ganaderia.notification.outbox.email.sent.count";
     private static final String NOTIFICATION_OUTBOX_EMAIL_FAILED_COUNT = "ganaderia.notification.outbox.email.failed.count";
     private static final String NOTIFICATION_OUTBOX_EMAIL_DEAD_COUNT = "ganaderia.notification.outbox.email.dead.count";
+    private static final String NOTIFICATION_OUTBOX_EMAIL_STUCK_RECOVERED_COUNT = "ganaderia.notification.outbox.email.stuck.recovered.count";
+    private static final String NOTIFICATION_OUTBOX_EMAIL_STUCK_DEAD_COUNT = "ganaderia.notification.outbox.email.stuck.dead.count";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -189,6 +191,16 @@ public class DomainMetricsService {
     public void incrementNotificationOutboxEmailDead(long count) {
         incrementCounterByAmount(NOTIFICATION_OUTBOX_EMAIL_DEAD_COUNT, count,
                 "Cantidad de mensajes EMAIL del outbox marcados como irrecuperables");
+    }
+
+    public void incrementNotificationOutboxEmailStuckRecovered(long count) {
+        incrementCounterByAmount(NOTIFICATION_OUTBOX_EMAIL_STUCK_RECOVERED_COUNT, count,
+                "Cantidad de mensajes EMAIL del outbox recuperados desde PROCESSING atascado");
+    }
+
+    public void incrementNotificationOutboxEmailStuckDead(long count) {
+        incrementCounterByAmount(NOTIFICATION_OUTBOX_EMAIL_STUCK_DEAD_COUNT, count,
+                "Cantidad de mensajes EMAIL del outbox atascados que terminaron en DEAD");
     }
 
     private Counter counterWithAlertType(String metricName, AlertType type) {

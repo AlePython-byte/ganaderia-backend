@@ -31,4 +31,18 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
                                                               @Param("statuses") List<NotificationOutboxStatus> statuses,
                                                               @Param("nextAttemptAt") Instant nextAttemptAt,
                                                               Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select message
+            from NotificationOutboxMessage message
+            where message.channel = :channel
+              and message.status = :status
+              and coalesce(message.lastAttemptAt, message.updatedAt) <= :cutoff
+            order by coalesce(message.lastAttemptAt, message.updatedAt) asc, message.id asc
+            """)
+    List<NotificationOutboxMessage> findStuckProcessingMessages(@Param("channel") NotificationChannel channel,
+                                                                @Param("status") NotificationOutboxStatus status,
+                                                                @Param("cutoff") Instant cutoff,
+                                                                Pageable pageable);
 }

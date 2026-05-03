@@ -76,6 +76,7 @@ public class NotificationOutboxEmailProcessor {
 
         try {
             Instant now = Instant.now(clock);
+            RecoveryOutcome recoveryOutcome = recoverStuckProcessingMessages(now, requestId);
             List<NotificationOutboxMessage> messages = notificationOutboxRepository.findEligibleForProcessing(
                     NotificationChannel.EMAIL,
                     List.of(NotificationOutboxStatus.PENDING, NotificationOutboxStatus.FAILED),
@@ -104,6 +105,12 @@ public class NotificationOutboxEmailProcessor {
             if (dead > 0) {
                 domainMetricsService.incrementNotificationOutboxEmailDead(dead);
             }
+            if (recoveryOutcome.recovered() > 0) {
+                domainMetricsService.incrementNotificationOutboxEmailStuckRecovered(recoveryOutcome.recovered());
+            }
+            if (recoveryOutcome.dead() > 0) {
+                domainMetricsService.incrementNotificationOutboxEmailStuckDead(recoveryOutcome.dead());
+            }
 
             log.info(
                     "event=notification_outbox_email_processor_completed requestId={} processed={} sent={} failed={} dead={} durationMs={}",
@@ -121,6 +128,49 @@ public class NotificationOutboxEmailProcessor {
                     elapsedMs(startedAt),
                     ex.getClass().getSimpleName(),
                     OperationalLogSanitizer.safe(ex.getMessage()),
+                    ex
+            );
+            throw ex;
+        }
+    }
+
+    private RecoveryOutcome recoverStuckProcessingMessages(Instant now, String requestId) {
+        try {
+            Instant cutoff = now.minus(effectiveProcessingTimeout());
+            List<NotificationOutboxMessage> stuckMessages = notificationOutboxRepository.findStuckProcessingMessages(
+                    NotificationChannel.EMAIL,
+                    NotificationOutboxStatus.PROCESSING,
+                    cutoff,
+                    PageRequest.of(0, effectiveBatchSize())
+            );
+
+            int recovered = 0;
+            int dead = 0;
+            for (NotificationOutboxMessage message : stuckMessages) {
+                if (message.getAttempts() >= message.getMaxAttempts()) {
+                    message.recoverStuckProcessingAsDead(now);
+                    dead++;
+                } else {
+                    message.recoverStuckProcessingAsFailed(now);
+                    recovered++;
+                }
+                notificationOutboxRepository.save(message);
+            }
+
+            if (recovered > 0 || dead > 0) {
+                log.warn(
+                        "event=notification_outbox_email_stuck_recovered requestId={} recovered={} dead={}",
+                        requestId,
+                        recovered,
+                        dead
+                );
+            }
+            return new RecoveryOutcome(recovered, dead);
+        } catch (RuntimeException ex) {
+            log.error(
+                    "event=notification_outbox_email_stuck_recovery_failed requestId={} errorType={}",
+                    requestId,
+                    ex.getClass().getSimpleName(),
                     ex
             );
             throw ex;
@@ -218,6 +268,14 @@ public class NotificationOutboxEmailProcessor {
         return configured;
     }
 
+    private Duration effectiveProcessingTimeout() {
+        Duration configured = properties.getProcessingTimeout();
+        if (configured == null || configured.isZero() || configured.isNegative()) {
+            return Duration.ofMinutes(5);
+        }
+        return configured;
+    }
+
     private long elapsedMs(long startedAt) {
         return Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
     }
@@ -250,5 +308,8 @@ public class NotificationOutboxEmailProcessor {
             String textBody,
             String htmlBody
     ) {
+    }
+
+    private record RecoveryOutcome(int recovered, int dead) {
     }
 }

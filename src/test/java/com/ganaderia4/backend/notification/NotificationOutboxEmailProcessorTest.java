@@ -8,6 +8,7 @@ import com.ganaderia4.backend.repository.NotificationOutboxRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -38,7 +39,7 @@ class NotificationOutboxEmailProcessorTest {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
         NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
                 repository,
-                processorProperties(false, 20, Duration.ofMinutes(1)),
+                processorProperties(false, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
                 emailProperties(),
                 List.of(providerClient()),
                 new DomainMetricsService(new SimpleMeterRegistry()),
@@ -52,15 +53,101 @@ class NotificationOutboxEmailProcessorTest {
     }
 
     @Test
+    void shouldRecoverStuckProcessingMessageAsFailedBeforeProcessingPending() {
+        NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
+        EmailProviderClient providerClient = providerClient();
+        NotificationOutboxMessage stuck = message(NotificationOutboxStatus.PROCESSING, FIXED_NOW.minus(Duration.ofMinutes(10)), 1, 3, validPayload("stuck@test.com"));
+        NotificationOutboxMessage pending = message(NotificationOutboxStatus.PENDING, FIXED_NOW.minusSeconds(5), 0, 3, validPayload("admin@test.com"));
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of(stuck));
+        when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
+                .thenReturn(List.of(pending));
+
+        NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
+                repository,
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
+                emailProperties(),
+                List.of(providerClient),
+                new DomainMetricsService(new SimpleMeterRegistry()),
+                new ObjectMapper(),
+                FIXED_CLOCK
+        );
+
+        processor.processPendingEmailMessages();
+
+        assertEquals(NotificationOutboxStatus.FAILED, stuck.getStatus());
+        assertEquals(FIXED_NOW, stuck.getNextAttemptAt());
+        assertEquals("processing_timeout", stuck.getLastError());
+
+        InOrder inOrder = inOrder(repository, providerClient);
+        inOrder.verify(repository).findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any());
+        inOrder.verify(repository).save(stuck);
+        inOrder.verify(repository).findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any());
+        inOrder.verify(providerClient).send(any());
+    }
+
+    @Test
+    void shouldRecoverStuckProcessingMessageAsDeadWhenAttemptsAreExhausted() {
+        NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
+        NotificationOutboxMessage stuck = message(NotificationOutboxStatus.PROCESSING, FIXED_NOW.minus(Duration.ofMinutes(10)), 3, 3, validPayload("stuck@test.com"));
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of(stuck));
+        when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
+                .thenReturn(List.of());
+
+        NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
+                repository,
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
+                emailProperties(),
+                List.of(providerClient()),
+                new DomainMetricsService(new SimpleMeterRegistry()),
+                new ObjectMapper(),
+                FIXED_CLOCK
+        );
+
+        processor.processPendingEmailMessages();
+
+        assertEquals(NotificationOutboxStatus.DEAD, stuck.getStatus());
+        assertEquals(FIXED_NOW, stuck.getFailedAt());
+        assertEquals("processing_timeout", stuck.getLastError());
+        verify(repository).save(stuck);
+    }
+
+    @Test
+    void shouldNotRecoverRecentProcessingMessage() {
+        NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of());
+        when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
+                .thenReturn(List.of());
+
+        NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
+                repository,
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
+                emailProperties(),
+                List.of(providerClient()),
+                new DomainMetricsService(new SimpleMeterRegistry()),
+                new ObjectMapper(),
+                FIXED_CLOCK
+        );
+
+        processor.processPendingEmailMessages();
+
+        verify(repository, never()).save(any(NotificationOutboxMessage.class));
+    }
+
+    @Test
     void shouldSendDuePendingMessageAndMarkItSent() {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
         EmailProviderClient providerClient = providerClient();
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of());
         when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
                 .thenReturn(List.of(message(NotificationOutboxStatus.PENDING, FIXED_NOW.minusSeconds(5), 0, 3, validPayload("admin@test.com"))));
 
         NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
                 repository,
-                processorProperties(true, 20, Duration.ofMinutes(1)),
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
                 emailProperties(),
                 List.of(providerClient),
                 new DomainMetricsService(new SimpleMeterRegistry()),
@@ -86,12 +173,14 @@ class NotificationOutboxEmailProcessorTest {
     void shouldNotProcessFuturePendingMessage() {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
         EmailProviderClient providerClient = providerClient();
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of());
         when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
                 .thenReturn(List.of());
 
         NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
                 repository,
-                processorProperties(true, 20, Duration.ofMinutes(1)),
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
                 emailProperties(),
                 List.of(providerClient),
                 new DomainMetricsService(new SimpleMeterRegistry()),
@@ -110,12 +199,14 @@ class NotificationOutboxEmailProcessorTest {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
         EmailProviderClient providerClient = providerClient();
         doThrow(new EmailNotificationException("http_500")).when(providerClient).send(any());
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of());
         when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
                 .thenReturn(List.of(message(NotificationOutboxStatus.PENDING, FIXED_NOW.minusSeconds(5), 0, 3, validPayload("admin@test.com"))));
 
         NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
                 repository,
-                processorProperties(true, 20, Duration.ofMinutes(2)),
+                processorProperties(true, 20, Duration.ofMinutes(2), Duration.ofMinutes(5)),
                 emailProperties(),
                 List.of(providerClient),
                 new DomainMetricsService(new SimpleMeterRegistry()),
@@ -140,12 +231,14 @@ class NotificationOutboxEmailProcessorTest {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
         EmailProviderClient providerClient = providerClient();
         doThrow(new EmailNotificationException("io_error")).when(providerClient).send(any());
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of());
         when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
                 .thenReturn(List.of(message(NotificationOutboxStatus.FAILED, FIXED_NOW.minusSeconds(5), 2, 3, validPayload("admin@test.com"))));
 
         NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
                 repository,
-                processorProperties(true, 20, Duration.ofMinutes(1)),
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
                 emailProperties(),
                 List.of(providerClient),
                 new DomainMetricsService(new SimpleMeterRegistry()),
@@ -170,12 +263,14 @@ class NotificationOutboxEmailProcessorTest {
         EmailProviderClient providerClient = providerClient();
         NotificationOutboxMessage corrupt = message(NotificationOutboxStatus.PENDING, FIXED_NOW.minusSeconds(5), 0, 3, "{\"provider\":\"resend\"");
         NotificationOutboxMessage valid = message(NotificationOutboxStatus.PENDING, FIXED_NOW.minusSeconds(5), 0, 3, validPayload("admin@test.com"));
+        when(repository.findStuckProcessingMessages(eq(NotificationChannel.EMAIL), eq(NotificationOutboxStatus.PROCESSING), eq(FIXED_NOW.minus(Duration.ofMinutes(5))), any()))
+                .thenReturn(List.of());
         when(repository.findEligibleForProcessing(eq(NotificationChannel.EMAIL), any(), eq(FIXED_NOW), any()))
                 .thenReturn(List.of(corrupt, valid));
 
         NotificationOutboxEmailProcessor processor = new NotificationOutboxEmailProcessor(
                 repository,
-                processorProperties(true, 20, Duration.ofMinutes(1)),
+                processorProperties(true, 20, Duration.ofMinutes(1), Duration.ofMinutes(5)),
                 emailProperties(),
                 List.of(providerClient),
                 new DomainMetricsService(new SimpleMeterRegistry()),
@@ -198,11 +293,15 @@ class NotificationOutboxEmailProcessorTest {
         assertNotNull(payload);
     }
 
-    private NotificationOutboxEmailProcessorProperties processorProperties(boolean enabled, int batchSize, Duration retryBackoff) {
+    private NotificationOutboxEmailProcessorProperties processorProperties(boolean enabled,
+                                                                           int batchSize,
+                                                                           Duration retryBackoff,
+                                                                           Duration processingTimeout) {
         NotificationOutboxEmailProcessorProperties properties = new NotificationOutboxEmailProcessorProperties();
         properties.setProcessorEnabled(enabled);
         properties.setProcessorBatchSize(batchSize);
         properties.setRetryBackoff(retryBackoff);
+        properties.setProcessingTimeout(processingTimeout);
         properties.setProcessorFixedDelay(Duration.ofSeconds(30));
         return properties;
     }

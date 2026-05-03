@@ -74,6 +74,27 @@ class NotificationOutboxRepositoryIntegrationTest extends AbstractIntegrationTes
         assertEquals(NotificationOutboxStatus.PENDING, eligible.get(1).getStatus());
     }
 
+    @Test
+    @Transactional
+    void shouldFindOnlyStuckProcessingEmailMessages() {
+        notificationOutboxRepository.save(processingMessage(NotificationChannel.EMAIL, NotificationOutboxStatus.PROCESSING, 1, 3, Instant.parse("2026-05-03T19:40:00Z")));
+        notificationOutboxRepository.save(processingMessage(NotificationChannel.EMAIL, NotificationOutboxStatus.PROCESSING, 3, 3, Instant.parse("2026-05-03T19:39:00Z")));
+        notificationOutboxRepository.save(processingMessage(NotificationChannel.EMAIL, NotificationOutboxStatus.PROCESSING, 1, 3, Instant.parse("2026-05-03T19:58:00Z")));
+        notificationOutboxRepository.save(processingMessage(NotificationChannel.EMAIL, NotificationOutboxStatus.PENDING, 0, 3, Instant.parse("2026-05-03T19:30:00Z")));
+        notificationOutboxRepository.save(processingMessage(NotificationChannel.WEBHOOK, NotificationOutboxStatus.PROCESSING, 1, 3, Instant.parse("2026-05-03T19:35:00Z")));
+
+        var stuck = notificationOutboxRepository.findStuckProcessingMessages(
+                NotificationChannel.EMAIL,
+                NotificationOutboxStatus.PROCESSING,
+                Instant.parse("2026-05-03T19:55:00Z"),
+                org.springframework.data.domain.PageRequest.of(0, 10)
+        );
+
+        assertEquals(2, stuck.size());
+        assertEquals(Instant.parse("2026-05-03T19:39:00Z"), stuck.get(0).getLastAttemptAt());
+        assertEquals(Instant.parse("2026-05-03T19:40:00Z"), stuck.get(1).getLastAttemptAt());
+    }
+
     private NotificationOutboxMessage message(NotificationChannel channel,
                                               NotificationOutboxStatus status,
                                               int attempts,
@@ -91,6 +112,27 @@ class NotificationOutboxRepositoryIntegrationTest extends AbstractIntegrationTes
         message.setNextAttemptAt(nextAttemptAt);
         message.setCreatedAt(Instant.parse("2026-05-03T19:30:00Z"));
         message.setUpdatedAt(Instant.parse("2026-05-03T19:30:00Z"));
+        return message;
+    }
+
+    private NotificationOutboxMessage processingMessage(NotificationChannel channel,
+                                                        NotificationOutboxStatus status,
+                                                        int attempts,
+                                                        int maxAttempts,
+                                                        Instant lastAttemptAt) {
+        NotificationOutboxMessage message = new NotificationOutboxMessage();
+        message.setChannel(channel);
+        message.setStatus(status);
+        message.setEventType("ALERT_CREATED");
+        message.setRecipient("alerts@ganaderia.test");
+        message.setSubject("Asunto");
+        message.setPayload("{\"message\":\"hola\"}");
+        message.setAttempts(attempts);
+        message.setMaxAttempts(maxAttempts);
+        message.setNextAttemptAt(Instant.parse("2026-05-03T19:20:00Z"));
+        message.setLastAttemptAt(lastAttemptAt);
+        message.setCreatedAt(Instant.parse("2026-05-03T19:10:00Z"));
+        message.setUpdatedAt(lastAttemptAt);
         return message;
     }
 }

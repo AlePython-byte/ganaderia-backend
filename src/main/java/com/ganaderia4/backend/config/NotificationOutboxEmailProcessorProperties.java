@@ -13,6 +13,7 @@ public class NotificationOutboxEmailProcessorProperties {
     private Duration processorFixedDelay = Duration.ofSeconds(30);
     private int processorBatchSize = 20;
     private Duration retryBackoff = Duration.ofMinutes(1);
+    private Duration processingTimeout = Duration.ofMinutes(5);
 
     public boolean isProcessorEnabled() {
         return processorEnabled;
@@ -44,5 +45,13 @@ public class NotificationOutboxEmailProcessorProperties {
 
     public void setRetryBackoff(Duration retryBackoff) {
         this.retryBackoff = retryBackoff;
+    }
+
+    public Duration getProcessingTimeout() {
+        return processingTimeout;
+    }
+
+    public void setProcessingTimeout(Duration processingTimeout) {
+        this.processingTimeout = processingTimeout;
     }
 }
