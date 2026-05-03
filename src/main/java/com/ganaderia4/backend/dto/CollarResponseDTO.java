@@ -1,22 +1,49 @@
 package com.ganaderia4.backend.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.LocalDateTime;
 
+@Schema(description = "Respuesta con los datos de un collar")
 public class CollarResponseDTO {
 
+    @Schema(description = "Identificador numerico interno", example = "1")
     private Long id;
+
+    @Schema(description = "Identificador publico generado por el backend y usado como X-Device-Token", example = "COLLAR-001")
     private String token;
+
+    @Schema(description = "Estado operativo actual del collar", example = "ACTIVE")
     private String status;
+
+    @Schema(description = "Id de la vaca asociada, si aplica", example = "1")
     private Long cowId;
+
+    @Schema(description = "Token publico de la vaca asociada, si aplica", example = "COW-001")
     private String cowToken;
+
+    @Schema(description = "Nombre de la vaca asociada, si aplica", example = "Luna")
     private String cowName;
 
+    @Schema(description = "Nivel de bateria en porcentaje", example = "78")
     private Integer batteryLevel;
+
+    @Schema(description = "Fecha y hora de ultima senal observada", example = "2026-05-02T10:15:30")
     private LocalDateTime lastSeenAt;
+
+    @Schema(description = "Estado de senal reportado", example = "ONLINE")
     private String signalStatus;
+
+    @Schema(description = "Version de firmware reportada", example = "v1.2.3")
     private String firmwareVersion;
+
+    @Schema(description = "Precision GPS reportada en metros", example = "5.4")
     private Double gpsAccuracy;
+
+    @Schema(description = "Indica si el collar esta habilitado operativamente", example = "true")
     private Boolean enabled;
+
+    @Schema(description = "Notas operativas", example = "Collar reasignado recientemente")
     private String notes;
 
     public CollarResponseDTO() {

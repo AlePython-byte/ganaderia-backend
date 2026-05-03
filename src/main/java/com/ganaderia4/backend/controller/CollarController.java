@@ -38,7 +38,7 @@ public class CollarController {
     @PostMapping
     @Operation(
             summary = "Crear collar",
-            description = "Registra un collar nuevo. Puede asociarse a una vaca durante la creacion si se informa cowId."
+            description = "Registra un collar nuevo. El token publico se genera automaticamente por el backend; si el cliente lo envia, se ignora por compatibilidad. Puede asociarse a una vaca durante la creacion si se informa cowId."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Collar creado correctamente",
@@ -51,7 +51,7 @@ public class CollarController {
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "Vaca asociada no encontrada",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
-            @ApiResponse(responseCode = "409", description = "Conflicto por token duplicado o vaca ya asociada a otro collar",
+            @ApiResponse(responseCode = "409", description = "Conflicto por vaca ya asociada a otro collar",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     public CollarResponseDTO createCollar(@Valid @RequestBody CollarRequestDTO requestDTO) {
@@ -61,7 +61,7 @@ public class CollarController {
     @PutMapping("/{id}")
     @Operation(
             summary = "Actualizar collar",
-            description = "Actualiza un collar existente. El token publico del collar debe mantenerse estable."
+            description = "Actualiza un collar existente. Si no se informa token, el backend conserva el valor actual. El token publico del collar es estable y no debe cambiarse."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Collar actualizado correctamente",
@@ -266,7 +266,7 @@ public class CollarController {
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     public CollarResponseDTO getCollarByToken(
-            @Parameter(description = "Token publico estable del collar", example = "COL-001")
+            @Parameter(description = "Token publico estable del collar", example = "COLLAR-001")
             @PathVariable String token) {
         return collarService.getCollarByToken(token);
     }

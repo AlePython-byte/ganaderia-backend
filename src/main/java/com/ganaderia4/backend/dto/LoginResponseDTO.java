@@ -1,14 +1,32 @@
 package com.ganaderia4.backend.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Respuesta de autenticacion con JWT y datos basicos del usuario")
 public class LoginResponseDTO {
 
+    @Schema(description = "Identificador numerico del usuario", example = "1")
     private Long id;
+
+    @Schema(description = "Nombre del usuario autenticado", example = "Administrador")
     private String name;
+
+    @Schema(description = "Correo del usuario autenticado", example = "admin@ganaderia.com")
     private String email;
+
+    @Schema(description = "Rol operativo del usuario", example = "ADMINISTRADOR")
     private String role;
+
+    @Schema(description = "JWT Bearer para endpoints protegidos", example = "eyJhbGciOiJIUzI1NiJ9...")
     private String token;
+
+    @Schema(description = "Tipo de token devuelto", example = "Bearer")
     private String tokenType;
+
+    @Schema(description = "Duracion del token en segundos", example = "86400")
     private Long expiresIn;
+
+    @Schema(description = "Mensaje operativo de autenticacion", example = "Inicio de sesion exitoso")
     private String message;
 
     public LoginResponseDTO() {

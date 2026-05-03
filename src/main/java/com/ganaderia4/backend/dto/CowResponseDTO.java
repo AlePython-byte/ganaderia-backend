@@ -1,12 +1,26 @@
 package com.ganaderia4.backend.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Respuesta con los datos de una vaca")
 public class CowResponseDTO {
 
+    @Schema(description = "Identificador numerico interno", example = "1")
     private Long id;
+
+    @Schema(description = "Identificador publico generado por el backend", example = "COW-001")
     private String token;
+
+    @Schema(description = "Codigo interno opcional de la vaca", example = "INT-025")
     private String internalCode;
+
+    @Schema(description = "Nombre visible de la vaca", example = "Luna")
     private String name;
+
+    @Schema(description = "Estado operativo actual", example = "ACTIVA")
     private String status;
+
+    @Schema(description = "Observaciones operativas", example = "Vaca en monitoreo diario")
     private String observations;
 
     public CowResponseDTO() {
