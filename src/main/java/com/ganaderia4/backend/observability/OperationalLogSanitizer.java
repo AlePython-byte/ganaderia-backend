@@ -35,6 +35,24 @@ public final class OperationalLogSanitizer {
         return "****" + sanitized.substring(sanitized.length() - 4);
     }
 
+    public static String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "UNKNOWN";
+        }
+
+        String sanitized = safe(email).toLowerCase();
+        int atIndex = sanitized.indexOf('@');
+        if (atIndex <= 0 || atIndex == sanitized.length() - 1) {
+            return maskToken(sanitized);
+        }
+
+        String localPart = sanitized.substring(0, atIndex);
+        String domain = sanitized.substring(atIndex + 1);
+        String visiblePrefix = localPart.substring(0, 1);
+
+        return visiblePrefix + "***@" + domain;
+    }
+
     public static String destination(URI uri) {
         if (uri == null || uri.getHost() == null || uri.getHost().isBlank()) {
             return "UNKNOWN";
