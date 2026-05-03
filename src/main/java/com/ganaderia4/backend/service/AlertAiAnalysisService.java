@@ -5,6 +5,7 @@ import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
 import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
 import com.ganaderia4.backend.model.AlertAnalysisRiskLevel;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,13 +24,16 @@ public class AlertAiAnalysisService {
     private final AlertAnalysisService alertAnalysisService;
     private final GeminiAiClient geminiAiClient;
     private final AiAnalysisProperties properties;
+    private final DomainMetricsService domainMetricsService;
 
     public AlertAiAnalysisService(AlertAnalysisService alertAnalysisService,
                                   GeminiAiClient geminiAiClient,
-                                  AiAnalysisProperties properties) {
+                                  AiAnalysisProperties properties,
+                                  DomainMetricsService domainMetricsService) {
         this.alertAnalysisService = alertAnalysisService;
         this.geminiAiClient = geminiAiClient;
         this.properties = properties;
+        this.domainMetricsService = domainMetricsService;
     }
 
     public AlertAiSummaryDTO getAiSummary() {
@@ -38,11 +42,11 @@ public class AlertAiAnalysisService {
                 alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT);
 
         if (!properties.isEnabled()) {
-            return fallback("ai_disabled", heuristicSummary, topPriorities);
+            return fallback("disabled", heuristicSummary, topPriorities);
         }
 
         if (!"gemini".equalsIgnoreCase(properties.getProvider())) {
-            return fallback("unsupported_provider", heuristicSummary, topPriorities);
+            return fallback("unknown", heuristicSummary, topPriorities);
         }
 
         if (properties.getGeminiApiKey() == null || properties.getGeminiApiKey().isBlank()) {
@@ -63,6 +67,9 @@ public class AlertAiAnalysisService {
                     false
             );
 
+            domainMetricsService.incrementAiProviderRequest("gemini", "success");
+            domainMetricsService.incrementAiSummaryGenerated(SOURCE_AI, heuristicSummary.getRiskLevel().name());
+
             log.info(
                     "event=alert_ai_summary_generated requestId={} source={} fallbackUsed={} riskLevel={}",
                     OperationalLogSanitizer.requestId(),
@@ -73,17 +80,22 @@ public class AlertAiAnalysisService {
 
             return response;
         } catch (GeminiAiClient.GeminiAiClientException ex) {
-            return fallback(ex.getMessage(), heuristicSummary, topPriorities);
+            domainMetricsService.incrementAiProviderRequest("gemini", "failure");
+            return fallback(normalizeFallbackReason(ex.getMessage()), heuristicSummary, topPriorities);
         }
     }
 
     private AlertAiSummaryDTO fallback(String reason,
                                        AlertAnalysisSummaryDTO heuristicSummary,
                                        List<AlertPriorityRecommendationDTO> topPriorities) {
+        String normalizedReason = normalizeFallbackReason(reason);
+
+        domainMetricsService.incrementAiSummaryFallback(normalizedReason);
+
         log.warn(
                 "event=alert_ai_summary_fallback requestId={} reason={}",
                 OperationalLogSanitizer.requestId(),
-                OperationalLogSanitizer.safe(reason)
+                OperationalLogSanitizer.safe(normalizedReason)
         );
 
         AlertAiSummaryDTO response = new AlertAiSummaryDTO(
@@ -92,6 +104,11 @@ public class AlertAiAnalysisService {
                 fallbackRecommendationFor(heuristicSummary, topPriorities),
                 SOURCE_RULE_BASED_FALLBACK,
                 true
+        );
+
+        domainMetricsService.incrementAiSummaryGenerated(
+                SOURCE_RULE_BASED_FALLBACK,
+                heuristicSummary.getRiskLevel().name()
         );
 
         log.info(
@@ -103,6 +120,29 @@ public class AlertAiAnalysisService {
         );
 
         return response;
+    }
+
+    private String normalizeFallbackReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "unknown";
+        }
+
+        return switch (reason) {
+            case "disabled", "ai_disabled" -> "disabled";
+            case "missing_api_key" -> "missing_api_key";
+            case "provider_error" -> "provider_error";
+            case "io_error", "interrupted" -> "provider_error";
+            case "unusable_response" -> "unusable_response";
+            case "parse_error", "missing_candidates", "missing_text" -> "parse_error";
+            case "unusable_plain_text" -> "unusable_response";
+            case "unknown", "unsupported_provider" -> "unknown";
+            default -> {
+                if (reason.startsWith("http_")) {
+                    yield "provider_error";
+                }
+                yield "unknown";
+            }
+        };
     }
 
     private String buildPrompt(AlertAnalysisSummaryDTO heuristicSummary,

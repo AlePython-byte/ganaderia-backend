@@ -25,6 +25,9 @@ public class DomainMetricsService {
     private static final String GPS_ACCURACY_QUALITY_COUNT = "ganaderia.gps.accuracy.quality.count";
     private static final String DEVICE_REPLAY_NONCE_CLEANUP_DELETED_COUNT = "ganaderia.device.replay_nonce.cleanup.deleted.count";
     private static final String ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT = "ganaderia.abuse.rate_limit.cleanup.deleted.count";
+    private static final String AI_SUMMARY_GENERATED_COUNT = "ganaderia.ai.summary.generated.count";
+    private static final String AI_SUMMARY_FALLBACK_COUNT = "ganaderia.ai.summary.fallback.count";
+    private static final String AI_SUMMARY_PROVIDER_REQUEST_COUNT = "ganaderia.ai.summary.provider.request.count";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -115,6 +118,46 @@ public class DomainMetricsService {
                         .description("Cantidad de entradas de abuse rate limit eliminadas por limpiezas programadas")
                         .register(meterRegistry)
         ).increment(deletedCount);
+    }
+
+    public void incrementAiSummaryGenerated(String source, String riskLevel) {
+        String sourceValue = normalizeTagValue(source);
+        String riskLevelValue = normalizeTagValue(riskLevel);
+        String key = AI_SUMMARY_GENERATED_COUNT + "|source=" + sourceValue + "|riskLevel=" + riskLevelValue;
+
+        counters.computeIfAbsent(key, ignored ->
+                Counter.builder(AI_SUMMARY_GENERATED_COUNT)
+                        .description("Cantidad de resúmenes operativos generados por el módulo de IA")
+                        .tag("source", sourceValue)
+                        .tag("riskLevel", riskLevelValue)
+                        .register(meterRegistry)
+        ).increment();
+    }
+
+    public void incrementAiSummaryFallback(String reason) {
+        String reasonValue = normalizeTagValue(reason);
+        String key = AI_SUMMARY_FALLBACK_COUNT + "|reason=" + reasonValue;
+
+        counters.computeIfAbsent(key, ignored ->
+                Counter.builder(AI_SUMMARY_FALLBACK_COUNT)
+                        .description("Cantidad de activaciones del fallback heurístico del módulo de IA")
+                        .tag("reason", reasonValue)
+                        .register(meterRegistry)
+        ).increment();
+    }
+
+    public void incrementAiProviderRequest(String provider, String outcome) {
+        String providerValue = normalizeTagValue(provider);
+        String outcomeValue = normalizeTagValue(outcome);
+        String key = AI_SUMMARY_PROVIDER_REQUEST_COUNT + "|provider=" + providerValue + "|outcome=" + outcomeValue;
+
+        counters.computeIfAbsent(key, ignored ->
+                Counter.builder(AI_SUMMARY_PROVIDER_REQUEST_COUNT)
+                        .description("Cantidad de solicitudes realizadas al proveedor de IA")
+                        .tag("provider", providerValue)
+                        .tag("outcome", outcomeValue)
+                        .register(meterRegistry)
+        ).increment();
     }
 
     private Counter counterWithAlertType(String metricName, AlertType type) {

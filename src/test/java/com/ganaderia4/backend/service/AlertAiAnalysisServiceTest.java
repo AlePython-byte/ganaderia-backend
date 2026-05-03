@@ -5,6 +5,7 @@ import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
 import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
 import com.ganaderia4.backend.model.AlertAnalysisRiskLevel;
+import com.ganaderia4.backend.observability.DomainMetricsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,13 +31,21 @@ class AlertAiAnalysisServiceTest {
     @Mock
     private GeminiAiClient geminiAiClient;
 
+    @Mock
+    private DomainMetricsService domainMetricsService;
+
     private AiAnalysisProperties properties;
     private AlertAiAnalysisService alertAiAnalysisService;
 
     @BeforeEach
     void setUp() {
         properties = new AiAnalysisProperties();
-        alertAiAnalysisService = new AlertAiAnalysisService(alertAnalysisService, geminiAiClient, properties);
+        alertAiAnalysisService = new AlertAiAnalysisService(
+                alertAnalysisService,
+                geminiAiClient,
+                properties,
+                domainMetricsService
+        );
     }
 
     @Test
@@ -48,7 +58,10 @@ class AlertAiAnalysisServiceTest {
 
         assertEquals("RULE_BASED_FALLBACK", response.getSource());
         assertTrue(response.isFallbackUsed());
-        verify(geminiAiClient, never()).generateOperationalSummary(org.mockito.ArgumentMatchers.anyString());
+        verify(geminiAiClient, never()).generateOperationalSummary(anyString());
+        verify(domainMetricsService).incrementAiSummaryFallback("disabled");
+        verify(domainMetricsService).incrementAiSummaryGenerated("RULE_BASED_FALLBACK", "HIGH");
+        verify(domainMetricsService, never()).incrementAiProviderRequest(anyString(), anyString());
     }
 
     @Test
@@ -60,7 +73,7 @@ class AlertAiAnalysisServiceTest {
         when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.CRITICAL, 7));
         when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
                 .thenReturn(List.of(priority("COLLAR_OFFLINE")));
-        when(geminiAiClient.generateOperationalSummary(org.mockito.ArgumentMatchers.anyString()))
+        when(geminiAiClient.generateOperationalSummary(anyString()))
                 .thenReturn(new GeminiAiClient.AiGeneratedSummary(
                         "El sistema presenta alertas pendientes que requieren atencion inmediata.",
                         "Revise primero los collares offline y luego las alertas de bateria baja."
@@ -71,6 +84,9 @@ class AlertAiAnalysisServiceTest {
         assertEquals("AI", response.getSource());
         assertEquals(false, response.isFallbackUsed());
         assertEquals(AlertAnalysisRiskLevel.CRITICAL, response.getRiskLevel());
+        verify(domainMetricsService).incrementAiProviderRequest("gemini", "success");
+        verify(domainMetricsService).incrementAiSummaryGenerated("AI", "CRITICAL");
+        verify(domainMetricsService, never()).incrementAiSummaryFallback(anyString());
     }
 
     @Test
@@ -82,7 +98,7 @@ class AlertAiAnalysisServiceTest {
         when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.HIGH, 2));
         when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
                 .thenReturn(List.of(priority("LOW_BATTERY")));
-        when(geminiAiClient.generateOperationalSummary(org.mockito.ArgumentMatchers.anyString()))
+        when(geminiAiClient.generateOperationalSummary(anyString()))
                 .thenThrow(new GeminiAiClient.GeminiAiClientException("http_500"));
 
         AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
@@ -90,6 +106,9 @@ class AlertAiAnalysisServiceTest {
         assertEquals("RULE_BASED_FALLBACK", response.getSource());
         assertTrue(response.isFallbackUsed());
         assertEquals(AlertAnalysisRiskLevel.HIGH, response.getRiskLevel());
+        verify(domainMetricsService).incrementAiProviderRequest("gemini", "failure");
+        verify(domainMetricsService).incrementAiSummaryFallback("provider_error");
+        verify(domainMetricsService).incrementAiSummaryGenerated("RULE_BASED_FALLBACK", "HIGH");
     }
 
     @Test
@@ -101,7 +120,7 @@ class AlertAiAnalysisServiceTest {
         when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.HIGH, 2));
         when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
                 .thenReturn(List.of(priority("LOW_BATTERY")));
-        when(geminiAiClient.generateOperationalSummary(org.mockito.ArgumentMatchers.anyString()))
+        when(geminiAiClient.generateOperationalSummary(anyString()))
                 .thenReturn(new GeminiAiClient.AiGeneratedSummary(
                         "Hay varias alertas pendientes que requieren atencion operativa.",
                         ""
@@ -113,10 +132,12 @@ class AlertAiAnalysisServiceTest {
         assertEquals(false, response.isFallbackUsed());
         assertEquals("Hay varias alertas pendientes que requieren atencion operativa.", response.getSummary());
         assertTrue(response.getRecommendation().contains("mayor prioridad"));
+        verify(domainMetricsService).incrementAiProviderRequest("gemini", "success");
+        verify(domainMetricsService).incrementAiSummaryGenerated("AI", "HIGH");
     }
 
     @Test
-    void shouldFallbackWhenClientReturnsGenericIntroductoryText() {
+    void shouldFallbackWhenClientReturnsUnusableResponse() {
         properties.setEnabled(true);
         properties.setProvider("gemini");
         properties.setGeminiApiKey("test-key");
@@ -124,13 +145,37 @@ class AlertAiAnalysisServiceTest {
         when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.HIGH, 2));
         when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
                 .thenReturn(List.of(priority("LOW_BATTERY")));
-        when(geminiAiClient.generateOperationalSummary(org.mockito.ArgumentMatchers.anyString()))
+        when(geminiAiClient.generateOperationalSummary(anyString()))
                 .thenThrow(new GeminiAiClient.GeminiAiClientException("unusable_plain_text"));
 
         AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
 
         assertEquals("RULE_BASED_FALLBACK", response.getSource());
         assertTrue(response.isFallbackUsed());
+        verify(domainMetricsService).incrementAiProviderRequest("gemini", "failure");
+        verify(domainMetricsService).incrementAiSummaryFallback("unusable_response");
+        verify(domainMetricsService).incrementAiSummaryGenerated("RULE_BASED_FALLBACK", "HIGH");
+    }
+
+    @Test
+    void shouldFallbackWithParseErrorMetricWhenClientResponseCannotBeParsed() {
+        properties.setEnabled(true);
+        properties.setProvider("gemini");
+        properties.setGeminiApiKey("test-key");
+
+        when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.MEDIUM, 2));
+        when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
+                .thenReturn(List.of(priority("LOW_BATTERY")));
+        when(geminiAiClient.generateOperationalSummary(anyString()))
+                .thenThrow(new GeminiAiClient.GeminiAiClientException("parse_error"));
+
+        AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
+
+        assertEquals("RULE_BASED_FALLBACK", response.getSource());
+        assertTrue(response.isFallbackUsed());
+        verify(domainMetricsService).incrementAiProviderRequest("gemini", "failure");
+        verify(domainMetricsService).incrementAiSummaryFallback("parse_error");
+        verify(domainMetricsService).incrementAiSummaryGenerated("RULE_BASED_FALLBACK", "MEDIUM");
     }
 
     private AlertAnalysisSummaryDTO summary(AlertAnalysisRiskLevel riskLevel, long totalPendingAlerts) {
