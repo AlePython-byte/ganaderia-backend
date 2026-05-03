@@ -1,5 +1,6 @@
 package com.ganaderia4.backend.config;
 
+import com.ganaderia4.backend.notification.EmailDeliveryMode;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ public class EmailNotificationProperties {
     private String apiKey = "";
     private String from = "";
     private String to = "";
+    private String deliveryMode = EmailDeliveryMode.DIRECT.name().toLowerCase();
     private long connectTimeoutMs = 3000;
     private long readTimeoutMs = 5000;
     private String baseUrl = "https://api.resend.com";
@@ -54,6 +56,18 @@ public class EmailNotificationProperties {
 
     public void setTo(String to) {
         this.to = to;
+    }
+
+    public String getDeliveryMode() {
+        return deliveryMode;
+    }
+
+    public void setDeliveryMode(String deliveryMode) {
+        this.deliveryMode = deliveryMode;
+    }
+
+    public EmailDeliveryMode resolveDeliveryMode() {
+        return EmailDeliveryMode.fromConfigValue(deliveryMode);
     }
 
     public long getConnectTimeoutMs() {

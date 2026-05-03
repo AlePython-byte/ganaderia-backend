@@ -63,6 +63,9 @@ public class NotificationOutboxEmailProcessor {
         if (!properties.isProcessorEnabled() || !emailNotificationProperties.isEnabled()) {
             return;
         }
+        if (emailNotificationProperties.resolveDeliveryMode() != EmailDeliveryMode.OUTBOX) {
+            return;
+        }
 
         long startedAt = System.nanoTime();
         String requestId = OperationalLogSanitizer.requestIdOr("scheduled");

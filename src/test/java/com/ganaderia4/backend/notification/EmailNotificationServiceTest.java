@@ -20,7 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(OutputCaptureExtension.class)
 class EmailNotificationServiceTest {
@@ -135,7 +144,7 @@ class EmailNotificationServiceTest {
     }
 
     @Test
-    void shouldCallProviderWhenEmailIsEnabledAndConfigured(CapturedOutput output) {
+    void shouldCallProviderWhenDeliveryModeIsDirect(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
         EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
@@ -149,7 +158,7 @@ class EmailNotificationServiceTest {
         );
 
         EmailNotificationService service = new EmailNotificationService(
-                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "direct"),
                 List.of(providerClient),
                 new AlertEmailTemplateBuilder(),
                 recipientResolver,
@@ -169,9 +178,10 @@ class EmailNotificationServiceTest {
         assertEquals("[Ganaderia 4.0] HIGH - Collar offline", request.subject());
         assertTrue(request.textBody().contains("Tipo: Collar offline"));
         assertTrue(request.htmlBody().contains("<html"));
-        verify(outboxService, times(2)).enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), any(), any(), any());
-        assertTrue(output.getOut().contains("event=email_notification_recipients_resolved"));
-        assertTrue(output.getOut().contains("event=email_notification_outbox_enqueued"));
+        verifyNoInteractions(outboxService);
+        assertTrue(output.getOut().contains("event=email_notification_delivery_mode_selected"));
+        assertTrue(output.getOut().contains("mode=DIRECT"));
+        assertTrue(output.getOut().contains("event=email_notification_direct_send"));
         assertTrue(output.getOut().contains("event=email_notification_send_requested"));
         assertTrue(output.getOut().contains("event=email_notification_sent"));
     }
@@ -191,7 +201,7 @@ class EmailNotificationServiceTest {
         );
 
         EmailNotificationService service = new EmailNotificationService(
-                emailProperties(true, "api-key", "alerts@ganaderia.test", "fallback@test.com"),
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "fallback@test.com", "direct"),
                 List.of(providerClient),
                 new AlertEmailTemplateBuilder(),
                 recipientResolver,
@@ -203,7 +213,7 @@ class EmailNotificationServiceTest {
 
         assertEquals(NotificationSendResult.SENT, result);
         verify(providerClient).send(argThat(request -> request.to().equals(List.of("fallback@test.com"))));
-        verify(outboxService).enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), eq("fallback@test.com"), any(), any());
+        verifyNoInteractions(outboxService);
         assertTrue(output.getOut().contains("event=email_notification_global_fallback_used"));
     }
 
@@ -222,7 +232,7 @@ class EmailNotificationServiceTest {
         );
 
         EmailNotificationService service = new EmailNotificationService(
-                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "direct"),
                 List.of(providerClient),
                 templateBuilder,
                 recipientResolver,
@@ -235,12 +245,11 @@ class EmailNotificationServiceTest {
         verify(templateBuilder).build(any(NotificationMessage.class));
         verify(providerClient).send(argThat(request ->
                 request.to().equals(List.of("admin@test.com"))
-                        &&
-                "subject-x".equals(request.subject())
+                        && "subject-x".equals(request.subject())
                         && "text-x".equals(request.textBody())
                         && "html-x".equals(request.htmlBody())
         ));
-        verify(outboxService).enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), eq("admin@test.com"), eq("subject-x"), any());
+        verifyNoInteractions(outboxService);
     }
 
     @Test
@@ -255,7 +264,7 @@ class EmailNotificationServiceTest {
         );
 
         EmailNotificationService service = new EmailNotificationService(
-                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "direct"),
                 List.of(providerClient),
                 new AlertEmailTemplateBuilder(),
                 recipientResolver,
@@ -269,13 +278,45 @@ class EmailNotificationServiceTest {
         );
 
         assertEquals("http_500", ex.getMessage());
-        verify(outboxService).enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), eq("admin@test.com"), any(), any());
+        verifyNoInteractions(outboxService);
         assertTrue(output.getOut().contains("event=email_notification_failed"));
         assertTrue(output.getOut().contains("reason=http_500"));
     }
 
     @Test
-    void shouldContinueDirectSendWhenOutboxEnqueueFails(CapturedOutput output) {
+    void shouldUseOutboxModeWithoutCallingProvider(CapturedOutput output) {
+        EmailProviderClient providerClient = mock(EmailProviderClient.class);
+        when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        NotificationOutboxService outboxService = mock(NotificationOutboxService.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(
+                        List.of("admin@test.com", "supervisor@test.com"),
+                        com.ganaderia4.backend.model.NotificationSeverity.HIGH,
+                        false
+                )
+        );
+
+        EmailNotificationService service = new EmailNotificationService(
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "outbox"),
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder(),
+                recipientResolver,
+                outboxService,
+                new ObjectMapper()
+        );
+
+        NotificationSendResult result = service.send(sampleMessage());
+
+        assertEquals(NotificationSendResult.SENT, result);
+        verify(providerClient, never()).send(any());
+        verify(outboxService, times(2)).enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), any(), any(), any());
+        assertTrue(output.getOut().contains("event=email_notification_enqueued_for_outbox"));
+        assertTrue(output.getOut().contains("mode=OUTBOX"));
+    }
+
+    @Test
+    void shouldFailWhenOutboxModeEnqueueFails(CapturedOutput output) {
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
         EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
@@ -287,7 +328,34 @@ class EmailNotificationServiceTest {
                 .enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), eq("admin@test.com"), any(), any());
 
         EmailNotificationService service = new EmailNotificationService(
-                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test"),
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "outbox"),
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder(),
+                recipientResolver,
+                outboxService,
+                new ObjectMapper()
+        );
+
+        EmailNotificationException ex = assertThrows(EmailNotificationException.class, () -> service.send(sampleMessage()));
+
+        assertEquals("email_outbox_enqueue_failed", ex.getMessage());
+        verify(providerClient, never()).send(any());
+        assertTrue(output.getOut().contains("event=email_notification_outbox_enqueue_failed"));
+        assertTrue(output.getOut().contains("mode=OUTBOX"));
+    }
+
+    @Test
+    void shouldContinueDirectSendWhenDeliveryModeIsInvalid(CapturedOutput output) {
+        EmailProviderClient providerClient = mock(EmailProviderClient.class);
+        when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        NotificationOutboxService outboxService = mock(NotificationOutboxService.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(List.of("admin@test.com"), com.ganaderia4.backend.model.NotificationSeverity.HIGH, false)
+        );
+
+        EmailNotificationService service = new EmailNotificationService(
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "broken-mode"),
                 List.of(providerClient),
                 new AlertEmailTemplateBuilder(),
                 recipientResolver,
@@ -299,7 +367,9 @@ class EmailNotificationServiceTest {
 
         assertEquals(NotificationSendResult.SENT, result);
         verify(providerClient).send(any());
-        assertTrue(output.getOut().contains("event=email_notification_outbox_enqueue_failed"));
+        verifyNoInteractions(outboxService);
+        assertTrue(output.getOut().contains("event=email_notification_delivery_mode_invalid"));
+        assertTrue(output.getOut().contains("fallback=direct"));
     }
 
     @Test
@@ -317,7 +387,7 @@ class EmailNotificationServiceTest {
         );
 
         EmailNotificationService service = new EmailNotificationService(
-                emailProperties(true, "api-key-secret", "alerts@ganaderia.test", "ops@ganaderia.test"),
+                emailProperties(true, "api-key-secret", "alerts@ganaderia.test", "ops@ganaderia.test", "outbox"),
                 List.of(providerClient),
                 new AlertEmailTemplateBuilder(),
                 recipientResolver,
@@ -348,6 +418,7 @@ class EmailNotificationServiceTest {
             assertTrue(parsed.containsKey("htmlBody"));
             assertFalse(payload.contains("api-key-secret"));
         }
+        verify(providerClient, never()).send(any());
     }
 
     @Test
@@ -377,12 +448,21 @@ class EmailNotificationServiceTest {
                                                         String apiKey,
                                                         String from,
                                                         String to) {
+        return emailProperties(enabled, apiKey, from, to, "direct");
+    }
+
+    private EmailNotificationProperties emailProperties(boolean enabled,
+                                                        String apiKey,
+                                                        String from,
+                                                        String to,
+                                                        String deliveryMode) {
         EmailNotificationProperties properties = new EmailNotificationProperties();
         properties.setEnabled(enabled);
         properties.setProvider("resend");
         properties.setApiKey(apiKey);
         properties.setFrom(from);
         properties.setTo(to);
+        properties.setDeliveryMode(deliveryMode);
         properties.setConnectTimeoutMs(3000);
         properties.setReadTimeoutMs(5000);
         return properties;

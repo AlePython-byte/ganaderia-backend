@@ -213,6 +213,7 @@ class NotificationOutboxEmailProcessorTest {
         properties.setProvider("resend");
         properties.setApiKey("api-key");
         properties.setFrom("alerts@ganaderia.test");
+        properties.setDeliveryMode("outbox");
         return properties;
     }
 

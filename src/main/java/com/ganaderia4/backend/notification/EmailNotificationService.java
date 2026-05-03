@@ -90,7 +90,24 @@ public class EmailNotificationService implements NotificationService {
             logGlobalFallbackUsed();
         }
 
-        enqueueOutboxMessages(provider, notificationMessage.getEventType(), request);
+        EmailDeliveryMode deliveryMode = resolveDeliveryMode();
+        logDeliveryModeSelected(deliveryMode);
+
+        if (deliveryMode == EmailDeliveryMode.OUTBOX) {
+            int enqueuedCount = enqueueOutboxMessages(provider, notificationMessage.getEventType(), request, true);
+            logger.info(
+                    "event=email_notification_enqueued_for_outbox requestId={} count={}",
+                    OperationalLogSanitizer.requestId(),
+                    enqueuedCount
+            );
+            return NotificationSendResult.SENT;
+        }
+
+        logger.info(
+                "event=email_notification_direct_send requestId={} recipients={}",
+                OperationalLogSanitizer.requestId(),
+                request.to().size()
+        );
         logSendRequested(provider);
 
         try {
@@ -101,6 +118,19 @@ public class EmailNotificationService implements NotificationService {
             logFailed(provider, ex);
             throw ex;
         }
+    }
+
+    private EmailDeliveryMode resolveDeliveryMode() {
+        EmailDeliveryMode resolved = properties.resolveDeliveryMode();
+        String rawValue = properties.getDeliveryMode();
+        if (!normalize(rawValue).equals(resolved.name().toLowerCase(Locale.ROOT))) {
+            logger.warn(
+                    "event=email_notification_delivery_mode_invalid requestId={} configured={} fallback=direct",
+                    OperationalLogSanitizer.requestId(),
+                    OperationalLogSanitizer.safe(rawValue)
+            );
+        }
+        return resolved;
     }
 
     private String resolveSkipReason() {
@@ -153,7 +183,10 @@ public class EmailNotificationService implements NotificationService {
         );
     }
 
-    private void enqueueOutboxMessages(String provider, String eventType, EmailNotificationRequest request) {
+    private int enqueueOutboxMessages(String provider,
+                                      String eventType,
+                                      EmailNotificationRequest request,
+                                      boolean failOnError) {
         int enqueuedCount = 0;
         try {
             for (String recipient : request.to()) {
@@ -173,12 +206,18 @@ public class EmailNotificationService implements NotificationService {
                         enqueuedCount
                 );
             }
+            return enqueuedCount;
         } catch (RuntimeException ex) {
             logger.warn(
-                    "event=email_notification_outbox_enqueue_failed requestId={} reason={}",
+                    "event=email_notification_outbox_enqueue_failed requestId={} mode={} reason={}",
                     OperationalLogSanitizer.requestId(),
+                    resolveDeliveryMode().name(),
                     OperationalLogSanitizer.safe(ex.getMessage())
             );
+            if (failOnError) {
+                throw new EmailNotificationException("email_outbox_enqueue_failed", ex);
+            }
+            return enqueuedCount;
         }
     }
 
@@ -219,6 +258,14 @@ public class EmailNotificationService implements NotificationService {
                 OperationalLogSanitizer.safe(provider),
                 OperationalLogSanitizer.safe(ex.getMessage()),
                 ex.getClass().getSimpleName()
+        );
+    }
+
+    private void logDeliveryModeSelected(EmailDeliveryMode deliveryMode) {
+        logger.info(
+                "event=email_notification_delivery_mode_selected requestId={} mode={}",
+                OperationalLogSanitizer.requestId(),
+                deliveryMode.name()
         );
     }
 
