@@ -28,6 +28,19 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Mask-Value {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    if ($Value.Length -le 8) {
+        return ("*" * $Value.Length)
+    }
+
+    return "{0}...{1}" -f $Value.Substring(0, 4), $Value.Substring($Value.Length - 4)
+}
+
 $path = "/api/device/locations"
 $trimmedBaseUrl = $BaseUrl.TrimEnd("/")
 
@@ -83,10 +96,10 @@ $headers = @{
 }
 
 Write-Host "Sending POST $trimmedBaseUrl$path"
-Write-Host "Device token: $DeviceToken"
+Write-Host "Device token: $(Mask-Value -Value $DeviceToken)"
 Write-Host "UTC auth timestamp: $timestampHeader"
 Write-Host "Body timestamp: $bodyTimestamp"
-Write-Host "Nonce: $nonce"
+Write-Host "Nonce: $(Mask-Value -Value $nonce)"
 Write-Host "Body: $bodyJson"
 
 if ($null -ne $BatteryLevel -or $null -ne $GpsAccuracy) {
