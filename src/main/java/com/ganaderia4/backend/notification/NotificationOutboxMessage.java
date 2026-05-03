@@ -105,6 +105,39 @@ public class NotificationOutboxMessage {
         updatedAt = Instant.now();
     }
 
+    public void markProcessing(Instant processedAt) {
+        setStatus(NotificationOutboxStatus.PROCESSING);
+        setLastAttemptAt(processedAt);
+        setUpdatedAt(processedAt);
+    }
+
+    public void markSent(Instant processedAt) {
+        setAttempts(getAttempts() + 1);
+        setStatus(NotificationOutboxStatus.SENT);
+        setLastAttemptAt(processedAt);
+        setSentAt(processedAt);
+        setLastError(null);
+        setUpdatedAt(processedAt);
+    }
+
+    public void markFailed(Instant processedAt, Instant nextAttemptAt, String lastError) {
+        setAttempts(getAttempts() + 1);
+        setStatus(NotificationOutboxStatus.FAILED);
+        setLastAttemptAt(processedAt);
+        setNextAttemptAt(nextAttemptAt);
+        setLastError(lastError);
+        setUpdatedAt(processedAt);
+    }
+
+    public void markDead(Instant processedAt, String lastError) {
+        setAttempts(getAttempts() + 1);
+        setStatus(NotificationOutboxStatus.DEAD);
+        setLastAttemptAt(processedAt);
+        setFailedAt(processedAt);
+        setLastError(lastError);
+        setUpdatedAt(processedAt);
+    }
+
     public Long getId() {
         return id;
     }

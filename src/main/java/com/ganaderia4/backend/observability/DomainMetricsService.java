@@ -29,6 +29,9 @@ public class DomainMetricsService {
     private static final String AI_SUMMARY_GENERATED_COUNT = "ganaderia.ai.summary.generated.count";
     private static final String AI_SUMMARY_FALLBACK_COUNT = "ganaderia.ai.summary.fallback.count";
     private static final String AI_SUMMARY_PROVIDER_REQUEST_COUNT = "ganaderia.ai.summary.provider.request.count";
+    private static final String NOTIFICATION_OUTBOX_EMAIL_SENT_COUNT = "ganaderia.notification.outbox.email.sent.count";
+    private static final String NOTIFICATION_OUTBOX_EMAIL_FAILED_COUNT = "ganaderia.notification.outbox.email.failed.count";
+    private static final String NOTIFICATION_OUTBOX_EMAIL_DEAD_COUNT = "ganaderia.notification.outbox.email.dead.count";
 
     private final MeterRegistry meterRegistry;
     private final Map<String, Counter> counters = new ConcurrentHashMap<>();
@@ -173,6 +176,21 @@ public class DomainMetricsService {
         ).increment();
     }
 
+    public void incrementNotificationOutboxEmailSent(long count) {
+        incrementCounterByAmount(NOTIFICATION_OUTBOX_EMAIL_SENT_COUNT, count,
+                "Cantidad de mensajes EMAIL del outbox enviados exitosamente");
+    }
+
+    public void incrementNotificationOutboxEmailFailed(long count) {
+        incrementCounterByAmount(NOTIFICATION_OUTBOX_EMAIL_FAILED_COUNT, count,
+                "Cantidad de mensajes EMAIL del outbox que fallaron y quedaron reintentables");
+    }
+
+    public void incrementNotificationOutboxEmailDead(long count) {
+        incrementCounterByAmount(NOTIFICATION_OUTBOX_EMAIL_DEAD_COUNT, count,
+                "Cantidad de mensajes EMAIL del outbox marcados como irrecuperables");
+    }
+
     private Counter counterWithAlertType(String metricName, AlertType type) {
         String typeValue = type != null ? type.name() : "UNKNOWN";
         String key = metricName + "|type=" + typeValue;
@@ -205,6 +223,18 @@ public class DomainMetricsService {
                         .description("Contador de eventos operativos del dominio")
                         .register(meterRegistry)
         );
+    }
+
+    private void incrementCounterByAmount(String metricName, long count, String description) {
+        if (count <= 0) {
+            return;
+        }
+
+        counters.computeIfAbsent(metricName, ignored ->
+                Counter.builder(metricName)
+                        .description(description)
+                        .register(meterRegistry)
+        ).increment(count);
     }
 
     private String normalizeTagValue(String value) {
