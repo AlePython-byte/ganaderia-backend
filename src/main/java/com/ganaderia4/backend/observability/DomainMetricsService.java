@@ -25,6 +25,7 @@ public class DomainMetricsService {
     private static final String GPS_ACCURACY_QUALITY_COUNT = "ganaderia.gps.accuracy.quality.count";
     private static final String DEVICE_REPLAY_NONCE_CLEANUP_DELETED_COUNT = "ganaderia.device.replay_nonce.cleanup.deleted.count";
     private static final String ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT = "ganaderia.abuse.rate_limit.cleanup.deleted.count";
+    private static final String PASSWORD_RESET_CLEANUP_DELETED_COUNT = "ganaderia.auth.password_reset.cleanup.deleted.count";
     private static final String AI_SUMMARY_GENERATED_COUNT = "ganaderia.ai.summary.generated.count";
     private static final String AI_SUMMARY_FALLBACK_COUNT = "ganaderia.ai.summary.fallback.count";
     private static final String AI_SUMMARY_PROVIDER_REQUEST_COUNT = "ganaderia.ai.summary.provider.request.count";
@@ -116,6 +117,18 @@ public class DomainMetricsService {
         counters.computeIfAbsent(ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT, ignored ->
                 Counter.builder(ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT)
                         .description("Cantidad de entradas de abuse rate limit eliminadas por limpiezas programadas")
+                        .register(meterRegistry)
+        ).increment(deletedCount);
+    }
+
+    public void incrementPasswordResetCleanupDeleted(long deletedCount) {
+        if (deletedCount <= 0) {
+            return;
+        }
+
+        counters.computeIfAbsent(PASSWORD_RESET_CLEANUP_DELETED_COUNT, ignored ->
+                Counter.builder(PASSWORD_RESET_CLEANUP_DELETED_COUNT)
+                        .description("Cantidad de tokens de recuperacion eliminados por limpiezas programadas")
                         .register(meterRegistry)
         ).increment(deletedCount);
     }
