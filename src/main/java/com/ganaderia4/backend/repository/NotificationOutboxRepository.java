@@ -4,6 +4,7 @@ import com.ganaderia4.backend.notification.NotificationChannel;
 import com.ganaderia4.backend.notification.NotificationOutboxMessage;
 import com.ganaderia4.backend.notification.NotificationOutboxStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -13,7 +14,8 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.List;
 
-public interface NotificationOutboxRepository extends JpaRepository<NotificationOutboxMessage, Long> {
+public interface NotificationOutboxRepository extends JpaRepository<NotificationOutboxMessage, Long>,
+        JpaSpecificationExecutor<NotificationOutboxMessage> {
 
     long countByStatus(NotificationOutboxStatus status);
 
