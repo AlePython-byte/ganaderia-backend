@@ -21,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -90,5 +91,23 @@ public class AdminNotificationOutboxController {
                 id
         );
         return notificationOutboxQueryService.getById(id);
+    }
+
+    @PostMapping("/{id}/requeue")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Reencolar un mensaje EMAIL fallido del notification outbox")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Mensaje reencolado correctamente"),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Se requiere rol ADMINISTRADOR",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Mensaje no encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "El estado o canal actual no permite reencolar",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public NotificationOutboxDetailDTO requeue(@PathVariable Long id) {
+        return notificationOutboxQueryService.requeue(id);
     }
 }

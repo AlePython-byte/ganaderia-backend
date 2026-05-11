@@ -22,7 +22,10 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Instant;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -203,6 +206,155 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
         assertTrue(lastErrorSummary.length() <= 200);
     }
 
+    @Test
+    void shouldRejectRequeueWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", existingMessageId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + existingMessageId + "/requeue"));
+    }
+
+    @Test
+    void shouldRejectRequeueForNonAdmin() throws Exception {
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", existingMessageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("operador@test.com", "12345678")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + existingMessageId + "/requeue"));
+    }
+
+    @Test
+    void shouldRequeueFailedEmailMessageForAdmin() throws Exception {
+        NotificationOutboxMessage beforeRequeue = notificationOutboxRepository.findById(existingMessageId).orElseThrow();
+        String originalPayload = beforeRequeue.getPayload();
+        Instant previousLastAttemptAt = beforeRequeue.getLastAttemptAt();
+        Instant before = Instant.now();
+
+        MvcResult result = mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", existingMessageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(existingMessageId))
+                .andExpect(jsonPath("$.channel").value("EMAIL"))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.attempts").value(0))
+                .andExpect(jsonPath("$.payload").doesNotExist())
+                .andExpect(jsonPath("$.payloadPreview").exists())
+                .andExpect(jsonPath("$.payloadSize").isNumber())
+                .andReturn();
+
+        Instant after = Instant.now();
+        NotificationOutboxMessage requeued = notificationOutboxRepository.findById(existingMessageId).orElseThrow();
+
+        assertEquals(NotificationOutboxStatus.PENDING, requeued.getStatus());
+        assertEquals(0, requeued.getAttempts());
+        assertEquals(originalPayload, requeued.getPayload());
+        assertEquals(previousLastAttemptAt, requeued.getLastAttemptAt());
+        assertNull(requeued.getLastError());
+        assertNull(requeued.getFailedAt());
+        assertNull(requeued.getSentAt());
+        assertNotNull(requeued.getNextAttemptAt());
+        assertFalse(requeued.getNextAttemptAt().isBefore(before));
+        assertFalse(requeued.getNextAttemptAt().isAfter(after.plusSeconds(1)));
+
+        String content = result.getResponse().getContentAsString();
+        assertFalse(content.contains("reset-secret-token-value"));
+        assertFalse(content.contains("Texto muy largo sensible"));
+        assertFalse(content.contains("<p>Html sensible</p>"));
+    }
+
+    @Test
+    void shouldRequeueDeadEmailMessageForAdmin() throws Exception {
+        Long deadMessageId = notificationOutboxRepository.save(emailMessage(
+                NotificationOutboxStatus.DEAD,
+                "{\"provider\":\"resend\",\"to\":\"admin@test.com\",\"token\":\"dead-secret-token\"}",
+                "permanent_failure"
+        )).getId();
+
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", deadMessageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(deadMessageId))
+                .andExpect(jsonPath("$.channel").value("EMAIL"))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.attempts").value(0))
+                .andExpect(jsonPath("$.payload").doesNotExist());
+
+        NotificationOutboxMessage requeued = notificationOutboxRepository.findById(deadMessageId).orElseThrow();
+        assertEquals(NotificationOutboxStatus.PENDING, requeued.getStatus());
+        assertEquals(0, requeued.getAttempts());
+        assertNull(requeued.getLastError());
+        assertNull(requeued.getFailedAt());
+        assertNull(requeued.getSentAt());
+    }
+
+    @Test
+    void shouldRejectRequeueForPendingMessage() throws Exception {
+        Long messageId = notificationOutboxRepository.save(emailMessage(
+                NotificationOutboxStatus.PENDING,
+                "{\"provider\":\"resend\",\"to\":\"admin@test.com\"}",
+                null
+        )).getId();
+
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", messageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + messageId + "/requeue"));
+    }
+
+    @Test
+    void shouldRejectRequeueForProcessingMessage() throws Exception {
+        Long messageId = notificationOutboxRepository.save(emailMessage(
+                NotificationOutboxStatus.PROCESSING,
+                "{\"provider\":\"resend\",\"to\":\"admin@test.com\"}",
+                null
+        )).getId();
+
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", messageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + messageId + "/requeue"));
+    }
+
+    @Test
+    void shouldRejectRequeueForSentMessage() throws Exception {
+        Long messageId = notificationOutboxRepository.save(emailMessage(
+                NotificationOutboxStatus.SENT,
+                "{\"provider\":\"resend\",\"to\":\"admin@test.com\"}",
+                null
+        )).getId();
+
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", messageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + messageId + "/requeue"));
+    }
+
+    @Test
+    void shouldRejectRequeueForNonEmailChannel() throws Exception {
+        Long messageId = notificationOutboxRepository.save(webhookMessage(NotificationOutboxStatus.FAILED)).getId();
+
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", messageId)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + messageId + "/requeue"));
+
+        NotificationOutboxMessage message = notificationOutboxRepository.findById(messageId).orElseThrow();
+        assertEquals(NotificationOutboxStatus.FAILED, message.getStatus());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenRequeueMessageDoesNotExist() throws Exception {
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", 999999L)
+                        .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/999999/requeue"));
+    }
+
     private NotificationOutboxMessage emailMessage(NotificationOutboxStatus status, String payload, String lastError) {
         NotificationOutboxMessage message = new NotificationOutboxMessage();
         message.setChannel(NotificationChannel.EMAIL);
@@ -215,7 +367,11 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
         message.setMaxAttempts(3);
         message.setNextAttemptAt(Instant.parse("2026-05-03T19:30:00Z"));
         message.setLastAttemptAt(Instant.parse("2026-05-03T19:30:00Z"));
-        message.setFailedAt(Instant.parse("2026-05-03T19:31:00Z"));
+        if (status == NotificationOutboxStatus.SENT) {
+            message.setSentAt(Instant.parse("2026-05-03T19:31:00Z"));
+        } else if (status == NotificationOutboxStatus.FAILED || status == NotificationOutboxStatus.DEAD) {
+            message.setFailedAt(Instant.parse("2026-05-03T19:31:00Z"));
+        }
         message.setLastError(lastError);
         message.setCreatedAt(Instant.parse("2026-05-03T19:00:00Z"));
         message.setUpdatedAt(Instant.parse("2026-05-03T19:31:00Z"));

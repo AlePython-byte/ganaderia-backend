@@ -152,6 +152,16 @@ public class NotificationOutboxMessage {
         setUpdatedAt(recoveredAt);
     }
 
+    public void requeueByAdmin(Instant requeuedAt) {
+        setStatus(NotificationOutboxStatus.PENDING);
+        setAttempts(0);
+        setNextAttemptAt(requeuedAt);
+        setSentAt(null);
+        setFailedAt(null);
+        setLastError(null);
+        setUpdatedAt(requeuedAt);
+    }
+
     public Long getId() {
         return id;
     }

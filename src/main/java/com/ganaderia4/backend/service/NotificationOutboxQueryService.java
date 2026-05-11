@@ -6,18 +6,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ganaderia4.backend.dto.NotificationOutboxDetailDTO;
 import com.ganaderia4.backend.dto.NotificationOutboxSummaryDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
+import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.notification.NotificationChannel;
 import com.ganaderia4.backend.notification.NotificationOutboxMessage;
 import com.ganaderia4.backend.notification.NotificationOutboxStatus;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.repository.NotificationOutboxRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -26,6 +31,8 @@ import java.util.Set;
 
 @Service
 public class NotificationOutboxQueryService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationOutboxQueryService.class);
 
     private static final int LAST_ERROR_SUMMARY_MAX_LENGTH = 200;
     private static final int PAYLOAD_PREVIEW_MAX_LENGTH = 300;
@@ -38,13 +45,16 @@ public class NotificationOutboxQueryService {
     private final NotificationOutboxRepository notificationOutboxRepository;
     private final PaginationService paginationService;
     private final ObjectMapper objectMapper;
+    private final AuditLogService auditLogService;
 
     public NotificationOutboxQueryService(NotificationOutboxRepository notificationOutboxRepository,
                                           PaginationService paginationService,
-                                          ObjectMapper objectMapper) {
+                                          ObjectMapper objectMapper,
+                                          AuditLogService auditLogService) {
         this.notificationOutboxRepository = notificationOutboxRepository;
         this.paginationService = paginationService;
         this.objectMapper = objectMapper;
+        this.auditLogService = auditLogService;
     }
 
     public Page<NotificationOutboxSummaryDTO> list(String status,
@@ -73,6 +83,45 @@ public class NotificationOutboxQueryService {
         NotificationOutboxMessage message = notificationOutboxRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Mensaje de notification outbox no encontrado"));
         return toDetailDto(message);
+    }
+
+    @Transactional
+    public NotificationOutboxDetailDTO requeue(Long id) {
+        NotificationOutboxMessage message = notificationOutboxRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Mensaje de notification outbox no encontrado"));
+
+        NotificationOutboxStatus previousStatus = message.getStatus();
+        NotificationChannel channel = message.getChannel();
+
+        if (channel != NotificationChannel.EMAIL) {
+            throw new ConflictException("Solo se pueden reencolar mensajes EMAIL del notification outbox");
+        }
+
+        if (previousStatus != NotificationOutboxStatus.FAILED && previousStatus != NotificationOutboxStatus.DEAD) {
+            throw new ConflictException("Solo se pueden reencolar mensajes FAILED o DEAD del notification outbox");
+        }
+
+        message.requeueByAdmin(Instant.now());
+        NotificationOutboxMessage saved = notificationOutboxRepository.save(message);
+
+        log.info(
+                "event=notification_outbox_admin_requeued requestId={} messageId={} channel={} previousStatus={}",
+                OperationalLogSanitizer.requestId(),
+                saved.getId(),
+                saved.getChannel(),
+                previousStatus
+        );
+        auditLogService.logWithCurrentActor(
+                "REQUEUE_NOTIFICATION_OUTBOX_MESSAGE",
+                "NOTIFICATION_OUTBOX",
+                saved.getId(),
+                "ADMIN",
+                "Reencolado administrativo de mensaje notification outbox canal " + saved.getChannel()
+                        + " desde estado " + previousStatus,
+                true
+        );
+
+        return toDetailDto(saved);
     }
 
     private NotificationOutboxSummaryDTO toSummaryDto(NotificationOutboxMessage message) {
