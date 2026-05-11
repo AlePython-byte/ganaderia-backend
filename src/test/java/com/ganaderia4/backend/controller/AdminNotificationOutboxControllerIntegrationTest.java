@@ -89,8 +89,22 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
                         .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true))
+                .andExpect(jsonPath("$.empty").value(false))
+                .andExpect(jsonPath("$.numberOfElements").value(2))
+                .andExpect(jsonPath("$.pageable").doesNotExist())
+                .andExpect(jsonPath("$.sort").doesNotExist())
+                .andExpect(jsonPath("$.number").doesNotExist())
                 .andExpect(jsonPath("$.content[0].recipientMasked").exists())
-                .andExpect(jsonPath("$.content[0].lastErrorSummary").exists());
+                .andExpect(jsonPath("$.content[0].lastErrorSummary").exists())
+                .andExpect(jsonPath("$.content[0].payload").doesNotExist())
+                .andExpect(jsonPath("$.content[0].payloadPreview").doesNotExist())
+                .andExpect(jsonPath("$.content[0].payloadSize").doesNotExist());
     }
 
     @Test
@@ -100,7 +114,9 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
                         .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].status").value("FAILED"));
+                .andExpect(jsonPath("$.content[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.numberOfElements").value(1));
     }
 
     @Test
@@ -110,7 +126,9 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
                         .header("Authorization", "Bearer " + loginAndGetToken("admin@test.com", "12345678")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].channel").value("WEBHOOK"));
+                .andExpect(jsonPath("$.content[0].channel").value("WEBHOOK"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.numberOfElements").value(1));
     }
 
     @Test

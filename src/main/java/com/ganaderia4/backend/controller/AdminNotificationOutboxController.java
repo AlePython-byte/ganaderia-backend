@@ -4,6 +4,7 @@ import com.ganaderia4.backend.config.OpenApiConfig;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.dto.NotificationOutboxDetailDTO;
 import com.ganaderia4.backend.dto.NotificationOutboxSummaryDTO;
+import com.ganaderia4.backend.dto.PagedResponseDTO;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.service.NotificationOutboxQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,7 +43,8 @@ public class AdminNotificationOutboxController {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(summary = "Listar mensajes del notification outbox")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Mensajes obtenidos correctamente"),
+            @ApiResponse(responseCode = "200", description = "Mensajes obtenidos correctamente",
+                    content = @Content(schema = @Schema(implementation = PagedResponseDTO.class))),
             @ApiResponse(responseCode = "400", description = "Filtro invalido",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
@@ -50,7 +52,7 @@ public class AdminNotificationOutboxController {
             @ApiResponse(responseCode = "403", description = "Se requiere rol ADMINISTRADOR",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
-    public Page<NotificationOutboxSummaryDTO> list(
+    public PagedResponseDTO<NotificationOutboxSummaryDTO> list(
             @Parameter(description = "Estado opcional", example = "FAILED")
             @RequestParam(required = false) String status,
             @Parameter(description = "Canal opcional", example = "EMAIL")
@@ -65,7 +67,8 @@ public class AdminNotificationOutboxController {
                 page,
                 size
         );
-        return notificationOutboxQueryService.list(status, channel, page, size);
+        Page<NotificationOutboxSummaryDTO> result = notificationOutboxQueryService.list(status, channel, page, size);
+        return PagedResponseDTO.from(result);
     }
 
     @GetMapping("/{id}")
