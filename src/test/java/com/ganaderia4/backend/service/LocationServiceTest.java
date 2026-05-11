@@ -198,7 +198,7 @@ class LocationServiceTest {
         payload.setDeviceToken("COL-001");
         payload.setLat(1.214);
         payload.setLon(-77.281);
-        payload.setReportedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        payload.setReportedAt(validDeviceReportedAt());
         payload.setGpsAccuracy(4.5);
 
         @SuppressWarnings("unchecked")
@@ -294,7 +294,7 @@ class LocationServiceTest {
         payload.setDeviceToken("COL-001");
         payload.setLat(1.214);
         payload.setLon(-77.281);
-        payload.setReportedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        payload.setReportedAt(validDeviceReportedAt());
         payload.setGpsAccuracy(20.0);
 
         @SuppressWarnings("unchecked")
@@ -328,7 +328,7 @@ class LocationServiceTest {
         payload.setDeviceToken("COL-001");
         payload.setLat(1.214);
         payload.setLon(-77.281);
-        payload.setReportedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        payload.setReportedAt(validDeviceReportedAt());
         payload.setGpsAccuracy(30.1);
 
         @SuppressWarnings("unchecked")
@@ -370,7 +370,7 @@ class LocationServiceTest {
         payload.setDeviceToken("COL-001");
         payload.setLat(1.214);
         payload.setLon(-77.281);
-        payload.setReportedAt(LocalDateTime.of(2026, 4, 29, 10, 0));
+        payload.setReportedAt(validDeviceReportedAt());
         payload.setBatteryLevel(18);
 
         @SuppressWarnings("unchecked")
@@ -405,7 +405,7 @@ class LocationServiceTest {
         payload.setDeviceToken("COL-001");
         payload.setLat(1.214);
         payload.setLon(-77.281);
-        payload.setReportedAt(LocalDateTime.of(2026, 4, 29, 10, 0));
+        payload.setReportedAt(validDeviceReportedAt());
         payload.setBatteryLevel(40);
 
         @SuppressWarnings("unchecked")
@@ -471,5 +471,9 @@ class LocationServiceTest {
         verify(monitoringFacade, never()).processLocation(any(), any());
         verify(locationRepository, never()).findById(any());
         verify(collarRepository, never()).findByToken(any());
+    }
+
+    private LocalDateTime validDeviceReportedAt() {
+        return LocalDateTime.now().minusMinutes(1);
     }
 }
