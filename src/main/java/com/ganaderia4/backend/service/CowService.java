@@ -24,8 +24,10 @@ public class CowService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "token", "internalCode", "name", "status");
     private static final int MAX_TOKEN_GENERATION_ATTEMPTS = 3;
-    private static final String GENERATED_TOKEN_PREFIX = "COW-";
-    private static final Pattern GENERATED_TOKEN_PATTERN = Pattern.compile("^COW-(\\d+)$");
+    private static final String COW_TOKEN_PREFIX = "COW-";
+    private static final String COW_INTERNAL_CODE_PREFIX = "INT-";
+    private static final Pattern GENERATED_TOKEN_PATTERN = Pattern.compile("^" + COW_TOKEN_PREFIX + "(\\d+)$");
+    private static final Pattern GENERATED_INTERNAL_CODE_PATTERN = Pattern.compile("^" + COW_INTERNAL_CODE_PREFIX + "(\\d+)$");
 
     private final CowRepository cowRepository;
     private final AuditLogService auditLogService;
@@ -41,12 +43,6 @@ public class CowService {
 
     @Transactional
     public CowResponseDTO createCow(CowRequestDTO requestDTO) {
-        if (requestDTO.getInternalCode() != null && !requestDTO.getInternalCode().isBlank()) {
-            if (cowRepository.findByInternalCode(requestDTO.getInternalCode()).isPresent()) {
-                throw new ConflictException("Ya existe una vaca con ese codigo interno");
-            }
-        }
-
         Cow savedCow = createCowWithGeneratedTokenAndRetry(requestDTO);
 
         auditLogService.logWithCurrentActor(
@@ -65,7 +61,7 @@ public class CowService {
         for (int attempt = 1; attempt <= MAX_TOKEN_GENERATION_ATTEMPTS; attempt++) {
             Cow cow = new Cow();
             cow.setToken(generateCowToken());
-            cow.setInternalCode(normalizeNullable(requestDTO.getInternalCode()));
+            cow.setInternalCode(generateCowInternalCode());
             cow.setName(requestDTO.getName().trim());
             cow.setStatus(requestDTO.getStatus());
             cow.setObservations(normalizeNullable(requestDTO.getObservations()));
@@ -73,11 +69,11 @@ public class CowService {
             try {
                 return cowRepository.save(cow);
             } catch (DataIntegrityViolationException ex) {
-                if (!isGeneratedTokenConflict(ex)) {
+                if (!isGeneratedCowIdentifierConflict(ex)) {
                     throw ex;
                 }
                 if (attempt == MAX_TOKEN_GENERATION_ATTEMPTS) {
-                    throw new ConflictException("No fue posible generar un token unico para la vaca");
+                    throw new ConflictException("No fue posible generar identificadores unicos para la vaca");
                 }
             }
         }
@@ -92,7 +88,7 @@ public class CowService {
 
         String requestedToken = normalizeNullable(requestDTO.getToken());
         String newToken = requestedToken != null ? requestedToken : cow.getToken();
-        String newInternalCode = normalizeNullable(requestDTO.getInternalCode());
+        String requestedInternalCode = normalizeNullable(requestDTO.getInternalCode());
 
         if (requestedToken != null) {
             cowRepository.findByToken(newToken)
@@ -102,16 +98,11 @@ public class CowService {
                     });
         }
 
-        if (newInternalCode != null) {
-            cowRepository.findByInternalCode(newInternalCode)
-                    .filter(existingCow -> !existingCow.getId().equals(cow.getId()))
-                    .ifPresent(existingCow -> {
-                        throw new ConflictException("Ya existe otra vaca con ese codigo interno");
-                    });
+        if (requestedInternalCode != null && !requestedInternalCode.equals(cow.getInternalCode())) {
+            throw new ConflictException("El codigo interno de la vaca es generado por el backend y no puede modificarse");
         }
 
         cow.setToken(newToken);
-        cow.setInternalCode(newInternalCode);
         cow.setName(requestDTO.getName().trim());
         cow.setStatus(requestDTO.getStatus());
         cow.setObservations(normalizeNullable(requestDTO.getObservations()));
@@ -182,15 +173,33 @@ public class CowService {
                 .max(Integer::compareTo)
                 .orElse(0) + 1;
 
-        return GENERATED_TOKEN_PREFIX + String.format("%03d", nextSequence);
+        return COW_TOKEN_PREFIX + String.format("%03d", nextSequence);
+    }
+
+    private String generateCowInternalCode() {
+        int nextSequence = cowRepository.findAllInternalCodes().stream()
+                .map(this::extractGeneratedInternalCodeSequence)
+                .filter(sequence -> sequence > 0)
+                .max(Integer::compareTo)
+                .orElse(0) + 1;
+
+        return COW_INTERNAL_CODE_PREFIX + String.format("%03d", nextSequence);
     }
 
     private int extractGeneratedTokenSequence(String token) {
-        if (token == null) {
+        return extractGeneratedSequence(token, GENERATED_TOKEN_PATTERN);
+    }
+
+    private int extractGeneratedInternalCodeSequence(String internalCode) {
+        return extractGeneratedSequence(internalCode, GENERATED_INTERNAL_CODE_PATTERN);
+    }
+
+    private int extractGeneratedSequence(String value, Pattern pattern) {
+        if (value == null) {
             return -1;
         }
 
-        Matcher matcher = GENERATED_TOKEN_PATTERN.matcher(token.trim());
+        Matcher matcher = pattern.matcher(value.trim());
         if (!matcher.matches()) {
             return -1;
         }
@@ -202,13 +211,13 @@ public class CowService {
         }
     }
 
-    private boolean isGeneratedTokenConflict(DataIntegrityViolationException ex) {
+    private boolean isGeneratedCowIdentifierConflict(DataIntegrityViolationException ex) {
         Throwable cause = ex;
         while (cause != null) {
             String message = cause.getMessage();
             if (message != null) {
                 String normalized = message.toLowerCase();
-                if (normalized.contains("identifier")
+                if ((normalized.contains("identifier") || normalized.contains("internal_code"))
                         && (normalized.contains("duplicate") || normalized.contains("unique"))) {
                     return true;
                 }

@@ -36,7 +36,7 @@ public class CowController {
     @PostMapping
     @Operation(
             summary = "Crear vaca",
-            description = "Registra una nueva vaca en el sistema. El token publico es generado automaticamente por el backend; si el cliente lo envia, se ignora por compatibilidad. El codigo interno no puede repetirse cuando se informa."
+            description = "Registra una nueva vaca en el sistema. El token publico y el codigo interno son generados automaticamente por el backend; si el cliente los envia, se ignoran por compatibilidad."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vaca creada correctamente",
@@ -47,7 +47,7 @@ public class CowController {
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "403", description = "Acceso denegado",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
-            @ApiResponse(responseCode = "409", description = "Conflicto por codigo interno duplicado",
+            @ApiResponse(responseCode = "409", description = "Conflicto al generar identificadores unicos",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
     public CowResponseDTO createCow(@Valid @RequestBody CowRequestDTO requestDTO) {
@@ -57,7 +57,7 @@ public class CowController {
     @PutMapping("/{id}")
     @Operation(
             summary = "Actualizar vaca",
-            description = "Actualiza los datos editables de una vaca existente identificada por id. Si no se informa token, el backend conserva el valor actual; si se informa, debe seguir siendo unico."
+            description = "Actualiza los datos editables de una vaca existente identificada por id. Si no se informa token, el backend conserva el valor actual; si se informa, debe seguir siendo unico. El codigo interno es generado por backend y no puede modificarse."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vaca actualizada correctamente",

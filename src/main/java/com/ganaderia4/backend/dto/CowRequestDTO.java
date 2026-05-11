@@ -17,8 +17,11 @@ public class CowRequestDTO {
     @Size(max = 50, message = "El token no puede superar 50 caracteres")
     private String token;
 
-    @Schema(description = "Codigo interno opcional de la vaca", example = "INT-025")
-    @Size(max = 50, message = "El codigo interno no puede superar 50 caracteres")
+    @Schema(
+            description = "Codigo interno generado por el backend con formato INT-001. En creacion se ignora si se envia; en actualizacion no puede modificarse.",
+            example = "INT-001",
+            requiredMode = Schema.RequiredMode.NOT_REQUIRED
+    )
     private String internalCode;
 
     @Schema(description = "Nombre visible de la vaca", example = "Luna")

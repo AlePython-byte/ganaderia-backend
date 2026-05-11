@@ -24,4 +24,7 @@ public interface CowRepository extends JpaRepository<Cow, Long> {
 
     @Query("select cow.token from Cow cow")
     List<String> findAllTokens();
+
+    @Query("select cow.internalCode from Cow cow")
+    List<String> findAllInternalCodes();
 }

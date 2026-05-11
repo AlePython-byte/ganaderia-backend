@@ -11,7 +11,7 @@ public class CowResponseDTO {
     @Schema(description = "Identificador publico generado por el backend", example = "COW-001")
     private String token;
 
-    @Schema(description = "Codigo interno opcional de la vaca", example = "INT-025")
+    @Schema(description = "Codigo interno secuencial generado por el backend", example = "INT-001")
     private String internalCode;
 
     @Schema(description = "Nombre visible de la vaca", example = "Luna")

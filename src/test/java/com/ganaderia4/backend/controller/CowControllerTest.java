@@ -45,7 +45,6 @@ class CowControllerTest {
 
         String body = """
                 {
-                  "internalCode": "INT-001",
                   "name": "Luna",
                   "status": "DENTRO"
                 }
@@ -56,6 +55,7 @@ class CowControllerTest {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("COW-001"))
+                .andExpect(jsonPath("$.internalCode").value("INT-001"))
                 .andExpect(jsonPath("$.name").value("Luna"));
 
         verify(cowService).createCow(any());
