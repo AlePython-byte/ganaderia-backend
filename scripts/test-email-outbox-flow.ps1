@@ -1,34 +1,49 @@
-# Uso:
+# Uso local:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\test-email-outbox-flow.ps1 `
 #     -BaseUrl "http://localhost:8080" `
-#     -Email "admin@ganaderia.com" `
-#     -Password "tu-password" `
+#     -AdminEmail "admin@ganaderia.com" `
+#     -AdminPassword "tu-password" `
 #     -ForgotPasswordEmail "admin@ganaderia.com" `
 #     -WaitSeconds 10
 #
-# Requiere que el backend se inicie con:
+# Requiere un usuario ADMINISTRADOR porque consulta el diagnostico admin del outbox.
+#
+# Para validar localmente el outbox EMAIL, iniciar backend con:
 #   APP_NOTIFICATIONS_EMAIL_ENABLED=true
+#   APP_NOTIFICATIONS_EMAIL_DELIVERY_MODE=outbox
+#   APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=true
+#   APP_NOTIFICATIONS_EMAIL_PROVIDER=resend
+#   APP_NOTIFICATIONS_EMAIL_API_KEY=...
+#   APP_NOTIFICATIONS_EMAIL_FROM=Ganaderia 4.0 <onboarding@resend.dev>
+#   APP_FRONTEND_PASSWORD_RESET_URL=http://localhost:5173/reset-password
+#
+# En Render, produccion normal recomendada:
+#   APP_NOTIFICATIONS_EMAIL_DELIVERY_MODE=direct
+#   APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=false
+#
+# En Render, solo para prueba controlada despues de validar local:
 #   APP_NOTIFICATIONS_EMAIL_DELIVERY_MODE=outbox
 #   APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=true
 #
 # El script:
 # - valida health
 # - hace login
+# - valida /api/auth/me
 # - ejecuta forgot-password
 # - espera a que el processor EMAIL outbox pueda correr
-# - no imprime JWT completo ni token de recuperación
+# - consulta /api/admin/notification-outbox?channel=EMAIL&page=0&size=10
+# - no imprime JWT completo, reset token, secrets, payload, HTML/textBody ni password
+# - no consulta DB ni llama Resend directamente
 
 param(
     [Alias("BASE_URL")]
     [string]$BaseUrl = "http://localhost:8080",
 
-    [Alias("EMAIL")]
     [Parameter(Mandatory = $true)]
-    [string]$Email,
+    [string]$AdminEmail,
 
-    [Alias("PASSWORD")]
     [Parameter(Mandatory = $true)]
-    [string]$Password,
+    [string]$AdminPassword,
 
     [string]$ForgotPasswordEmail,
 
@@ -125,8 +140,11 @@ function Invoke-JsonRequest {
         $invokeParams = @{
             Method      = $Method
             Uri         = $Uri
-            Headers     = $Headers
             ErrorAction = "Stop"
+        }
+
+        if ($null -ne $Headers) {
+            $invokeParams["Headers"] = $Headers
         }
 
         if ($null -ne $Body) {
@@ -211,8 +229,81 @@ function Format-HttpFailure {
     return ($parts -join " | ")
 }
 
+function Format-Nullable {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return "-"
+    }
+
+    $stringValue = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($stringValue)) {
+        return "-"
+    }
+
+    return $stringValue
+}
+
+function Get-PropertyValue {
+    param(
+        [object]$Object,
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+function Get-OutboxContent {
+    param([object]$Body)
+
+    $content = Get-PropertyValue -Object $Body -Name "content"
+    if ($null -eq $content) {
+        return @()
+    }
+
+    return @($content)
+}
+
+function Write-OutboxMessages {
+    param(
+        [object[]]$Messages
+    )
+
+    if (@($Messages).Count -eq 0) {
+        Write-Host "No EMAIL outbox messages found in recent page."
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Outbox recent EMAIL messages:"
+    $Messages |
+        Select-Object `
+            @{Name = "id"; Expression = { $_.id } },
+            @{Name = "channel"; Expression = { $_.channel } },
+            @{Name = "status"; Expression = { $_.status } },
+            @{Name = "eventType"; Expression = { $_.eventType } },
+            @{Name = "recipientMasked"; Expression = { $_.recipientMasked } },
+            @{Name = "attempts"; Expression = { $_.attempts } },
+            @{Name = "nextAttemptAt"; Expression = { Format-Nullable -Value $_.nextAttemptAt } },
+            @{Name = "sentAt"; Expression = { Format-Nullable -Value $_.sentAt } },
+            @{Name = "failedAt"; Expression = { Format-Nullable -Value $_.failedAt } },
+            @{Name = "lastErrorSummary"; Expression = { Format-Nullable -Value $_.lastErrorSummary } } |
+        Format-Table -AutoSize
+}
+
 $trimmedBaseUrl = $BaseUrl.TrimEnd("/")
-$targetForgotPasswordEmail = if ([string]::IsNullOrWhiteSpace($ForgotPasswordEmail)) { $Email } else { $ForgotPasswordEmail.Trim() }
+$targetForgotPasswordEmail = if ([string]::IsNullOrWhiteSpace($ForgotPasswordEmail)) { $AdminEmail } else { $ForgotPasswordEmail.Trim() }
+$maskedForgotPasswordEmail = Mask-Email -Value $targetForgotPasswordEmail
 
 $results = [ordered]@{
     Health = $false
@@ -220,17 +311,26 @@ $results = [ordered]@{
     Me = $false
     ForgotPassword = $false
     Wait = $false
+    Outbox = $false
 }
 
 Write-Host "Email outbox flow target: $trimmedBaseUrl"
-Write-Host "Login user: $Email"
-Write-Host "Forgot-password target: $(Mask-Email -Value $targetForgotPasswordEmail)"
+Write-Host "Login user: $(Mask-Email -Value $AdminEmail)"
+Write-Host "Forgot-password target: $maskedForgotPasswordEmail"
 Write-Host "WaitSeconds: $WaitSeconds"
 Write-Host ""
-Write-Host "Precondiciones requeridas en backend:"
+Write-Host "Precondiciones requeridas en backend local:"
 Write-Host "- APP_NOTIFICATIONS_EMAIL_ENABLED=true"
 Write-Host "- APP_NOTIFICATIONS_EMAIL_DELIVERY_MODE=outbox"
 Write-Host "- APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=true"
+Write-Host "- APP_NOTIFICATIONS_EMAIL_PROVIDER=resend"
+Write-Host "- APP_NOTIFICATIONS_EMAIL_API_KEY=<configured>"
+Write-Host "- APP_NOTIFICATIONS_EMAIL_FROM=Ganaderia 4.0 <onboarding@resend.dev>"
+Write-Host "- APP_FRONTEND_PASSWORD_RESET_URL=http://localhost:5173/reset-password"
+Write-Host ""
+Write-Host "Render:"
+Write-Host "- Produccion normal: delivery-mode=direct y processor=false"
+Write-Host "- Prueba controlada: delivery-mode=outbox y processor=true, despues de probar localmente"
 Write-Host ""
 
 $healthEndpoints = @("/healthz", "/actuator/health")
@@ -258,8 +358,8 @@ $results["Health"] = $true
 Write-StepResult -Name "Health" -Success $true -Detail "endpoint=$healthPath"
 
 $loginBody = @{
-    email = $Email
-    password = $Password
+    email = $AdminEmail
+    password = $AdminPassword
 }
 
 $loginResult = Invoke-JsonRequest -Method POST -Uri "$trimmedBaseUrl/api/auth/login" -Body $loginBody
@@ -293,6 +393,9 @@ if ($meResult.Ok) {
 }
 else {
     Write-StepResult -Name "Auth me" -Success $false -Detail (Format-HttpFailure -Result $meResult)
+    Write-Host ""
+    Write-Host "Final result: FAIL"
+    exit 1
 }
 
 $forgotPasswordBody = @{
@@ -319,19 +422,81 @@ Start-Sleep -Seconds $WaitSeconds
 $results["Wait"] = $true
 Write-StepResult -Name "Wait for processor" -Success $true -Detail "seconds=$WaitSeconds"
 
-Write-Host ""
-Write-Host "Revisión operativa sugerida:"
-Write-Host "- Verifica que haya llegado el correo de recuperación al destinatario."
-Write-Host "- Revisa logs con event=notification_outbox_email_processor_completed."
-Write-Host "- Revisa logs con event=email_notification_enqueued_for_outbox."
-Write-Host "- Si el provider procesa correctamente, revisa logs con event=notification_outbox_email_processor_completed sent>0."
-Write-Host "- Si falla el envío, revisa event=notification_outbox_email_send_failed o notification_outbox_email_dead."
-Write-Host "- Si quieres confirmación persistente, revisa la tabla notification_outbox y verifica status=SENT para el mensaje EMAIL correspondiente."
-Write-Host "- Este script no consulta DB ni imprime reset token."
+$outboxUri = "$trimmedBaseUrl/api/admin/notification-outbox?channel=EMAIL&page=0&size=10"
+$outboxResult = Invoke-JsonRequest -Method GET -Uri $outboxUri -Headers $authHeaders
+if (-not $outboxResult.Ok) {
+    Write-StepResult -Name "Outbox admin query" -Success $false -Detail (Format-HttpFailure -Result $outboxResult)
+    Write-Host ""
+    Write-Host "El endpoint requiere rol ADMINISTRADOR. No se imprime payload ni se consulta DB."
+    Write-Host "Final result: FAIL"
+    exit 1
+}
 
-$allPassed = ($results.Values | Where-Object { -not $_ }).Count -eq 0
+$outbox = $outboxResult.Body
+$contentProperty = if ($null -eq $outbox) { $null } else { $outbox.PSObject.Properties["content"] }
+if ($null -eq $contentProperty) {
+    Write-StepResult -Name "Outbox admin query" -Success $false -Detail "response missing content property"
+    Write-Host ""
+    Write-Host "Final result: FAIL"
+    exit 1
+}
+
+$messages = @(Get-OutboxContent -Body $outbox)
+$page = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "page")
+$size = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "size")
+$totalElements = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "totalElements")
+$totalPages = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "totalPages")
+$numberOfElements = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "numberOfElements")
+
+$results["Outbox"] = $true
+Write-StepResult -Name "Outbox admin query" -Success $true -Detail "items=$($messages.Count) page=$page size=$size totalElements=$totalElements totalPages=$totalPages numberOfElements=$numberOfElements"
+
+if ($messages.Count -eq 0) {
+    Write-Host "No EMAIL outbox messages found in recent page."
+    Write-Host ""
+    Write-Host "Posibles causas:"
+    Write-Host "1. backend no esta en delivery-mode=outbox"
+    Write-Host "2. processor apagado"
+    Write-Host "3. flujo usado no encola en notification_outbox"
+    Write-Host "4. usuario inexistente/inactivo"
+    Write-Host "5. email disabled/missing config"
+    Write-Host ""
+    Write-Host "Final result: FAIL"
+    exit 1
+}
+
+Write-OutboxMessages -Messages $messages
+
+$sentMessages = @($messages | Where-Object { $_.status -eq "SENT" })
+$pendingMessages = @($messages | Where-Object { $_.status -eq "PENDING" })
+$failedMessages = @($messages | Where-Object { $_.status -eq "FAILED" })
+$deadMessages = @($messages | Where-Object { $_.status -eq "DEAD" })
+
 Write-Host ""
-Write-Host "Final result: $(if ($allPassed) { 'PASS' } else { 'FAIL' })"
+if ($sentMessages.Count -gt 0) {
+    Write-StepResult -Name "Outbox SENT check" -Success $true -Detail "sentMessagesInPage=$($sentMessages.Count)"
+}
+else {
+    Write-StepResult -Name "Outbox SENT check" -Success $false -Detail "no SENT message found in the latest EMAIL page"
+}
+
+Write-Host ""
+Write-Host "Que revisar si no aparece SENT:"
+Write-Host "- PENDING: confirma APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=true y delivery-mode=outbox."
+Write-Host "- FAILED: revisa lastErrorSummary y logs event=notification_outbox_email_send_failed."
+Write-Host "- DEAD: revisa lastErrorSummary, maxAttempts y usa requeue admin solo si corresponde."
+Write-Host "- Sin mensajes: confirma que el email exista como usuario activo y que EMAIL este habilitado."
+Write-Host "- Logs utiles: email_notification_enqueued_for_outbox, notification_outbox_email_processor_completed."
+Write-Host "- Correo: valida llegada del email de recuperacion en el destinatario."
+Write-Host "- Este script no imprime reset token, payload, HTML/textBody, API key, secrets ni password."
+
+$allCorePassed = ($results.Values | Where-Object { -not $_ }).Count -eq 0
+$sentFound = $sentMessages.Count -gt 0
+$allPassed = $allCorePassed -and $sentFound
+
+Write-Host ""
+Write-Host "Outbox status counts: SENT=$($sentMessages.Count) PENDING=$($pendingMessages.Count) FAILED=$($failedMessages.Count) DEAD=$($deadMessages.Count)"
+Write-Host "Final result: $(if ($allPassed) { 'PASS' } else { 'CHECK_OUTBOX_STATUS' })"
 
 if (-not $allPassed) {
     exit 1
