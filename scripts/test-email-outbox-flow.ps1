@@ -447,11 +447,12 @@ $size = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "size")
 $totalElements = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "totalElements")
 $totalPages = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "totalPages")
 $numberOfElements = Format-Nullable -Value (Get-PropertyValue -Object $outbox -Name "numberOfElements")
+$messageCount = @($messages).Count
 
 $results["Outbox"] = $true
-Write-StepResult -Name "Outbox admin query" -Success $true -Detail "items=$($messages.Count) page=$page size=$size totalElements=$totalElements totalPages=$totalPages numberOfElements=$numberOfElements"
+Write-StepResult -Name "Outbox admin query" -Success $true -Detail "items=$messageCount page=$page size=$size totalElements=$totalElements totalPages=$totalPages numberOfElements=$numberOfElements"
 
-if ($messages.Count -eq 0) {
+if ($messageCount -eq 0) {
     Write-Host "No EMAIL outbox messages found in recent page."
     Write-Host ""
     Write-Host "Posibles causas:"
@@ -471,10 +472,14 @@ $sentMessages = @($messages | Where-Object { $_.status -eq "SENT" })
 $pendingMessages = @($messages | Where-Object { $_.status -eq "PENDING" })
 $failedMessages = @($messages | Where-Object { $_.status -eq "FAILED" })
 $deadMessages = @($messages | Where-Object { $_.status -eq "DEAD" })
+$sentCount = @($sentMessages).Count
+$pendingCount = @($pendingMessages).Count
+$failedCount = @($failedMessages).Count
+$deadCount = @($deadMessages).Count
 
 Write-Host ""
-if ($sentMessages.Count -gt 0) {
-    Write-StepResult -Name "Outbox SENT check" -Success $true -Detail "sentMessagesInPage=$($sentMessages.Count)"
+if ($sentCount -gt 0) {
+    Write-StepResult -Name "Outbox SENT check" -Success $true -Detail "sentMessagesInPage=$sentCount"
 }
 else {
     Write-StepResult -Name "Outbox SENT check" -Success $false -Detail "no SENT message found in the latest EMAIL page"
@@ -490,13 +495,14 @@ Write-Host "- Logs utiles: email_notification_enqueued_for_outbox, notification_
 Write-Host "- Correo: valida llegada del email de recuperacion en el destinatario."
 Write-Host "- Este script no imprime reset token, payload, HTML/textBody, API key, secrets ni password."
 
-$allCorePassed = ($results.Values | Where-Object { -not $_ }).Count -eq 0
-$sentFound = $sentMessages.Count -gt 0
+$coreFailures = @($results.Values | Where-Object { -not $_ })
+$allCorePassed = $coreFailures.Count -eq 0
+$sentFound = $sentCount -gt 0
 $allPassed = $allCorePassed -and $sentFound
 
 Write-Host ""
-Write-Host "Outbox status counts: SENT=$($sentMessages.Count) PENDING=$($pendingMessages.Count) FAILED=$($failedMessages.Count) DEAD=$($deadMessages.Count)"
-Write-Host "Final result: $(if ($allPassed) { 'PASS' } else { 'CHECK_OUTBOX_STATUS' })"
+Write-Host "Outbox status counts: SENT=$sentCount PENDING=$pendingCount FAILED=$failedCount DEAD=$deadCount"
+Write-Host "Final result: $(if ($allPassed) { 'PASS' } else { 'FAIL' })"
 
 if (-not $allPassed) {
     exit 1
