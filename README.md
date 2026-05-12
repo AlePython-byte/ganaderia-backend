@@ -1,12 +1,18 @@
-# Ganaderia 4.0 Backend
+# Ganadería 4.0 Backend
 
-Backend del sistema **Ganaderia 4.0**, orientado al monitoreo ganadero con collares IoT, telemetria GPS, geocercas, alertas operativas, autenticacion JWT, integracion HMAC para dispositivos, notificaciones y analisis operativo asistido por IA.
+Backend del sistema **Ganadería 4.0**, orientado al monitoreo ganadero con collares IoT, telemetria GPS, geocercas, alertas operativas, autenticacion JWT, integracion HMAC para dispositivos, notificaciones y analisis operativo asistido por IA.
 
 ## Descripcion general
 
 La aplicacion expone una API REST en Spring Boot para administrar vacas, collares, geocercas, ubicaciones, alertas, usuarios, reportes y flujos operativos asociados al monitoreo de ganado. Tambien incluye un canal IoT seguro para recibir ubicaciones desde dispositivos mediante firmas HMAC, proteccion anti-replay y validaciones temporales.
 
 El backend esta preparado para uso academico y tecnico, con migraciones versionadas, pruebas automatizadas, observabilidad, scripts operativos y documentacion complementaria.
+
+Dominio backend desplegado en Render:
+
+```text
+https://ganaderia-backend.onrender.com
+```
 
 ## Estado actual
 
@@ -23,13 +29,16 @@ El proyecto cuenta actualmente con:
 - Abuse protection/rate limiting para login y dispositivos.
 - Notificaciones por LOG, WEBHOOK y EMAIL.
 - EMAIL real con Resend.
+- EMAIL habilitado para la demo y configurable por entorno.
 - Preferencias de notificacion por usuario.
 - Password reset por email.
 - IA analitica con Gemini y fallback heuristico.
+- IA habilitada para la demo y configurable por entorno.
 - Notification outbox para EMAIL, processor y requeue admin.
 - Generacion automatica de tokens `COW-*`, `COLLAR-*` e internal code `INT-*`.
 - Scripts operativos para smoke tests, seed demo, email, outbox y carga IoT.
 - Pruebas unitarias, integracion, JaCoCo y SpotBugs.
+- Ultimo `clean verify` conocido: 277 tests unitarios, 198 tests de integracion, 475 tests totales, JaCoCo OK y SpotBugs OK.
 
 ## Stack tecnico
 
@@ -217,14 +226,34 @@ Autenticacion:
 - `POST /api/auth/forgot-password`
 - `POST /api/auth/reset-password`
 
-Dominio:
+Vacas:
 
 - `GET /api/cows`
 - `POST /api/cows`
+
+Collares:
+
 - `GET /api/collars`
 - `POST /api/collars`
 - `PATCH /api/collars/{id}/rotate-secret`
+
+Geocercas y ubicaciones:
+
+- `GET /api/geofences`
+- `POST /api/geofences`
+- `GET /api/locations/cow/{cowId}`
+- `POST /api/locations`
+
+Device ingestion:
+
 - `POST /api/device/locations`
+
+Alertas, dashboard y reportes:
+
+- `GET /api/alerts`
+- `GET /api/dashboard/summary`
+- `GET /api/reports/alerts`
+- `GET /api/reports/alerts.csv`
 
 Analisis:
 
@@ -297,6 +326,19 @@ El flujo de verificacion incluye:
 - JaCoCo.
 - SpotBugs.
 - Validaciones de cobertura configuradas en Maven.
+
+Ultima evidencia conocida:
+
+- Tests unitarios: 277.
+- Tests de integracion: 198.
+- Tests totales: 475.
+- Failures: 0.
+- Errors: 0.
+- Skipped: 0.
+- JaCoCo: OK.
+- SpotBugs: OK.
+
+Estos valores documentan la ultima ejecucion conocida reportada para el proyecto. En esta subfase documental no se vuelve a ejecutar `clean verify`.
 
 ## Pruebas de carga
 
@@ -409,6 +451,12 @@ http://localhost:8080/swagger-ui.html
 
 ## Despliegue en Render
 
+Dominio actual:
+
+```text
+https://ganaderia-backend.onrender.com
+```
+
 Para Render se recomienda:
 
 - Perfil `prod`.
@@ -432,6 +480,8 @@ APP_CORS_ALLOWED_ORIGINS=https://<frontend-domain>
 AI_ENABLED=false
 ```
 
+Para la demo, EMAIL e IA pueden estar habilitados con sus respectivas variables seguras. En ambientes locales o entornos de seguridad pueden permanecer apagados por configuracion.
+
 No activar `outbox` o `processor` en produccion sin validar primero el flujo en local.
 
 ## Documentacion adicional
@@ -446,6 +496,10 @@ No activar `outbox` o `processor` en produccion sin validar primero el flujo en 
 
 - Las pruebas de carga documentadas son locales y no representan capacidad maxima real.
 - No se documentan secretos reales ni deben compartirse por consola o capturas.
+- No existe integracion SMS real documentada en este backend; no debe presentarse como funcionalidad implementada.
+- El outbox implementado esta orientado a EMAIL.
+- Actuator y Prometheus estan disponibles como endpoints de observabilidad; Grafana visual queda como mejora si no existe configuracion externa.
+- La validacion frontend/backend final depende del dominio frontend configurado en CORS y en `APP_FRONTEND_PASSWORD_RESET_URL`.
 - No hay `docker-compose.yml` en la raiz del proyecto.
 - El throughput de las pruebas con PowerShell depende de `DelayMs`, concurrencia y maquina local.
 - Para pruebas de rendimiento formales se recomienda complementar con k6, JMeter u observabilidad de CPU/RAM.
