@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Ganaderia4
+    orgId: 1
+    folder: Ganadería 4.0
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
