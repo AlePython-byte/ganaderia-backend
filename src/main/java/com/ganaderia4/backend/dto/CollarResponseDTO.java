@@ -13,7 +13,7 @@ public class CollarResponseDTO {
     @Schema(description = "Identificador publico generado por el backend y usado como X-Device-Token", example = "COLLAR-001")
     private String token;
 
-    @Schema(description = "Estado operativo actual del collar", example = "ACTIVE")
+    @Schema(description = "Estado operativo actual del collar", example = "ACTIVO")
     private String status;
 
     @Schema(description = "Id de la vaca asociada, si aplica", example = "1")
@@ -25,19 +25,19 @@ public class CollarResponseDTO {
     @Schema(description = "Nombre de la vaca asociada, si aplica", example = "Luna")
     private String cowName;
 
-    @Schema(description = "Nivel de bateria en porcentaje", example = "78")
+    @Schema(description = "Nivel de batería en porcentaje", example = "78")
     private Integer batteryLevel;
 
-    @Schema(description = "Fecha y hora de ultima senal observada", example = "2026-05-02T10:15:30")
+    @Schema(description = "Fecha y hora de última señal observada", example = "2026-05-02T10:15:30")
     private LocalDateTime lastSeenAt;
 
-    @Schema(description = "Estado de senal reportado", example = "ONLINE")
+    @Schema(description = "Estado de señal reportado", example = "FUERTE")
     private String signalStatus;
 
     @Schema(description = "Version de firmware reportada", example = "v1.2.3")
     private String firmwareVersion;
 
-    @Schema(description = "Precision GPS reportada en metros", example = "5.4")
+    @Schema(description = "Precisión GPS reportada en metros", example = "5.4")
     private Double gpsAccuracy;
 
     @Schema(description = "Indica si el collar esta habilitado operativamente", example = "true")

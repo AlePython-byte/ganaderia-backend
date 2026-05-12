@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "Solicitud publica para iniciar recuperacion de contrasena")
 public class ForgotPasswordRequestDTO {
 
-    @Schema(description = "Correo del usuario que solicita recuperacion", example = "admin@ganaderia.com")
+    @Schema(description = "Correo del usuario que solicita recuperacion", example = "<ADMIN_EMAIL>")
     @NotBlank(message = "El correo es obligatorio")
     @Email(message = "El correo no tiene un formato valido")
     @Size(max = 150, message = "El correo no puede superar 150 caracteres")

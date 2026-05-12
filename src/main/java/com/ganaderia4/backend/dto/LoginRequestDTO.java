@@ -8,13 +8,13 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "Credenciales de acceso para obtener un JWT")
 public class LoginRequestDTO {
 
-    @Schema(description = "Correo del usuario registrado", example = "admin@ganaderia.com")
+    @Schema(description = "Correo del usuario registrado", example = "<ADMIN_EMAIL>")
     @NotBlank(message = "El correo es obligatorio")
     @Email(message = "El correo no tiene un formato valido")
     @Size(max = 150, message = "El correo no puede superar 150 caracteres")
     private String email;
 
-    @Schema(description = "Contrasena del usuario", example = "123ganadero456*")
+    @Schema(description = "Contraseña del usuario", example = "<ADMIN_PASSWORD>")
     @NotBlank(message = "La contrasena es obligatoria")
     @Size(min = 8, max = 100, message = "La contrasena debe tener entre 8 y 100 caracteres")
     private String password;

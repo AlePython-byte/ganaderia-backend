@@ -29,7 +29,7 @@ public class CowRequestDTO {
     @Size(max = 100, message = "El nombre no puede superar 100 caracteres")
     private String name;
 
-    @Schema(description = "Estado operativo de la vaca", example = "ACTIVA")
+    @Schema(description = "Estado de ubicación de la vaca", example = "SIN_UBICACION")
     @NotNull(message = "El estado es obligatorio")
     private CowStatus status;
 

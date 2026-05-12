@@ -80,7 +80,7 @@ public class AlertAnalysisController {
     @GetMapping("/ai-summary")
     @Operation(
             summary = "Obtener resumen operativo asistido por IA",
-            description = "Combina el analisis heuristico del backend con una salida narrativa opcional de IA y fallback interno seguro."
+            description = "Combina el análisis heurístico del backend con una salida narrativa opcional de IA y fallback interno seguro. La respuesta expone riskLevel, summary, recommendation, source y fallbackUsed."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Resumen IA o fallback obtenido correctamente",

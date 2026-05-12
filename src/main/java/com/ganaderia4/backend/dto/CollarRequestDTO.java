@@ -24,7 +24,7 @@ public class CollarRequestDTO {
     @Size(max = 50, message = "El token del collar no puede superar 50 caracteres")
     private String token;
 
-    @Schema(description = "Estado operativo del collar", example = "ACTIVE")
+    @Schema(description = "Estado operativo del collar", example = "ACTIVO")
     @NotNull(message = "El estado del collar es obligatorio")
     private CollarStatus status;
 
@@ -32,23 +32,23 @@ public class CollarRequestDTO {
     @Positive(message = "El id de la vaca debe ser mayor que cero")
     private Long cowId;
 
-    @Schema(description = "Nivel de bateria en porcentaje", example = "78")
+    @Schema(description = "Nivel de batería en porcentaje", example = "78")
     @Min(value = 0, message = "La bateria no puede ser menor a 0")
     @Max(value = 100, message = "La bateria no puede ser mayor a 100")
     private Integer batteryLevel;
 
-    @Schema(description = "Fecha y hora de ultima senal observada", example = "2026-05-02T10:15:30")
+    @Schema(description = "Fecha y hora de última señal observada", example = "2026-05-02T10:15:30")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime lastSeenAt;
 
-    @Schema(description = "Estado de senal del dispositivo", example = "ONLINE")
+    @Schema(description = "Estado de señal del dispositivo", example = "FUERTE")
     private DeviceSignalStatus signalStatus;
 
     @Schema(description = "Version de firmware reportada por el collar", example = "v1.2.3")
     @Size(max = 100, message = "La version de firmware no puede superar 100 caracteres")
     private String firmwareVersion;
 
-    @Schema(description = "Precision GPS reportada en metros", example = "5.4")
+    @Schema(description = "Precisión GPS reportada en metros", example = "5.4")
     @DecimalMin(value = "0.0", inclusive = true, message = "La precision GPS no puede ser negativa")
     private Double gpsAccuracy;
 

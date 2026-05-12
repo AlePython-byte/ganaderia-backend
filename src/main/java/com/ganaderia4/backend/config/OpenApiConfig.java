@@ -26,32 +26,45 @@ public class OpenApiConfig {
     public OpenAPI ganaderiaOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Ganaderia 4.0 Backend API")
+                        .title("Ganadería 4.0 Backend API")
                         .description("""
-                                API REST para monitoreo ganadero con collares, telemetria GPS, geocercas,
-                                alertas operativas, dashboard, reportes y observabilidad.
+                                API REST para monitoreo ganadero con autenticación JWT, operación IoT,
+                                telemetría GPS, geocercas, alertas, notificaciones, IA analítica,
+                                reportes y observabilidad.
 
-                                La API usa dos mecanismos de autenticacion:
+                                La API usa dos mecanismos de autenticación:
                                 - JWT Bearer para usuarios del backend.
                                 - HMAC por headers para ingestiones desde dispositivos.
                                 """)
                         .version("0.0.1-SNAPSHOT")
                         .contact(new Contact()
-                                .name("Equipo Ganaderia 4.0")
-                                .email("admin@ganaderia.com"))
+                                .name("Equipo Ganadería 4.0"))
                         .license(new License()
-                                .name("Uso academico")))
+                                .name("Uso académico")))
                 .servers(List.of(
                         new Server()
                                 .url("http://localhost:8080")
-                                .description("Entorno local o dev"),
+                                .description("Entorno local"),
                         new Server()
-                                .url("http://localhost:10000")
-                                .description("Referencia de despliegue local con perfil prod")
+                                .url("https://ganaderia-backend.onrender.com")
+                                .description("Despliegue demo en Render")
                 ))
                 .tags(List.of(
-                        new Tag().name("Autenticacion").description("Login y recuperacion del usuario autenticado"),
-                        new Tag().name("Dispositivos").description("Ingestion de telemetria desde collares usando HMAC")
+                        new Tag().name("Autenticacion").description("Login, sesion activa y recuperacion de contrasena"),
+                        new Tag().name("Usuarios").description("Administracion de usuarios internos"),
+                        new Tag().name("Vacas").description("Gestion operativa de vacas y sus identificadores"),
+                        new Tag().name("Collares").description("Gestion de collares, asociacion y secretos HMAC"),
+                        new Tag().name("Geocercas").description("Administracion de geocercas del dominio ganadero"),
+                        new Tag().name("Ubicaciones").description("Registro manual y consultas historicas de ubicaciones"),
+                        new Tag().name("Alertas").description("Consulta y gestion operativa de alertas"),
+                        new Tag().name("Reportes").description("Analitica y exportaciones CSV"),
+                        new Tag().name("Dispositivos").description("Ingestion de telemetria desde collares usando HMAC"),
+                        new Tag().name("Alert Analysis").description("Analisis heuristico y asistido por IA"),
+                        new Tag().name("Preferencias de notificacion").description("Configuracion administrativa de preferencias de notificacion"),
+                        new Tag().name("Notification outbox admin").description("Diagnostico y requeue administrativo del outbox EMAIL"),
+                        new Tag().name("Dashboard").description("Indicadores operativos del monitoreo"),
+                        new Tag().name("Auditoria").description("Consulta administrativa de eventos auditables"),
+                        new Tag().name("Salud del sistema").description("Health check publico del backend")
                 ))
                 .components(new Components()
                         .addSecuritySchemes(

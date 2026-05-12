@@ -17,7 +17,7 @@ public class CowResponseDTO {
     @Schema(description = "Nombre visible de la vaca", example = "Luna")
     private String name;
 
-    @Schema(description = "Estado operativo actual", example = "ACTIVA")
+    @Schema(description = "Estado de ubicación actual", example = "SIN_UBICACION")
     private String status;
 
     @Schema(description = "Observaciones operativas", example = "Vaca en monitoreo diario")

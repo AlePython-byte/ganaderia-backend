@@ -154,7 +154,7 @@ public class DashboardController {
     @GetMapping("/collars-offline")
     @Operation(
             summary = "Obtener collares offline",
-            description = "Lista collares actualmente sin senal para seguimiento operativo rapido."
+            description = "Lista collares actualmente sin señal para seguimiento operativo rápido."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Listado de collares offline obtenido correctamente",

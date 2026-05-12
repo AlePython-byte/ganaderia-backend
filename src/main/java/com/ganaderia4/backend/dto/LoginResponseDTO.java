@@ -17,7 +17,7 @@ public class LoginResponseDTO {
     @Schema(description = "Rol operativo del usuario", example = "ADMINISTRADOR")
     private String role;
 
-    @Schema(description = "JWT Bearer para endpoints protegidos", example = "eyJhbGciOiJIUzI1NiJ9...")
+    @Schema(description = "JWT Bearer para endpoints protegidos", example = "<JWT>")
     private String token;
 
     @Schema(description = "Tipo de token devuelto", example = "Bearer")

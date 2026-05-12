@@ -297,7 +297,7 @@ public class ReportController {
     @GetMapping("/offline-collars")
     @Operation(
             summary = "Obtener reporte de collares offline",
-            description = "Lista collares sin senal ordenados para seguimiento operativo rapido."
+            description = "Lista collares sin señal ordenados para seguimiento operativo rápido."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reporte de collares offline obtenido correctamente",
@@ -314,7 +314,7 @@ public class ReportController {
     @GetMapping("/offline-collars/staleness")
     @Operation(
             summary = "Obtener reporte de collares offline por staleness",
-            description = "Lista collares sin senal ordenados por antiguedad del ultimo reporte para priorizacion operativa."
+            description = "Lista collares sin señal ordenados por antigüedad del último reporte para priorización operativa."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reporte de staleness de collares offline obtenido correctamente",
