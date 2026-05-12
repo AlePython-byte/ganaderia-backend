@@ -1,4 +1,4 @@
-# Runbook operativo — Ganadería 4.0
+﻿# Runbook operativo — Ganadería 4.0
 
 ## 1. Propósito del documento
 
