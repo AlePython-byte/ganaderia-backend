@@ -1,0 +1,48 @@
+﻿@baseUrl = {{baseUrl}}
+@jwt = {{jwt}}
+@requestId = {{requestId}}
+
+### Reporte legacy de alertas
+GET {{baseUrl}}/api/reports/alerts?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Reporte paginado de alertas
+GET {{baseUrl}}/api/reports/alerts/page?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE&page=0&size=10&sort=createdAt&direction=DESC
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Tendencia de alertas
+GET {{baseUrl}}/api/reports/alerts/trend?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Recurrencia por tipo de alerta
+GET {{baseUrl}}/api/reports/alerts/type-recurrence?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&status=PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Exportar alertas CSV
+GET {{baseUrl}}/api/reports/alerts/export.csv?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Collares offline
+GET {{baseUrl}}/api/reports/offline-collars
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Staleness de collares offline
+GET {{baseUrl}}/api/reports/offline-collars/staleness
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Vacas con mas incidentes
+GET {{baseUrl}}/api/reports/cows-most-incidents?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Recurrencia de incidentes por vaca
+GET {{baseUrl}}/api/reports/cows-incident-recurrence?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}

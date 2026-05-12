@@ -1,0 +1,51 @@
+﻿@baseUrl = {{baseUrl}}
+@adminEmail = {{adminEmail}}
+@adminPassword = {{adminPassword}}
+@jwt = {{jwt}}
+@requestId = {{requestId}}
+
+### Healthz
+GET {{baseUrl}}/healthz
+X-Request-Id: {{requestId}}
+
+### Actuator health
+GET {{baseUrl}}/actuator/health
+X-Request-Id: {{requestId}}
+
+### Login JWT
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {% client.global.set("jwt", response.body.token); %}
+
+### Auth me
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Forgot password
+POST {{baseUrl}}/api/auth/forgot-password
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+
+{
+  "email": "{{adminEmail}}"
+}
+
+### Reset password
+# Reemplazar placeholders localmente. No commitear tokens reales.
+POST {{baseUrl}}/api/auth/reset-password
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+
+{
+  "token": "<RESET_TOKEN>",
+  "newPassword": "<NEW_PASSWORD>",
+  "confirmPassword": "<NEW_PASSWORD>"
+}

@@ -1,0 +1,28 @@
+﻿@baseUrl = {{baseUrl}}
+@jwt = {{jwt}}
+@requestId = {{requestId}}
+@outboxMessageId = {{outboxMessageId}}
+
+### Listar outbox EMAIL
+# Requiere ADMINISTRADOR.
+GET {{baseUrl}}/api/admin/notification-outbox?channel=EMAIL&page=0&size=10
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Listar outbox por estado
+GET {{baseUrl}}/api/admin/notification-outbox?channel=EMAIL&status=FAILED&page=0&size=10
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Detalle outbox
+# No expone payload completo.
+GET {{baseUrl}}/api/admin/notification-outbox/{{outboxMessageId}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Requeue outbox
+# Requiere ADMINISTRADOR.
+# Solo aplica a mensajes FAILED o DEAD.
+POST {{baseUrl}}/api/admin/notification-outbox/{{outboxMessageId}}/requeue
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}

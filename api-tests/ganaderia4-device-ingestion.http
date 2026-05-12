@@ -1,0 +1,29 @@
+﻿@baseUrl = {{baseUrl}}
+@deviceToken = {{deviceToken}}
+@requestId = {{requestId}}
+
+### Device ingestion HMAC
+# IntelliJ HTTP Client no debe contener DeviceSecret real.
+# La firma HMAC debe generarse con script externo o herramienta controlada.
+# Para flujo real se recomienda:
+#   scripts/send-device-location.ps1
+#
+# Reemplazar placeholders en headers antes de ejecutar:
+# - <UTC_TIMESTAMP_WITH_Z>
+# - <UNIQUE_NONCE>
+# - <HMAC_SIGNATURE>
+POST {{baseUrl}}/api/device/locations
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+X-Device-Token: {{deviceToken}}
+X-Device-Timestamp: <UTC_TIMESTAMP_WITH_Z>
+X-Device-Nonce: <UNIQUE_NONCE>
+X-Device-Signature: <HMAC_SIGNATURE>
+
+{
+  "latitude": 1.2136,
+  "longitude": -77.2811,
+  "timestamp": "2026-05-12T10:00:00",
+  "batteryLevel": 85,
+  "gpsAccuracy": 8.5
+}

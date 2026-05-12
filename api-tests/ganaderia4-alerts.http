@@ -1,0 +1,55 @@
+﻿@baseUrl = {{baseUrl}}
+@jwt = {{jwt}}
+@requestId = {{requestId}}
+@alertId = {{alertId}}
+
+### Listar alertas
+GET {{baseUrl}}/api/alerts
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Listar alertas paginadas
+GET {{baseUrl}}/api/alerts/page?status=PENDIENTE&type=LOW_BATTERY&page=0&size=10&sort=createdAt&direction=DESC
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Obtener alerta por id
+GET {{baseUrl}}/api/alerts/{{alertId}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Filtrar alertas por estado
+GET {{baseUrl}}/api/alerts/status/PENDIENTE
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Filtrar alertas por tipo
+GET {{baseUrl}}/api/alerts/type/LOW_BATTERY
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Cola de prioridad
+GET {{baseUrl}}/api/alerts/pending/priority-queue?limit=10
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Actualizar alerta
+PUT {{baseUrl}}/api/alerts/{{alertId}}
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+
+{
+  "status": "PENDIENTE",
+  "observations": "Actualizada desde IntelliJ HTTP Client"
+}
+
+### Resolver alerta
+PATCH {{baseUrl}}/api/alerts/{{alertId}}/resolve?observations=Resuelta%20desde%20HTTP%20Client
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Descartar alerta
+PATCH {{baseUrl}}/api/alerts/{{alertId}}/discard?observations=Descartada%20desde%20HTTP%20Client
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}

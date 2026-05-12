@@ -1,0 +1,18 @@
+﻿@baseUrl = {{baseUrl}}
+@jwt = {{jwt}}
+@requestId = {{requestId}}
+
+### Resumen heuristico de alertas
+GET {{baseUrl}}/api/alert-analysis/summary
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Top prioridades
+GET {{baseUrl}}/api/alert-analysis/top-priorities?limit=5
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Resumen IA con Gemini/fallback
+GET {{baseUrl}}/api/alert-analysis/ai-summary
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}

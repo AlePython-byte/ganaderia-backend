@@ -1,0 +1,99 @@
+﻿@baseUrl = {{baseUrl}}
+@jwt = {{jwt}}
+@requestId = {{requestId}}
+@cowId = {{cowId}}
+@cowToken = {{cowToken}}
+@collarId = {{collarId}}
+@collarToken = {{collarToken}}
+
+### Crear vaca sin token tecnico ni internalCode
+# El backend genera COW-xxx e INT-xxx.
+POST {{baseUrl}}/api/cows
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+
+{
+  "name": "Demo Luna HTTP",
+  "status": "SIN_UBICACION",
+  "observations": "Creada desde IntelliJ HTTP Client"
+}
+
+### Listar vacas
+GET {{baseUrl}}/api/cows
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Listar vacas paginadas
+GET {{baseUrl}}/api/cows/page?status=SIN_UBICACION&page=0&size=10&sort=id&direction=ASC
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Obtener vaca por id
+GET {{baseUrl}}/api/cows/{{cowId}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Obtener vaca por token
+GET {{baseUrl}}/api/cows/token/{{cowToken}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Crear collar sin token tecnico
+# El backend genera COLLAR-xxx.
+POST {{baseUrl}}/api/collars
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+X-Request-Id: {{requestId}}
+
+{
+  "status": "ACTIVO",
+  "cowId": {{cowId}},
+  "batteryLevel": 85,
+  "signalStatus": "FUERTE",
+  "firmwareVersion": "demo-1.0.0",
+  "gpsAccuracy": 8.5,
+  "enabled": true,
+  "notes": "Collar creado desde IntelliJ HTTP Client"
+}
+
+### Listar collares
+GET {{baseUrl}}/api/collars
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Listar collares paginados
+GET {{baseUrl}}/api/collars/page?status=ACTIVO&page=0&size=10&sort=id&direction=ASC
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Obtener collar por id
+GET {{baseUrl}}/api/collars/{{collarId}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Obtener collar por token
+GET {{baseUrl}}/api/collars/token/{{collarToken}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Rotar secreto del collar
+# La respuesta puede contener secreto nuevo. No commitear ni compartir.
+PATCH {{baseUrl}}/api/collars/{{collarId}}/rotate-secret
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Habilitar collar
+PATCH {{baseUrl}}/api/collars/{{collarId}}/enable
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Deshabilitar collar
+PATCH {{baseUrl}}/api/collars/{{collarId}}/disable
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
+
+### Reasignar collar a vaca
+PATCH {{baseUrl}}/api/collars/{{collarId}}/assign/{{cowId}}
+Authorization: Bearer {{jwt}}
+X-Request-Id: {{requestId}}
