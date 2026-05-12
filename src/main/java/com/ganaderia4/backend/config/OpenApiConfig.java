@@ -5,9 +5,15 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -107,5 +113,35 @@ public class OpenApiConfig {
                                         .in(SecurityScheme.In.HEADER)
                                         .description("Firma HMAC-SHA256 Base64 de la solicitud canonica")
                         ));
+    }
+
+    @Bean
+    public OpenApiCustomizer standardUnexpectedErrorResponseCustomizer() {
+        return openApi -> {
+            if (openApi.getPaths() == null) {
+                return;
+            }
+
+            openApi.getPaths().values().forEach(pathItem ->
+                    pathItem.readOperations().forEach(operation -> {
+                        ApiResponses responses = operation.getResponses();
+                        if (responses == null) {
+                            responses = new ApiResponses();
+                            operation.setResponses(responses);
+                        }
+
+                        responses.computeIfAbsent("500", ignored -> internalServerErrorResponse());
+                    })
+            );
+        };
+    }
+
+    private ApiResponse internalServerErrorResponse() {
+        return new ApiResponse()
+                .description("Error inesperado gestionado por el manejador global de excepciones")
+                .content(new Content().addMediaType(
+                        "application/json",
+                        new MediaType().schema(new Schema<>().$ref("#/components/schemas/ErrorResponseDTO"))
+                ));
     }
 }
