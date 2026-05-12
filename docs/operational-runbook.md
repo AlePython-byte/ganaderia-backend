@@ -1,429 +1,492 @@
 # Runbook operativo — Ganadería 4.0
 
-## Propósito
+## 1. Propósito del documento
 
-Este runbook documenta cómo validar, operar y diagnosticar el backend Ganadería 4.0 en ambientes `local`, `test` y `producción`.
+Este runbook documenta operación, validación y troubleshooting del backend Ganadería 4.0. Está pensado para guiar a un jurado, profesor, operador técnico o desarrollador externo durante una demo, una revisión de despliegue o una investigación de fallos.
 
-Su objetivo es servir como guía base para:
+No reemplaza el código fuente ni la configuración real del entorno. La fuente de verdad operativa sigue siendo la configuración activa de Spring Boot, las variables de entorno y los logs del backend.
 
-- verificar que el backend está sano;
-- levantar el sistema localmente de forma consistente;
-- validar seguridad, ingestión device y observabilidad;
-- diagnosticar fallos comunes;
-- ejecutar checks mínimos antes de desplegar o entregar.
-
-No reemplaza la revisión del código ni de la configuración real del entorno. La referencia ejecutable sigue siendo la configuración Spring Boot, `SecurityConfig`, Flyway y las variables de entorno activas en cada ambiente.
-
-## Ambientes
+## 2. Ambientes soportados
 
 ### Local
 
-Ambiente de desarrollo en la máquina del equipo.
-
-Uso típico:
-
-- levantar PostgreSQL con Docker;
-- ejecutar Spring Boot con perfil `local`;
-- validar Swagger/OpenAPI;
-- probar login, JWT, `/healthz`, `/actuator/health` y flujos básicos.
-
-Archivo de referencia principal:
-
-- `src/main/resources/application-local.properties`
+Ambiente de desarrollo en la máquina del equipo. Se usa para ejecutar el backend con PostgreSQL local o externo, validar Swagger, probar scripts PowerShell y depurar flujos funcionales.
 
 ### Test
 
-Ambiente de pruebas automatizadas.
+Ambiente de pruebas automatizadas. La suite usa Maven Wrapper, JUnit, MockMvc, Testcontainers, JaCoCo y SpotBugs.
 
-Uso típico:
+### Render/demo
 
-- `./mvnw test`
-- `./mvnw clean verify`
+Ambiente desplegado para demostración:
 
-Características:
+```text
+https://ganaderia-backend.onrender.com
+```
 
-- unit tests y integration tests;
-- integration tests con Testcontainers y PostgreSQL efímero;
-- validación de Flyway, seguridad, controladores, reportes y métricas;
-- quality gate de JaCoCo y análisis con SpotBugs durante `verify`.
+Algunos endpoints requieren JWT y roles específicos. Swagger puede no estar disponible si el perfil de producción lo deshabilita.
 
-### Producción / Render
+## 3. Requisitos locales
 
-Ambiente desplegado en Render.
+- Java 17 o superior, según `pom.xml` y Maven Enforcer.
+- Maven Wrapper incluido en el repositorio (`mvnw.cmd` en Windows).
+- Docker Desktop activo para tests de integración con Testcontainers.
+- PostgreSQL para ejecución local manual.
+- PowerShell para scripts operativos.
+- Variables de entorno configuradas con placeholders seguros, sin secretos reales en archivos versionados.
 
-Uso típico:
+## 4. Variables de entorno
 
-- ejecutar el backend con perfil `prod`;
-- usar PostgreSQL gestionado o configurado externamente;
-- exponer `/healthz`;
-- mantener Swagger/OpenAPI deshabilitado por seguridad;
-- restringir métricas y endpoints administrativos según la matriz de permisos actual.
+No incluir valores reales en documentación, commits, capturas o tickets. Usar placeholders.
 
-Archivo de referencia principal:
+### Base de datos
 
-- `src/main/resources/application-prod.properties`
+```env
+DB_URL=<DB_URL>
+DB_USERNAME=<DB_USERNAME>
+DB_PASSWORD=<POSTGRES_PASSWORD>
+```
 
-## Variables de entorno principales
+### JWT
 
-Las siguientes variables son las más relevantes para operación básica. No deben documentarse ni compartirse con valores reales.
+```env
+JWT_SECRET=<JWT_SECRET>
+JWT_EXPIRATION_MS=86400000
+```
 
-| Variable | Propósito |
-|---|---|
-| `PORT` | Puerto HTTP del backend. En local suele ser `8080`; en Render puede ser inyectado por la plataforma. |
-| `DB_URL` | URL JDBC de PostgreSQL. Ejemplo local: `jdbc:postgresql://localhost:5432/ganaderia4`. |
-| `DB_USERNAME` | Usuario de conexión a PostgreSQL. |
-| `DB_PASSWORD` | Contraseña de conexión a PostgreSQL. |
-| `JWT_SECRET` | Secreto usado para firmar y validar JWT. Debe ser fuerte y privado. |
-| `DEVICE_SECRET_MASTER_KEY` | Clave maestra usada en el flujo HMAC de dispositivos. Es crítica y no debe exponerse. |
-| `APP_CORS_ALLOWED_ORIGINS` | Orígenes frontend permitidos por CORS. |
-| `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` | Lista de endpoints Actuator expuestos por HTTP. |
-| `APP_DEVICE_MONITOR_OFFLINE_THRESHOLD_MINUTES` | Umbral en minutos para considerar un collar como offline. |
-| `APP_DEVICE_MONITOR_OFFLINE_CHECK_MS` | Frecuencia del monitoreo offline en milisegundos. |
-| `APP_BOOTSTRAP_ADMIN_NAME` | Nombre del usuario administrador bootstrap, si se inicializa desde entorno. |
-| `APP_BOOTSTRAP_ADMIN_EMAIL` | Correo del usuario administrador bootstrap. |
-| `APP_BOOTSTRAP_ADMIN_PASSWORD` | Contraseña inicial del usuario administrador bootstrap. |
+### Bootstrap admin
 
-Variables adicionales importantes, aunque no sean el foco principal de este bloque:
+```env
+APP_BOOTSTRAP_ADMIN_ENABLED=true
+APP_BOOTSTRAP_ADMIN_NAME=<ADMIN_NAME>
+APP_BOOTSTRAP_ADMIN_EMAIL=<ADMIN_EMAIL>
+APP_BOOTSTRAP_ADMIN_PASSWORD=<ADMIN_PASSWORD>
+APP_BOOTSTRAP_ADMIN_UPDATE_EXISTING=false
+APP_BOOTSTRAP_ADMIN_RESET_PASSWORD=false
+```
 
-- `JWT_EXPIRATION_MS`
-- `DEVICE_AUTH_WINDOW_SECONDS`
-- `APP_ABUSE_PROTECTION_*`
-- `APP_NOTIFICATIONS_WEBHOOK_*`
+### CORS
 
-## Validación local rápida
+```env
+APP_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://<FRONTEND_DOMAIN>
+```
 
-### 1. Levantar PostgreSQL local con Docker
+### Email / Resend
 
-Puerto estándar `5432`:
+```env
+APP_NOTIFICATIONS_EMAIL_ENABLED=true
+APP_NOTIFICATIONS_EMAIL_PROVIDER=resend
+APP_NOTIFICATIONS_EMAIL_API_KEY=<RESEND_API_KEY>
+APP_NOTIFICATIONS_EMAIL_FROM=<EMAIL_FROM>
+APP_NOTIFICATIONS_EMAIL_DELIVERY_MODE=direct
+APP_FRONTEND_PASSWORD_RESET_URL=<FRONTEND_RESET_PASSWORD_URL>
+```
+
+En la demo, EMAIL puede estar habilitado. En local o ambientes seguros puede apagarse por configuración.
+
+### Gemini / IA
+
+```env
+AI_ENABLED=true
+AI_PROVIDER=gemini
+GEMINI_API_KEY=<GEMINI_API_KEY>
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+En la demo, IA puede estar habilitada. Si Gemini falla o la IA está apagada, el backend debe usar fallback heurístico.
+
+### Device ingestion / HMAC
+
+```env
+DEVICE_SECRET_MASTER_KEY=<DEVICE_SECRET>
+DEVICE_AUTH_WINDOW_SECONDS=300
+DEVICE_HMAC_PEPPER=
+```
+
+El secreto real de un collar no debe documentarse ni compartirse.
+
+### Outbox / notificaciones
+
+```env
+APP_NOTIFICATIONS_WEBHOOK_ENABLED=false
+APP_NOTIFICATIONS_WEBHOOK_URL=<WEBHOOK_URL>
+APP_NOTIFICATIONS_WEBHOOK_SECRET=<WEBHOOK_SECRET>
+
+APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=false
+APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_FIXED_DELAY=30s
+APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_BATCH_SIZE=20
+APP_NOTIFICATIONS_OUTBOX_EMAIL_RETRY_BACKOFF=1m
+APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSING_TIMEOUT=5m
+```
+
+Para una prueba controlada de EMAIL por outbox:
+
+```env
+APP_NOTIFICATIONS_EMAIL_ENABLED=true
+APP_NOTIFICATIONS_EMAIL_DELIVERY_MODE=outbox
+APP_NOTIFICATIONS_OUTBOX_EMAIL_PROCESSOR_ENABLED=true
+```
+
+### Actuator / observabilidad
+
+```env
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+```
+
+## 5. Arranque local
+
+1. Clonar el repositorio.
+2. Configurar PostgreSQL y variables de entorno.
+3. Ejecutar la aplicación:
 
 ```powershell
-docker run --name ganaderia4-postgres `
-  -e POSTGRES_DB=ganaderia4 `
-  -e POSTGRES_USER=postgres `
-  -e POSTGRES_PASSWORD=postgres `
-  -p 5432:5432 `
-  -d postgres:16-alpine
+.\mvnw.cmd spring-boot:run
 ```
 
-Si `5432` está ocupado, usar `5433`:
+4. Validar health:
 
 ```powershell
-docker run --name ganaderia4-postgres `
-  -e POSTGRES_DB=ganaderia4 `
-  -e POSTGRES_USER=postgres `
-  -e POSTGRES_PASSWORD=postgres `
-  -p 5433:5432 `
-  -d postgres:16-alpine
+Invoke-RestMethod http://localhost:8080/healthz
+Invoke-RestMethod http://localhost:8080/actuator/health
 ```
 
-### 2. Definir variables de entorno en PowerShell
+5. Validar Swagger en entorno local si está habilitado:
 
-Con PostgreSQL en `5432`:
-
-```powershell
-$env:DB_URL="jdbc:postgresql://localhost:5432/ganaderia4"
-$env:DB_USERNAME="postgres"
-$env:DB_PASSWORD="postgres"
+```text
+http://localhost:8080/swagger-ui/index.html
 ```
 
-Con PostgreSQL en `5433`:
+Si se usa otro puerto, reemplazar `8080` por el puerto configurado.
 
-```powershell
-$env:DB_URL="jdbc:postgresql://localhost:5433/ganaderia4"
-$env:DB_USERNAME="postgres"
-$env:DB_PASSWORD="postgres"
+## 6. Validación de despliegue en Render
+
+Dominio:
+
+```text
+https://ganaderia-backend.onrender.com
 ```
 
-Opcionalmente, definir secretos locales explícitos:
+Validaciones básicas:
 
-```powershell
-$env:JWT_SECRET="local-dev-jwt-secret-change-me-32-bytes-minimum"
-$env:DEVICE_SECRET_MASTER_KEY="local-dev-device-master-key-change-me-32-bytes-minimum"
+```text
+GET https://ganaderia-backend.onrender.com/healthz
+GET https://ganaderia-backend.onrender.com/actuator/health
+GET https://ganaderia-backend.onrender.com/swagger-ui/index.html
 ```
 
-### 3. Levantar la aplicación
+Notas:
 
-```powershell
-./mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
+- Render puede tardar en responder el primer request si el servicio está frío.
+- Algunos endpoints requieren `Authorization: Bearer <token>`.
+- Swagger puede estar deshabilitado según el perfil activo.
+
+## 7. Autenticación y roles
+
+Login:
+
+```http
+POST /api/auth/login
 ```
 
-### 4. Validar Swagger/OpenAPI
-
-Abrir en navegador:
-
-- `http://localhost:8080/swagger-ui.html`
-- `http://localhost:8080/v3/api-docs`
-
-Si `PORT` se configuró distinto, reemplazar `8080` por el puerto real.
-
-## Validación de salud
-
-### `GET /healthz`
-
-Health check ligero, público y orientado a operación básica.
-
-Uso esperado:
-
-- validación rápida desde navegador, `curl`, balanceador o plataforma;
-- verificación simple de que la aplicación está respondiendo.
-
-Respuesta sana esperada:
-
-```json
-{"status":"ok"}
-```
-
-### `GET /actuator/health`
-
-Health endpoint de Actuator.
-
-Uso esperado:
-
-- validación técnica más alineada con Spring Boot Actuator;
-- integración con plataformas, monitoreo o revisiones operativas.
-
-### `GET /actuator/info`
-
-Expone metadatos básicos de la aplicación, por ejemplo nombre, descripción y versión.
-
-### Diferencia entre `healthz` y `actuator/health`
-
-- `/healthz`: endpoint público, ligero y estable para checks rápidos.
-- `/actuator/health`: endpoint Actuator del framework, orientado a observabilidad y runtime Spring.
-
-En un estado sano, ambos deben responder sin error HTTP.
-
-## Validación de seguridad
-
-### Login
-
-Endpoint público:
-
-- `POST /api/auth/login`
-
-Uso esperado:
-
-- enviar credenciales válidas;
-- recibir JWT Bearer;
-- usar ese token en endpoints protegidos.
-
-### JWT Bearer
-
-Para endpoints protegidos:
+Los endpoints protegidos usan:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-### Diferencia entre `401` y `403`
-
-- `401 Unauthorized`: el request no está autenticado correctamente.
-  - token ausente;
-  - token inválido;
-  - token expirado.
-
-- `403 Forbidden`: el request sí está autenticado, pero el rol no tiene permiso.
-
-### Roles actuales
+Roles principales:
 
 - `ADMINISTRADOR`
 - `SUPERVISOR`
 - `TECNICO`
 - `OPERADOR`
 
-La matriz oficial vigente está en:
+No documentar credenciales reales. Para pruebas usar usuarios demo controlados o credenciales gestionadas por el entorno.
 
-- [docs/permissions-matrix.md](permissions-matrix.md)
-
-## Validación de device ingestion
+## 8. Device ingestion IoT
 
 Endpoint:
 
-- `POST /api/device/locations`
+```http
+POST /api/device/locations
+```
 
-Este endpoint es público para Spring Security, pero no es anónimo funcionalmente. El flujo real exige autenticación HMAC y validaciones adicionales.
-
-### Headers requeridos
+Headers requeridos:
 
 - `X-Device-Token`
 - `X-Device-Timestamp`
 - `X-Device-Nonce`
 - `X-Device-Signature`
 
-### Comportamiento esperado
+El endpoint valida:
 
-- el request debe incluir headers consistentes;
-- la firma HMAC debe corresponder exactamente al payload enviado;
-- el timestamp debe estar dentro de la ventana permitida;
-- el nonce no debe estar repetido;
-- el payload debe cumplir validaciones JSON y de negocio.
+- Firma HMAC del request.
+- Token de dispositivo.
+- Timestamp dentro de ventana válida.
+- Nonce único persistido para evitar replay.
+- Collar existente, habilitado y operativo.
+- Payload con latitud, longitud y timestamp.
+- `batteryLevel`.
+- `gpsAccuracy`.
 
-### Errores esperados
-
-Casos frecuentes:
-
-- token o header faltante;
-- firma inválida;
-- nonce repetido (`replayed nonce`);
-- timestamp expirado;
-- timestamp demasiado en el futuro;
-- payload inválido o inconsistente con reglas de dominio.
-
-No usar secretos reales en pruebas manuales ni en Swagger.
-
-## Logs y correlación
-
-### `X-Request-Id`
-
-El backend usa correlación de requests mediante `X-Request-Id`.
-
-Uso recomendado:
-
-- enviar `X-Request-Id` desde cliente o frontend cuando sea posible;
-- si no se envía, el backend puede generar uno;
-- usar ese identificador para rastrear una petición de extremo a extremo.
-
-### Request correlation logs
-
-Los logs incluyen un patrón con `requestId`, lo que permite buscar una misma petición en:
-
-- autenticación;
-- controlador;
-- validaciones;
-- errores;
-- métricas y filtros HTTP.
-
-### Cómo rastrear una petición
-
-1. capturar el `X-Request-Id` de la respuesta o del cliente;
-2. buscar ese valor en logs;
-3. revisar la secuencia completa:
-   - entrada HTTP;
-   - warnings de seguridad;
-   - validaciones;
-   - excepción final si existe.
-
-### Tipos de logs
-
-- logs operativos normales:
-  - requests HTTP;
-  - completitud de jobs;
-  - eventos esperados.
-
-- warnings de seguridad:
-  - JWT inválido;
-  - acceso prohibido;
-  - HMAC inválido;
-  - replay de nonce.
-
-- errores reales:
-  - excepciones no esperadas;
-  - fallos de persistencia;
-  - problemas de infraestructura;
-  - fallos de integración.
-
-## Métricas y Actuator
-
-Endpoints relevantes:
-
-- `/actuator/metrics`
-- `/actuator/prometheus`
-
-Según la matriz actual, estos endpoints están restringidos a `ADMINISTRADOR`.
-
-Qué revisar si no responden:
-
-1. que el usuario tenga el rol correcto;
-2. que el JWT sea válido;
-3. que `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` incluya `metrics` y `prometheus`;
-4. que el perfil activo no los haya restringido;
-5. que `SecurityConfig` no esté bloqueando el acceso por rol.
-
-En producción, es normal que la exposición sea más limitada que en `local` o `dev`.
-
-## Pruebas y calidad
-
-### Comandos principales
-
-Unit tests:
+Scripts relacionados:
 
 ```powershell
-./mvnw test
+.\scripts\send-device-location.ps1
+.\scripts\load-test-device-ingestion.ps1
 ```
 
-Suite completa:
+No incluir `DeviceSecret` real en documentación, consola compartida o capturas.
+
+## 9. EMAIL y recuperación de contraseña
+
+Endpoints públicos:
+
+```http
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+```
+
+Características:
+
+- Envío de email con Resend.
+- EMAIL habilitado para demo y configurable por ambiente.
+- Puede apagarse en local o ambientes seguros.
+- `forgot-password` no revela si el email existe.
+- Tokens de recuperación seguros y hasheados en base de datos.
+- Limpieza programada de tokens usados o expirados.
+
+Scripts relacionados:
 
 ```powershell
-./mvnw clean verify
+.\scripts\test-email-notification-flow.ps1
+.\scripts\test-email-outbox-flow.ps1
 ```
 
-### Testcontainers
+## 10. Outbox EMAIL
 
-Los integration tests usan Testcontainers con PostgreSQL efímero.
+Outbox implementado para EMAIL.
 
-Requisito:
+Estados:
 
-- Docker debe estar activo.
+- `PENDING`
+- `PROCESSING`
+- `SENT`
+- `FAILED`
+- `DEAD`
 
-Si aparece:
+Endpoints admin:
 
-`Could not find a valid Docker environment`
+```http
+GET /api/admin/notification-outbox
+GET /api/admin/notification-outbox/{id}
+POST /api/admin/notification-outbox/{id}/requeue
+```
 
-acciones recomendadas:
+Notas operativas:
 
-1. iniciar Docker Desktop;
-2. verificar que el daemon Docker responde;
-3. reintentar `./mvnw clean verify`;
-4. evitar ejecutar dos procesos Maven simultáneos sobre el mismo `target`.
+- Requiere rol `ADMINISTRADOR`.
+- El endpoint de requeue permite recuperar mensajes `FAILED` o `DEAD`.
+- El endpoint admin no debe exponer payload completo, tokens, passwords, secrets, `htmlBody` ni `textBody`.
+- No es un outbox universal; está implementado para EMAIL.
 
-### JaCoCo
+## 11. IA analítica
 
-El proyecto tiene quality gate de cobertura. `verify` valida que el umbral actual se cumpla.
+Endpoints:
 
-### SpotBugs
+```http
+GET /api/alert-analysis/summary
+GET /api/alert-analysis/top-priorities?limit=5
+GET /api/alert-analysis/ai-summary
+```
 
-`verify` ejecuta análisis estático con SpotBugs. El build falla si aparecen hallazgos bloqueantes según la configuración actual.
+Características:
 
-### OWASP Dependency-Check
+- IA con Google Gemini.
+- IA habilitada para demo y configurable por entorno.
+- Fallback heurístico si Gemini falla o si IA está apagada.
+- Métricas de IA.
 
-Está documentado y configurado en workflow separado para detectar dependencias vulnerables.
+Campos esperados en respuestas analíticas:
 
-### Trivy
+- `summary`
+- `riskLevel`
+- `recommendations`
+- `source`
+- `fallbackUsed`
+- `generatedAt`
 
-Está documentado y configurado en workflow separado para análisis de contenedor.
+No incluir `GEMINI_API_KEY` real.
 
-## Diagnóstico de fallos comunes
+## 12. Observabilidad
 
-| Síntoma | Causa probable | Acción recomendada |
-|---|---|---|
-| `401 Unauthorized` | JWT ausente, inválido o expirado | Validar login, header `Authorization`, expiración del token y formato `Bearer`. |
-| `403 Forbidden` | El usuario está autenticado pero su rol no tiene permiso | Revisar la matriz en `docs/permissions-matrix.md` y confirmar el rol real del usuario. |
-| Error de conexión a PostgreSQL | Base caída, `DB_URL` incorrecta, credenciales erróneas o puerto ocupado | Verificar contenedor/instancia, credenciales, puerto y conectividad. |
-| `Flyway migration failed` | Script inválido, esquema inconsistente o base en estado inesperado | Revisar logs de Flyway, versión actual de la base y scripts en `db/migration`. |
-| `Could not find a valid Docker environment` | Docker/Testcontainers no disponible | Levantar Docker Desktop y reejecutar `./mvnw clean verify`. |
-| Swagger no carga | Perfil incorrecto, `springdoc` deshabilitado o puerto distinto | Confirmar perfil `local` o `dev`, revisar `/v3/api-docs` y el puerto activo. |
-| Render muestra servicio caído | Variables faltantes, fallo de arranque, error DB o health check fallando | Revisar logs del deploy, variables de entorno, conexión a DB y `/healthz`. |
-| `POST /api/device/locations` devuelve `401` | HMAC inválido, nonce repetido, timestamp fuera de ventana o token device desconocido | Revisar headers HMAC, ventana temporal, nonce y firma exacta del payload. |
-| `POST /api/device/locations` devuelve `400` | Payload inválido o regla funcional rechazada | Revisar JSON, formato del timestamp, collar habilitado/activo y validaciones de dominio. |
-| Export CSV falla o devuelve vacío | Filtros sin datos, error de consulta o acceso no permitido | Revisar filtros, permisos del usuario y datos disponibles en la base. |
+El backend usa:
 
-## Checklist antes de desplegar o entregar
+- Logs estructurados con `event=...`.
+- Correlación por `X-Request-Id`.
+- Health endpoint propio `/healthz`.
+- Spring Boot Actuator.
+- Métricas Prometheus.
 
-- `git status` limpio o cambios intencionales controlados;
-- `./mvnw test`;
-- `./mvnw clean verify`;
-- Docker activo si se van a correr integration tests;
-- variables de entorno revisadas;
-- `/healthz` validado;
-- `/actuator/health` validado;
-- Swagger revisado en `local` o `dev` si aplica;
-- ningún secreto real expuesto en documentación, logs o Swagger;
-- `README.md` y `docs/` actualizados.
+Endpoints:
+
+```http
+GET /healthz
+GET /actuator/health
+GET /actuator/metrics
+GET /actuator/prometheus
+```
+
+Algunos endpoints de Actuator pueden requerir JWT con rol `ADMINISTRADOR`, según la configuración de seguridad activa.
+
+## 13. Pruebas y calidad
+
+Comando principal:
+
+```powershell
+.\mvnw.cmd clean verify
+```
+
+Último resultado conocido:
+
+- Tests unitarios: 277.
+- Tests de integración: 198.
+- Tests totales: 475.
+- Failures: 0.
+- Errors: 0.
+- Skipped: 0.
+- JaCoCo OK.
+- SpotBugs OK.
+
+Notas:
+
+- Los tests de integración usan Testcontainers.
+- Docker Desktop debe estar iniciado.
+- Si Docker no está activo, puede fallar la fase de integración.
+- Este runbook documenta el último resultado conocido; no implica que `clean verify` se haya ejecutado durante cada cambio documental.
+
+## 14. Scripts operativos
+
+### `scripts/smoke-test-backend.ps1`
+
+Valida health, login y endpoints de análisis principales.
+
+Parámetros principales:
+
+- `BaseUrl`
+- `Email`
+- `Password`
+
+### `scripts/seed-demo-data.ps1`
+
+Crea o reutiliza datos demo: vacas, collares, geocerca, ubicaciones y preferencias de notificación.
+
+Parámetros principales:
+
+- `BaseUrl`
+- `AdminEmail`
+- `AdminPassword`
+- `Prefix`
+- `SkipExisting`
+- `IncludeEmailPreferences`
+- `IncludeGeofence`
+
+### `scripts/send-device-location.ps1`
+
+Envía una ubicación firmada con HMAC a `POST /api/device/locations`.
+
+Parámetros principales:
+
+- `BaseUrl`
+- `DeviceToken`
+- `DeviceSecret`
+- `Latitude`
+- `Longitude`
+- `BatteryLevel`
+- `GpsAccuracy`
+
+### `scripts/test-email-notification-flow.ps1`
+
+Valida flujos operativos de email/notificación, incluyendo escenarios como baja batería.
+
+Parámetros principales:
+
+- `BaseUrl`
+- `Email`
+- `Password`
+- `Mode`
+- `CollarToken`
+- `DeviceToken`
+- `DeviceSecret`
+- `BatteryLevel`
+- `PollAttempts`
+- `PollDelaySeconds`
+
+### `scripts/test-email-outbox-flow.ps1`
+
+Valida forgot-password con EMAIL por outbox y consulta el endpoint admin del outbox.
+
+Parámetros principales:
+
+- `BaseUrl`
+- `AdminEmail`
+- `AdminPassword`
+- `ForgotPasswordEmail`
+- `WaitSeconds`
+
+### `scripts/load-test-device-ingestion.ps1`
+
+Ejecuta carga controlada contra `POST /api/device/locations`.
+
+Parámetros principales:
+
+- `BaseUrl`
+- `DeviceToken`
+- `DeviceSecret`
+- `Requests`
+- `Concurrency`
+- `DelayMs`
+- `Latitude`
+- `Longitude`
+- `BatteryLevel`
+- `GpsAccuracy`
+- `VerboseErrors`
+
+## 15. Troubleshooting
+
+| Problema | Síntoma | Causa probable | Acción recomendada |
+| --- | --- | --- | --- |
+| 401 Unauthorized | Respuesta 401 en endpoint protegido | JWT ausente, inválido o expirado | Ejecutar login, revisar `Authorization: Bearer <token>` y expiración. |
+| 403 Forbidden | Usuario autenticado sin acceso | Rol insuficiente | Validar rol real del usuario y matriz de permisos. |
+| CORS bloqueado | El navegador bloquea la llamada | Origen frontend no permitido | Revisar `APP_CORS_ALLOWED_ORIGINS`. |
+| Render lento al primer request | Primer request demora o parece colgar | Servicio frío o inicializando | Esperar y reintentar; validar logs y `/healthz`. |
+| Testcontainers falla | `Could not find a valid Docker environment` | Docker Desktop apagado | Iniciar Docker Desktop y repetir `.\mvnw.cmd clean verify`. |
+| EMAIL no llega | Forgot-password responde OK pero no llega correo | Email deshabilitado, API key incorrecta, remitente inválido o provider fallando | Revisar variables Resend, logs `password_reset_email_*` y outbox si aplica. |
+| Gemini no responde | AI summary usa fallback o falla | API key ausente, cuota, timeout o Gemini no disponible | Revisar `AI_ENABLED`, `GEMINI_API_KEY`, logs y `fallbackUsed`. |
+| Outbox queda en FAILED | Mensajes no enviados | Error de provider o payload/configuración inválida | Revisar `lastErrorSummary`, logs y configuración EMAIL. |
+| Outbox queda en DEAD | Mensaje agotó reintentos | Fallo persistente tras max attempts | Revisar detalle admin y usar requeue solo si la causa fue corregida. |
+| Device ingestion 401 por firma inválida | Request IoT rechazado | Canonical request, secreto o body firmado no coinciden | Usar `send-device-location.ps1` y confirmar que body firmado es el mismo enviado. |
+| Device ingestion 401 por nonce repetido | Request rechazado por replay | Nonce ya usado | Generar nonce único por request. |
+| Device ingestion 400 por payload inválido | Error de validación | Timestamp futuro/antiguo, lat/lon inválidos, batería o GPS fuera de rango | Revisar payload, timestamp local/UTC y rangos. |
+| Actuator metrics 403 | `/actuator/metrics` o `/actuator/prometheus` denegado | Falta rol `ADMINISTRADOR` o endpoint restringido | Usar JWT admin y revisar exposición Actuator. |
+
+## 16. Checklist rápido de demo técnica
+
+- Backend Render health OK: `https://ganaderia-backend.onrender.com/healthz`.
+- Login OK.
+- EMAIL OK.
+- IA OK.
+- Seed demo OK.
+- Device ingestion OK.
+- Outbox admin OK.
+- Tests conocidos en verde: 475 totales, 0 failures, 0 errors.
+- Swagger accesible si el perfil lo permite.
+- No hay secretos reales en consola compartida, README, runbook o capturas.
 
 ## Referencias internas
 
+- [README principal](../README.md)
+- [Pruebas de carga device ingestion](device-ingestion-load-test.md)
 - [Matriz de permisos](permissions-matrix.md)
-- [Política temporal UTC](time-policy.md)
-- [Lifecycle de collares](collar-lifecycle.md)
-- [Resumen Fase 1 Hardening](phase-1-hardening-summary.md)
-- [README.md](../README.md)
+- [Política temporal](time-policy.md)
+- [Ciclo de vida de collares](collar-lifecycle.md)
