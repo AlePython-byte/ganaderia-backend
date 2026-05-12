@@ -22,6 +22,9 @@ public class ErrorResponseDTO {
     @Schema(description = "Ruta del request que produjo el error", example = "/api/device/locations")
     private String path;
 
+    @Schema(description = "Identificador de correlacion del request asociado al error", example = "req-demo-001")
+    private String requestId;
+
     @Schema(description = "Fecha y hora del error con el contrato temporal actual", example = "2026-04-28T20:52:08")
     private LocalDateTime timestamp;
 
@@ -33,12 +36,14 @@ public class ErrorResponseDTO {
                             String code,
                             String message,
                             String path,
+                            String requestId,
                             LocalDateTime timestamp) {
         this.status = status;
         this.error = error;
         this.code = code;
         this.message = message;
         this.path = path;
+        this.requestId = requestId;
         this.timestamp = timestamp;
     }
 
@@ -80,6 +85,14 @@ public class ErrorResponseDTO {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
     public LocalDateTime getTimestamp() {

@@ -3,16 +3,22 @@ package com.ganaderia4.backend.exception;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import com.ganaderia4.backend.observability.RequestCorrelationFilter;
 import com.ganaderia4.backend.service.InvalidPasswordResetTokenException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 
@@ -29,7 +35,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 ApiErrorCode.RESOURCE_NOT_FOUND,
                 ex.getMessage(),
-                request.getRequestURI()
+                request
         );
     }
 
@@ -41,7 +47,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.BAD_REQUEST,
                 ex.getMessage(),
-                request.getRequestURI()
+                request
         );
     }
 
@@ -53,7 +59,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.CONFLICT,
                 ApiErrorCode.CONFLICT,
                 ex.getMessage(),
-                request.getRequestURI()
+                request
         );
     }
 
@@ -64,7 +70,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNAUTHORIZED,
                 ApiErrorCode.DEVICE_UNAUTHORIZED,
                 ex.getMessage(),
-                request.getRequestURI()
+                request
         );
     }
 
@@ -75,7 +81,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.FORBIDDEN,
                 ApiErrorCode.FORBIDDEN,
                 "Acceso denegado",
-                request.getRequestURI()
+                request
         );
     }
 
@@ -89,7 +95,7 @@ public class GlobalExceptionHandler {
                         HttpStatus.TOO_MANY_REQUESTS,
                         ApiErrorCode.TOO_MANY_REQUESTS,
                         ex.getMessage(),
-                        request.getRequestURI()
+                        request
                 ));
     }
 
@@ -105,7 +111,59 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.VALIDATION_ERROR,
                 message,
-                request.getRequestURI()
+                request
+        );
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request) {
+        logHandled(HttpStatus.BAD_REQUEST, "malformed_request_body", request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ApiErrorCode.BAD_REQUEST,
+                "El cuerpo de la solicitud no es válido o no tiene formato JSON correcto.",
+                request
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request) {
+        logHandled(HttpStatus.BAD_REQUEST, "argument_type_mismatch", request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ApiErrorCode.BAD_REQUEST,
+                "Uno o más parámetros tienen un formato inválido.",
+                request
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request) {
+        logHandled(HttpStatus.BAD_REQUEST, "missing_request_parameter", request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ApiErrorCode.BAD_REQUEST,
+                "Falta un parámetro requerido en la solicitud.",
+                request
+        );
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleConstraintViolationException(
+            ConstraintViolationException ex,
+            HttpServletRequest request) {
+        logHandled(HttpStatus.BAD_REQUEST, "constraint_violation", request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                ApiErrorCode.VALIDATION_ERROR,
+                "La solicitud contiene valores inválidos.",
+                request
         );
     }
 
@@ -126,28 +184,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 ApiErrorCode.INTERNAL_ERROR,
                 "Ocurrió un error interno del servidor",
-                request.getRequestURI()
-        );
-    }
-
-    private ResponseEntity<ErrorResponseDTO> buildErrorResponse(HttpStatus status,
-                                                                ApiErrorCode code,
-                                                                String message,
-                                                                String path) {
-        return new ResponseEntity<>(buildError(status, code, message, path), status);
-    }
-
-    private ErrorResponseDTO buildError(HttpStatus status,
-                                        ApiErrorCode code,
-                                        String message,
-                                        String path) {
-        return new ErrorResponseDTO(
-                status.value(),
-                status.getReasonPhrase(),
-                code.name(),
-                message,
-                path,
-                LocalDateTime.now()
+                request
         );
     }
 
@@ -160,7 +197,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED,
                 ApiErrorCode.BAD_REQUEST,
                 "Método HTTP no permitido para este endpoint",
-                request.getRequestURI()
+                request
         );
     }
 
@@ -173,7 +210,29 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.BAD_REQUEST,
                 "El token de recuperación es inválido o expiró.",
-                request.getRequestURI()
+                request
+        );
+    }
+
+    private ResponseEntity<ErrorResponseDTO> buildErrorResponse(HttpStatus status,
+                                                                ApiErrorCode code,
+                                                                String message,
+                                                                HttpServletRequest request) {
+        return new ResponseEntity<>(buildError(status, code, message, request), status);
+    }
+
+    private ErrorResponseDTO buildError(HttpStatus status,
+                                        ApiErrorCode code,
+                                        String message,
+                                        HttpServletRequest request) {
+        return new ErrorResponseDTO(
+                status.value(),
+                status.getReasonPhrase(),
+                code.name(),
+                message,
+                path(request),
+                requestId(request),
+                LocalDateTime.now()
         );
     }
 
@@ -199,5 +258,22 @@ public class GlobalExceptionHandler {
 
     private boolean queryPresent(HttpServletRequest request) {
         return request != null && request.getQueryString() != null && !request.getQueryString().isBlank();
+    }
+
+    private String requestId(HttpServletRequest request) {
+        if (request != null) {
+            Object attribute = request.getAttribute(RequestCorrelationFilter.REQUEST_ATTRIBUTE);
+            if (attribute instanceof String requestId && !requestId.isBlank()) {
+                return requestId;
+            }
+
+            String header = request.getHeader(RequestCorrelationFilter.HEADER_NAME);
+            if (header != null && !header.isBlank()) {
+                return header.trim();
+            }
+        }
+
+        String requestId = MDC.get(RequestCorrelationFilter.MDC_KEY);
+        return requestId == null || requestId.isBlank() ? "-" : requestId;
     }
 }

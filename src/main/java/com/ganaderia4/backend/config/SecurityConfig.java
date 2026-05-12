@@ -25,6 +25,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.slf4j.MDC;
 
 import java.time.LocalDateTime;
 
@@ -166,7 +167,8 @@ public class SecurityConfig {
                                         HttpStatus.UNAUTHORIZED,
                                         ApiErrorCode.UNAUTHORIZED,
                                         "No autorizado",
-                                        request.getRequestURI()
+                                        request.getRequestURI(),
+                                        resolveRequestId(request)
                                 );
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
@@ -182,7 +184,8 @@ public class SecurityConfig {
                                         HttpStatus.FORBIDDEN,
                                         ApiErrorCode.FORBIDDEN,
                                         "Acceso denegado",
-                                        request.getRequestURI()
+                                        request.getRequestURI(),
+                                        resolveRequestId(request)
                                 );
                         })
                 )
@@ -195,13 +198,15 @@ public class SecurityConfig {
                                     HttpStatus status,
                                     ApiErrorCode code,
                                     String message,
-                                    String path) throws java.io.IOException {
+                                    String path,
+                                    String requestId) throws java.io.IOException {
         ErrorResponseDTO error = new ErrorResponseDTO(
                 status.value(),
                 status.getReasonPhrase(),
                 code.name(),
                 message,
                 path,
+                requestId,
                 LocalDateTime.now()
         );
 
@@ -233,5 +238,22 @@ public class SecurityConfig {
         }
 
         return value.replaceAll("[\\r\\n\\t ]+", "_");
+    }
+
+    private String resolveRequestId(jakarta.servlet.http.HttpServletRequest request) {
+        if (request != null) {
+            Object attribute = request.getAttribute(RequestCorrelationFilter.REQUEST_ATTRIBUTE);
+            if (attribute instanceof String requestId && !requestId.isBlank()) {
+                return requestId;
+            }
+
+            String header = request.getHeader(RequestCorrelationFilter.HEADER_NAME);
+            if (header != null && !header.isBlank()) {
+                return header.trim();
+            }
+        }
+
+        String requestId = MDC.get(RequestCorrelationFilter.MDC_KEY);
+        return requestId == null || requestId.isBlank() ? "-" : requestId;
     }
 }

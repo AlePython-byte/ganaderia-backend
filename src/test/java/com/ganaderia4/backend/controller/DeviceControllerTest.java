@@ -186,12 +186,14 @@ class DeviceControllerTest {
                 """;
 
         mockMvc.perform(post(DEVICE_LOCATION_PATH)
+                        .header("X-Request-Id", "req-device-unauthorized")
                         .header("X-Device-Token", "COLLAR-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("Timestamp de dispositivo ausente o invalido"));
+                .andExpect(jsonPath("$.message").value("Timestamp de dispositivo ausente o invalido"))
+                .andExpect(jsonPath("$.requestId").value("req-device-unauthorized"));
     }
 
     @Test

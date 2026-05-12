@@ -7,10 +7,15 @@ import org.slf4j.MDC;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.http.HttpInputMessage;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,6 +46,7 @@ class GlobalExceptionHandlerTest {
         var response = handler.handleValidationException(exception, request);
 
         assertEquals(400, response.getStatusCode().value());
+        assertEquals("req-validation-001", response.getBody().getRequestId());
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_handled"));
         assertTrue(logs.contains("requestId=req-validation-001"));
@@ -64,6 +70,7 @@ class GlobalExceptionHandlerTest {
         );
 
         assertEquals(404, response.getStatusCode().value());
+        assertEquals("req-not-found-001", response.getBody().getRequestId());
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_handled"));
         assertTrue(logs.contains("requestId=req-not-found-001"));
@@ -84,6 +91,8 @@ class GlobalExceptionHandlerTest {
         var response = handler.handleGenericException(new IllegalStateException("database unavailable"), request);
 
         assertEquals(500, response.getStatusCode().value());
+        assertEquals("req-unhandled-001", response.getBody().getRequestId());
+        assertEquals("Ocurrió un error interno del servidor", response.getBody().getMessage());
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_unhandled"));
         assertTrue(logs.contains("requestId=req-unhandled-001"));
@@ -94,5 +103,76 @@ class GlobalExceptionHandlerTest {
         assertTrue(logs.contains("queryPresent=true"));
         assertTrue(logs.contains("java.lang.IllegalStateException"));
         assertFalse(logs.contains("secret=hidden"));
+    }
+
+    @Test
+    void shouldReturnBadRequestForMalformedJsonWithRequestId() {
+        MDC.put("requestId", "req-json-001");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+
+        var response = handler.handleHttpMessageNotReadableException(
+                new HttpMessageNotReadableException("invalid json", mock(HttpInputMessage.class)),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("BAD_REQUEST", response.getBody().getCode());
+        assertEquals("El cuerpo de la solicitud no es válido o no tiene formato JSON correcto.",
+                response.getBody().getMessage());
+        assertEquals("req-json-001", response.getBody().getRequestId());
+    }
+
+    @Test
+    void shouldReturnBadRequestForArgumentTypeMismatchWithRequestId() {
+        MDC.put("requestId", "req-argument-001");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/alerts");
+
+        var response = handler.handleMethodArgumentTypeMismatchException(
+                new MethodArgumentTypeMismatchException(
+                        "invalid",
+                        Long.class,
+                        "id",
+                        mock(MethodParameter.class),
+                        new IllegalArgumentException("invalid")
+                ),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("BAD_REQUEST", response.getBody().getCode());
+        assertEquals("Uno o más parámetros tienen un formato inválido.", response.getBody().getMessage());
+        assertEquals("req-argument-001", response.getBody().getRequestId());
+    }
+
+    @Test
+    void shouldReturnBadRequestForMissingRequestParameterWithRequestId() {
+        MDC.put("requestId", "req-parameter-001");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/reports/alerts");
+
+        var response = handler.handleMissingServletRequestParameterException(
+                new MissingServletRequestParameterException("from", "String"),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("BAD_REQUEST", response.getBody().getCode());
+        assertEquals("Falta un parámetro requerido en la solicitud.", response.getBody().getMessage());
+        assertEquals("req-parameter-001", response.getBody().getRequestId());
+    }
+
+    @Test
+    void shouldKeepMethodNotAllowedAs405WithRequestId() {
+        MDC.put("requestId", "req-method-001");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/health");
+
+        var response = handler.handleMethodNotSupportedException(
+                new HttpRequestMethodNotSupportedException("POST"),
+                request
+        );
+
+        assertEquals(405, response.getStatusCode().value());
+        assertEquals("BAD_REQUEST", response.getBody().getCode());
+        assertEquals("Método HTTP no permitido para este endpoint", response.getBody().getMessage());
+        assertEquals("req-method-001", response.getBody().getRequestId());
     }
 }

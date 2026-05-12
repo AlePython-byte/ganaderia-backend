@@ -60,11 +60,13 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldRejectAuthMeWhenTokenIsMissing() throws Exception {
-        mockMvc.perform(get("/api/auth/me"))
+        mockMvc.perform(get("/api/auth/me")
+                        .header("X-Request-Id", "req-auth-me-unauthorized"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message").value("No autorizado"))
-                .andExpect(jsonPath("$.path").value("/api/auth/me"));
+                .andExpect(jsonPath("$.path").value("/api/auth/me"))
+                .andExpect(jsonPath("$.requestId").value("req-auth-me-unauthorized"));
     }
 
     @Test
@@ -138,11 +140,13 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
         String token = loginAndGetToken("operador@test.com", "12345678");
 
         mockMvc.perform(get("/api/users")
+                        .header("X-Request-Id", "req-users-forbidden")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.message").value("Acceso denegado"))
-                .andExpect(jsonPath("$.path").value("/api/users"));
+                .andExpect(jsonPath("$.path").value("/api/users"))
+                .andExpect(jsonPath("$.requestId").value("req-users-forbidden"));
     }
 
     @Test
