@@ -131,7 +131,7 @@ $jobScript = {
 
     $requestInstantUtc = [DateTimeOffset]::UtcNow
     $timestampHeader = $requestInstantUtc.ToString("yyyy-MM-ddTHH:mm:ss'Z'")
-    $bodyTimestamp = $requestInstantUtc.ToString("yyyy-MM-ddTHH:mm:ss")
+    $bodyTimestamp = (Get-Date).AddMinutes(-1).ToString("yyyy-MM-ddTHH:mm:ss")
     $nonce = ([Guid]::NewGuid().ToString() + "-" + $RequestNumber)
 
     $bodyObject = [ordered]@{
@@ -175,6 +175,8 @@ $jobScript = {
             Success = $true
             StatusCode = 200
             LatencyMs = $stopwatch.ElapsedMilliseconds
+            HeaderTimestamp = $timestampHeader
+            BodyTimestamp = $bodyTimestamp
             ErrorSummary = $null
         }
     }
@@ -217,6 +219,8 @@ $jobScript = {
             Success = $false
             StatusCode = $statusCode
             LatencyMs = $stopwatch.ElapsedMilliseconds
+            HeaderTimestamp = $timestampHeader
+            BodyTimestamp = $bodyTimestamp
             ErrorSummary = $errorText
         }
     }
@@ -327,10 +331,12 @@ if ($VerboseErrors -and $errorCount -gt 0) {
         Where-Object { -not $_.Success } |
         Select-Object -First 10 |
         ForEach-Object {
-            Write-Host ("- request={0} status={1} latencyMs={2} error={3}" -f `
+            Write-Host ("- request={0} status={1} latencyMs={2} headerTimestamp={3} bodyTimestamp={4} error={5}" -f `
                     $_.RequestNumber,
                     $_.StatusCode,
                     $_.LatencyMs,
+                    $_.HeaderTimestamp,
+                    $_.BodyTimestamp,
                     (Truncate-Text -Value $_.ErrorSummary -MaxLength 300))
         }
 }

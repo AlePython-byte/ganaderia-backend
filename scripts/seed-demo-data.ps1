@@ -1,8 +1,8 @@
 # Uso:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\seed-demo-data.ps1 `
 #     -BaseUrl "http://localhost:8080" `
-#     -Email "admin@ganaderia.com" `
-#     -Password "tu-password"
+#     -AdminEmail "admin@ganaderia.com" `
+#     -AdminPassword "tu-password"
 #
 # El script:
 # - hace login via JWT
@@ -15,13 +15,11 @@ param(
     [Alias("BASE_URL")]
     [string]$BaseUrl = "http://localhost:8080",
 
-    [Alias("EMAIL")]
     [Parameter(Mandatory = $true)]
-    [string]$Email,
+    [string]$AdminEmail,
 
-    [Alias("PASSWORD")]
     [Parameter(Mandatory = $true)]
-    [string]$Password,
+    [string]$AdminPassword,
 
     [string]$Prefix = "Demo",
     [bool]$SkipExisting = $true,
@@ -184,8 +182,21 @@ function Format-HttpFailure {
     return ($parts -join " | ")
 }
 
+function ConvertTo-SafeJson {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Value
+    )
+
+    return ($Value | ConvertTo-Json -Depth 10 -Compress)
+}
+
 function Get-IsoLocalTimestamp {
-    return (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss")
+    param(
+        [int]$MinutesAgo = 5
+    )
+
+    return (Get-Date).AddMinutes(-1 * $MinutesAgo).ToString("yyyy-MM-ddTHH:mm:ss")
 }
 
 function New-RequestHeaders {
@@ -252,13 +263,13 @@ function Ensure-Cow {
 
     $body = @{
         name = $targetName
-        status = "ACTIVA"
+        status = "SIN_UBICACION"
         observations = "Seed demo por API"
     }
 
     $result = Invoke-JsonRequest -Method POST -Uri "$BaseUrl/api/cows" -Headers (New-RequestHeaders -Jwt $Jwt) -Body $body
     if (-not $result.Ok) {
-        throw "No fue posible crear vaca '$targetName': $(Format-HttpFailure -Result $result)"
+        throw "No fue posible crear vaca '$targetName': $(Format-HttpFailure -Result $result) | sentBody=$(ConvertTo-SafeJson -Value $body)"
     }
 
     Write-StepResult -Name "Cow $targetName" -Success $true -Detail "created id=$($result.Body.id) token=$($result.Body.token)"
@@ -302,17 +313,17 @@ function Ensure-Collar {
     }
 
     $body = @{
-        status = "ACTIVE"
+        status = "ACTIVO"
         cowId = $Cow.id
         batteryLevel = 100
-        signalStatus = "ONLINE"
+        signalStatus = "FUERTE"
         enabled = $true
         notes = "Seed demo por API"
     }
 
     $result = Invoke-JsonRequest -Method POST -Uri "$BaseUrl/api/collars" -Headers (New-RequestHeaders -Jwt $Jwt) -Body $body
     if (-not $result.Ok) {
-        throw "No fue posible crear collar para '$($Cow.name)': $(Format-HttpFailure -Result $result)"
+        throw "No fue posible crear collar para '$($Cow.name)': $(Format-HttpFailure -Result $result) | sentBody=$(ConvertTo-SafeJson -Value $body)"
     }
 
     Write-StepResult -Name "Collar for $($Cow.name)" -Success $true -Detail "created id=$($result.Body.id) token=$($result.Body.token)"
@@ -390,19 +401,20 @@ function Create-ManualLocation {
         [Parameter(Mandatory = $true)]
         [double]$Latitude,
         [Parameter(Mandatory = $true)]
-        [double]$Longitude
+        [double]$Longitude,
+        [int]$MinutesAgo = 5
     )
 
     $body = @{
         collarToken = $CollarToken
         latitude = $Latitude
         longitude = $Longitude
-        timestamp = Get-IsoLocalTimestamp
+        timestamp = Get-IsoLocalTimestamp -MinutesAgo $MinutesAgo
     }
 
     $result = Invoke-JsonRequest -Method POST -Uri "$BaseUrl/api/locations" -Headers (New-RequestHeaders -Jwt $Jwt) -Body $body
     if (-not $result.Ok) {
-        throw "No fue posible crear ubicacion para collar '$CollarToken': $(Format-HttpFailure -Result $result)"
+        throw "No fue posible crear ubicacion para collar '$CollarToken': $(Format-HttpFailure -Result $result) | sentBody=$(ConvertTo-SafeJson -Value $body)"
     }
 
     Write-StepResult -Name "Location $CollarToken" -Success $true -Detail "created id=$($result.Body.id)"
@@ -450,7 +462,7 @@ $summary = [ordered]@{
 }
 
 Write-Host "Demo seed target: $trimmedBaseUrl"
-Write-Host "User: $Email"
+Write-Host "User: $AdminEmail"
 Write-Host "Prefix: $Prefix"
 Write-Host "SkipExisting: $SkipExisting"
 Write-Host ""
@@ -465,8 +477,8 @@ if (-not $health.Ok) {
 Write-StepResult -Name "Health" -Success $true -Detail "endpoint=/healthz"
 
 $loginBody = @{
-    email = $Email
-    password = $Password
+    email = $AdminEmail
+    password = $AdminPassword
 }
 
 $login = Invoke-JsonRequest -Method POST -Uri "$trimmedBaseUrl/api/auth/login" -Body $loginBody
@@ -504,8 +516,8 @@ try {
         Write-StepResult -Name "Geofence" -Success $true -Detail "skipped by flag"
     }
 
-    $locationOne = Create-ManualLocation -BaseUrl $trimmedBaseUrl -Jwt $jwt -CollarToken $collarOne.token -Latitude 1.2140 -Longitude -77.2810
-    $locationTwo = Create-ManualLocation -BaseUrl $trimmedBaseUrl -Jwt $jwt -CollarToken $collarTwo.token -Latitude 1.2185 -Longitude -77.2765
+    $locationOne = Create-ManualLocation -BaseUrl $trimmedBaseUrl -Jwt $jwt -CollarToken $collarOne.token -Latitude 1.2140 -Longitude -77.2810 -MinutesAgo 5
+    $locationTwo = Create-ManualLocation -BaseUrl $trimmedBaseUrl -Jwt $jwt -CollarToken $collarTwo.token -Latitude 1.2185 -Longitude -77.2765 -MinutesAgo 4
     $summary.locations += @($locationOne, $locationTwo)
 
     if ($IncludeEmailPreferences) {
