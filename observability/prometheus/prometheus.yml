@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "ganaderia4-backend-local"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+
+  # Render target opcional. Mantener comentado por defecto para evitar scrapear
+  # internet o un endpoint protegido sin una decision explicita.
+  #
+  # - job_name: "ganaderia4-backend-render"
+  #   scheme: "https"
+  #   metrics_path: "/actuator/prometheus"
+  #   static_configs:
+  #     - targets: ["ganaderia-backend.onrender.com"]
