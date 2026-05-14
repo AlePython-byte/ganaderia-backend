@@ -1,10 +1,17 @@
-# Guía de performance con k6 — Ganadería 4.0
+# Guia de performance con k6 - Ganaderia 4.0
 
-## 1. Propósito
+## 1. Proposito
 
-k6 complementa el load test PowerShell existente con una herramienta estándar para pruebas de performance reproducibles sobre el endpoint IoT del backend.
+k6 complementa los scripts PowerShell existentes con herramientas estandar para pruebas de performance reproducibles del backend.
 
-## 2. Endpoint evaluado
+Scripts disponibles:
+
+- `performance/k6/device-ingestion.js`: prueba IoT con HMAC.
+- `performance/k6/operational-read.js`: prueba lecturas protegidas con JWT.
+
+La guia especifica de lectura operativa esta en `docs/k6-operational-read-guide.md`.
+
+## 2. Endpoint IoT evaluado
 
 Endpoint:
 
@@ -17,18 +24,18 @@ Headers:
 - `X-Device-Nonce`.
 - `X-Device-Signature`.
 
-Cada request se firma con HMAC SHA-256 y utiliza nonce único.
+Cada request se firma con HMAC SHA-256 y utiliza nonce unico.
 
 ## 3. Requisitos
 
 - k6 instalado.
 - Backend local o Render disponible.
-- Device token válido.
-- Device secret válido.
+- Device token valido.
+- Device secret valido.
 - Collar activo y habilitado.
 - Variables de entorno configuradas de forma segura.
 
-## 4. Ejecución segura
+## 4. Ejecucion segura
 
 ```powershell
 $env:BASE_URL="https://ganaderia-backend.onrender.com"
@@ -45,7 +52,7 @@ Remove-Item Env:DEVICE_SECRET
 
 ## 5. Escenarios
 
-- **Smoke:** escenario conservador por defecto, adecuado para validar conectividad, firma HMAC y estabilidad básica.
+- **Smoke:** escenario conservador por defecto, adecuado para validar conectividad, firma HMAC y estabilidad basica.
 - **Light:** puede representarse elevando `VUS`, `DURATION` o `REQUESTS_PER_SECOND` de forma moderada.
 - **Medium:** puede representarse con mayor concurrencia controlada, evitando carga agresiva contra Render.
 
@@ -62,7 +69,22 @@ k6 run `
   performance/k6/device-ingestion.js
 ```
 
-## 6. Métricas k6 importantes
+## 6. Lectura operativa
+
+Para validar endpoints GET protegidos con JWT:
+
+```powershell
+k6 run `
+  -e BASE_URL=https://ganaderia-backend.onrender.com `
+  -e JWT=<JWT> `
+  -e VUS=2 `
+  -e DURATION=30s `
+  performance/k6/operational-read.js
+```
+
+Detalles: `docs/k6-operational-read-guide.md`.
+
+## 7. Metricas k6 importantes
 
 - `http_req_duration`.
 - `http_req_failed`.
@@ -72,18 +94,18 @@ k6 run `
 - `data_received`.
 - `data_sent`.
 
-## 7. Interpretación de errores
+## 8. Interpretacion de errores
 
-| Error | Causa probable | Acción |
+| Error | Causa probable | Accion |
 | --- | --- | --- |
 | `200` | Request procesada correctamente. | Confirmar tendencia de latencia y checks. |
-| `400` | Payload inválido o timestamp del body no aceptado. | Revisar body, formatos y rangos. |
-| `401` | Firma inválida, nonce repetido, timestamp de autenticación inválido o token desconocido. | Revisar canonicalización, headers, secreto y reloj. |
-| `403` | Regla de autorización o estado operativo que bloquee la acción, si aplica. | Revisar configuración y logs seguros. |
-| `429` | Rate limit o protección de abuso. | Reducir tasa o revisar configuración del ambiente. |
-| `5xx` | Error backend o saturación. | Revisar logs, métricas y request correlation. |
+| `400` | Payload o parametros invalidos. | Revisar body, formatos, rangos y query params. |
+| `401` | JWT/firma/token/timestamp invalido segun script. | Revisar credenciales, headers y reloj. |
+| `403` | Rol insuficiente o endpoint admin con JWT no admin. | Usar rol adecuado. |
+| `429` | Rate limit o proteccion de abuso. | Reducir tasa o revisar configuracion del ambiente. |
+| `5xx` | Error backend o saturacion. | Revisar logs, metricas y request correlation. |
 
-## 8. Relación con Prometheus/Grafana
+## 9. Relacion con Prometheus/Grafana
 
 Durante la prueba puede levantarse el stack local de observabilidad:
 
@@ -96,40 +118,37 @@ URLs:
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
 
-## 9. Qué valida k6
+## 10. Que valida k6
 
-- Concurrencia básica.
+- Concurrencia basica.
 - Latencia.
 - Tasa de error.
-- Estabilidad del endpoint.
-- HMAC bajo carga controlada.
+- Estabilidad de endpoints.
+- HMAC o JWT segun script.
 
-## 10. Qué no valida
+## 11. Que no valida
 
 - Hardware GPS real.
-- Batería real.
+- Bateria real.
 - Millones de requests.
 - Escalamiento horizontal.
-- Producción sostenida.
-- Resiliencia ante caída de base de datos.
+- Produccion sostenida.
+- Resiliencia ante caida de base de datos.
 
-## 11. Seguridad
+## 12. Seguridad
 
 - No versionar secretos.
-- No pegar `DEVICE_SECRET` en documentos.
+- No pegar `DEVICE_SECRET` ni `JWT` en documentos.
 - No publicar outputs con tokens operativos.
 - No saturar Render.
 - No desactivar seguridad para que la prueba pase.
 
-## 12. Criterio de aceptación
+## 13. Criterio de aceptacion
 
 La subfase queda lista si:
 
-- Existe `performance/k6/device-ingestion.js`.
-- Existe `performance/k6/README.md`.
-- Existe `docs/k6-performance-guide.md`.
-- El script no contiene secretos reales.
-- El script usa variables de entorno.
-- La firma HMAC se calcula de acuerdo con la canonicalización backend/script real.
-- No se tocó código productivo.
-- No se ejecutó carga agresiva por defecto.
+- Existen los scripts k6 requeridos.
+- Los scripts no contienen secretos reales.
+- Los scripts usan variables de entorno.
+- No se toca codigo productivo.
+- No se ejecuta carga agresiva por defecto.
