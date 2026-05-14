@@ -26,6 +26,21 @@
         "type": "prometheus",
         "uid": "Prometheus"
       },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "title": "Salud general",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -49,12 +64,12 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 5,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 1
       },
-      "id": 1,
+      "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -90,40 +105,89 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [],
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "process_uptime_seconds",
+          "legendFormat": "uptime",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Process uptime",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
           "unit": "reqps"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 6,
-        "y": 0
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 1
       },
-      "id": 2,
+      "id": 4,
       "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "textMode": "auto"
       },
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(http_server_requests_seconds_count[5m])",
-          "legendFormat": "{{method}} {{uri}}",
+          "expr": "sum(rate(http_server_requests_seconds_count[5m]))",
+          "legendFormat": "requests/s",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "HTTP requests rate",
-      "type": "timeseries"
+      "title": "HTTP request rate",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -138,12 +202,73 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 15,
-        "y": 0
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 1
       },
-      "id": 3,
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(http_server_requests_seconds_sum[5m])) / sum(rate(http_server_requests_seconds_count[5m]))",
+          "legendFormat": "avg",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP latency avg approx",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 6,
+      "title": "HTTP",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "id": 7,
       "options": {
         "legend": {
           "calcs": [],
@@ -159,14 +284,79 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "rate(http_server_requests_seconds_sum[5m]) / rate(http_server_requests_seconds_count[5m])",
-          "legendFormat": "{{method}} {{uri}}",
+          "expr": "sum(rate(http_server_requests_seconds_count[5m])) by (method, uri, status)",
+          "legendFormat": "{{method}} {{uri}} {{status}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "HTTP latency avg approx",
+      "title": "HTTP requests by URI/status",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(http_server_requests_seconds_count{status=~\"4..\"}[5m]))",
+          "legendFormat": "4xx",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))",
+          "legendFormat": "5xx",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "HTTP error rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "id": 9,
+      "title": "JVM",
+      "type": "row"
     },
     {
       "datasource": {
@@ -182,11 +372,11 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 8
+        "y": 16
       },
-      "id": 4,
+      "id": 10,
       "options": {
         "legend": {
           "calcs": [],
@@ -216,20 +406,35 @@
         "type": "prometheus",
         "uid": "Prometheus"
       },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 11,
+      "title": "Dominio Ganaderia 4.0",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "mappings": [],
-          "unit": "s"
+          "unit": "ops"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 25
       },
-      "id": 5,
+      "id": 12,
       "options": {
         "legend": {
           "calcs": [],
@@ -245,13 +450,27 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "process_uptime_seconds",
-          "legendFormat": "{{instance}}",
+          "expr": "sum(rate(ganaderia_alerts_created_total[5m])) by (type)",
+          "legendFormat": "created {{type}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_alerts_resolved_total[5m])) by (type)",
+          "legendFormat": "resolved {{type}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_alerts_discarded_total[5m])) by (type)",
+          "legendFormat": "discarded {{type}}",
+          "range": true,
+          "refId": "C"
         }
       ],
-      "title": "Process uptime",
+      "title": "Alert lifecycle rate",
       "type": "timeseries"
     },
     {
@@ -262,17 +481,17 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [],
-          "unit": "short"
+          "unit": "ops"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 16
+        "x": 12,
+        "y": 25
       },
-      "id": 6,
+      "id": 13,
       "options": {
         "legend": {
           "calcs": [],
@@ -288,15 +507,15 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "ganaderia_device_requests_accepted_total",
+          "expr": "sum(rate(ganaderia_device_requests_accepted_total[5m]))",
           "legendFormat": "accepted",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "ganaderia_device_requests_rejected_total",
-          "legendFormat": "rejected",
+          "expr": "sum(rate(ganaderia_device_requests_rejected_total[5m])) by (reason)",
+          "legendFormat": "rejected {{reason}}",
           "range": true,
           "refId": "B"
         }
@@ -312,17 +531,17 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [],
-          "unit": "short"
+          "unit": "ops"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 16
+        "x": 0,
+        "y": 33
       },
-      "id": 7,
+      "id": 14,
       "options": {
         "legend": {
           "calcs": [],
@@ -338,20 +557,270 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "ganaderia_notification_outbox_email_sent_count_total",
+          "expr": "sum(rate(ganaderia_gps_accuracy_quality_count_total[5m])) by (quality)",
+          "legendFormat": "{{quality}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "GPS accuracy quality",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notifications_sent_total[5m])) by (channel, eventType)",
+          "legendFormat": "sent {{channel}} {{eventType}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notifications_failed_total[5m])) by (channel, eventType)",
+          "legendFormat": "failed {{channel}} {{eventType}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notifications_queued_total[5m])) by (channel, eventType)",
+          "legendFormat": "queued {{channel}} {{eventType}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Notifications by channel",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 16,
+      "title": "Outbox / IA / jobs",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notification_outbox_email_sent_count_total[5m]))",
           "legendFormat": "sent",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "ganaderia_notification_outbox_email_failed_count_total",
+          "expr": "sum(rate(ganaderia_notification_outbox_email_failed_count_total[5m]))",
           "legendFormat": "failed",
           "range": true,
           "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notification_outbox_email_dead_count_total[5m]))",
+          "legendFormat": "dead",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notification_outbox_email_stuck_recovered_count_total[5m]))",
+          "legendFormat": "stuck recovered",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_notification_outbox_email_stuck_dead_count_total[5m]))",
+          "legendFormat": "stuck dead",
+          "range": true,
+          "refId": "E"
         }
       ],
       "title": "Outbox EMAIL outcomes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_ai_summary_generated_count_total[5m])) by (source, riskLevel)",
+          "legendFormat": "generated {{source}} {{riskLevel}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_ai_summary_fallback_count_total[5m])) by (reason)",
+          "legendFormat": "fallback {{reason}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_ai_summary_provider_request_count_total[5m])) by (provider, outcome)",
+          "legendFormat": "provider {{provider}} {{outcome}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "AI summaries and provider outcomes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_device_replay_nonce_cleanup_deleted_count_total[5m]))",
+          "legendFormat": "device replay nonces deleted",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_abuse_rate_limit_cleanup_deleted_count_total[5m]))",
+          "legendFormat": "abuse rate limit entries deleted",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(ganaderia_auth_password_reset_cleanup_deleted_count_total[5m]))",
+          "legendFormat": "password reset tokens deleted",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Cleanup deleted records",
       "type": "timeseries"
     }
   ],
@@ -360,7 +829,8 @@
   "tags": [
     "ganaderia4",
     "spring-boot",
-    "backend"
+    "backend",
+    "observability"
   ],
   "templating": {
     "list": []
@@ -373,6 +843,6 @@
   "timezone": "browser",
   "title": "Ganadería 4.0 — Backend Overview",
   "uid": "ganaderia4-backend-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
