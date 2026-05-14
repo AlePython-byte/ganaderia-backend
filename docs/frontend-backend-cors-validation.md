@@ -14,7 +14,7 @@ Este documento guía la validación de integración entre el frontend y el backe
 ### Frontend
 
 - Local: `http://localhost:5173`.
-- Vercel: `https://<FRONTEND_VERCEL_URL>`.
+- Vercel: `[https://<FRONTEND_VERCEL_URL>](http://localhost:5173,https://ganaderia-frontend-7yzwkkmsf-david-cabrera00s-projects.vercel.app,https://ganaderia-frontend.vercel.app)`.
 
 `<FRONTEND_VERCEL_URL>` debe reemplazarse por el dominio real de Vercel cuando esté definido.
 
