@@ -63,6 +63,7 @@ k6 run `
   -e BASE_URL=https://ganaderia-backend.onrender.com `
   -e DEVICE_TOKEN=<DEVICE_TOKEN> `
   -e DEVICE_SECRET=<DEVICE_SECRET> `
+  -e P95_THRESHOLD_MS=1500 `
   -e REQUESTS_PER_SECOND=2 `
   -e VUS=2 `
   -e DURATION=30s `
@@ -79,12 +80,25 @@ k6 run `
   -e JWT=<JWT> `
   -e VUS=2 `
   -e DURATION=30s `
+  -e P95_THRESHOLD_MS=1500 `
   performance/k6/operational-read.js
 ```
 
 Detalles: `docs/k6-operational-read-guide.md`.
 
-## 7. Metricas k6 importantes
+## 7. Thresholds por ambiente
+
+Los scripts aceptan `P95_THRESHOLD_MS` para configurar el threshold p95 de latencia sin editar codigo:
+
+- Local: `P95_THRESHOLD_MS=700`.
+- Render/demo: `P95_THRESHOLD_MS=1500`.
+- Red lenta o Render con cold start: `P95_THRESHOLD_MS=2000`.
+
+Render puede mostrar mayor latencia por red, cold start o base de datos externa. Si `checks` es 100%, `http_req_failed` es 0% y los status son `200`, una falla de threshold p95 puede significar calibracion incorrecta del umbral para ese ambiente, no necesariamente un backend roto.
+
+No se recomiendan thresholds demasiado permisivos como `10000` ms salvo diagnostico puntual.
+
+## 8. Metricas k6 importantes
 
 - `http_req_duration`.
 - `http_req_failed`.
@@ -94,7 +108,7 @@ Detalles: `docs/k6-operational-read-guide.md`.
 - `data_received`.
 - `data_sent`.
 
-## 8. Interpretacion de errores
+## 9. Interpretacion de errores
 
 | Error | Causa probable | Accion |
 | --- | --- | --- |
@@ -105,7 +119,7 @@ Detalles: `docs/k6-operational-read-guide.md`.
 | `429` | Rate limit o proteccion de abuso. | Reducir tasa o revisar configuracion del ambiente. |
 | `5xx` | Error backend o saturacion. | Revisar logs, metricas y request correlation. |
 
-## 9. Relacion con Prometheus/Grafana
+## 10. Relacion con Prometheus/Grafana
 
 Durante la prueba puede levantarse el stack local de observabilidad:
 
@@ -118,7 +132,7 @@ URLs:
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
 
-## 10. Que valida k6
+## 11. Que valida k6
 
 - Concurrencia basica.
 - Latencia.
@@ -126,7 +140,7 @@ URLs:
 - Estabilidad de endpoints.
 - HMAC o JWT segun script.
 
-## 11. Que no valida
+## 12. Que no valida
 
 - Hardware GPS real.
 - Bateria real.
@@ -135,7 +149,7 @@ URLs:
 - Produccion sostenida.
 - Resiliencia ante caida de base de datos.
 
-## 12. Seguridad
+## 13. Seguridad
 
 - No versionar secretos.
 - No pegar `DEVICE_SECRET` ni `JWT` en documentos.
@@ -143,7 +157,7 @@ URLs:
 - No saturar Render.
 - No desactivar seguridad para que la prueba pase.
 
-## 13. Criterio de aceptacion
+## 14. Criterio de aceptacion
 
 La subfase queda lista si:
 

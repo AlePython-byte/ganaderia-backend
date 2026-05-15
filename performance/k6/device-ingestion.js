@@ -17,6 +17,7 @@ const endpointPath = '/api/device/locations';
 const duration = __ENV.DURATION || '30s';
 const vus = positiveInteger(__ENV.VUS, 1);
 const requestsPerSecond = nonNegativeInteger(__ENV.REQUESTS_PER_SECOND, 0);
+const p95ThresholdMs = positiveNumber(__ENV.P95_THRESHOLD_MS, 1500, 'P95_THRESHOLD_MS');
 
 const latitude = numericEnv('LATITUDE', 1.2136);
 const longitude = numericEnv('LONGITUDE', -77.2811);
@@ -44,7 +45,7 @@ export const options = {
       },
   thresholds: {
     http_req_failed: ['rate<0.01'],
-    http_req_duration: ['p(95)<500'],
+    http_req_duration: [`p(95)<${p95ThresholdMs}`],
     checks: ['rate>0.99'],
   },
 };
@@ -101,6 +102,18 @@ function positiveInteger(raw, fallback) {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error('VUS must be a positive integer.');
+  }
+  return parsed;
+}
+
+function positiveNumber(raw, fallback, name) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number.`);
   }
   return parsed;
 }

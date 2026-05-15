@@ -31,12 +31,14 @@ Variables principales:
 | `REQUESTS_PER_SECOND` | No | Tasa controlada para `constant-arrival-rate`. | `2` |
 | `DURATION` | No | Duracion total del escenario. | `30s` |
 | `VUS` | No | Usuarios virtuales base. | `1` |
+| `P95_THRESHOLD_MS` | No | Threshold p95 de latencia en milisegundos. Default: `1500`. | `1500` |
 
 ```powershell
 k6 run `
   -e BASE_URL=https://ganaderia-backend.onrender.com `
   -e DEVICE_TOKEN=<DEVICE_TOKEN> `
   -e DEVICE_SECRET=<DEVICE_SECRET> `
+  -e P95_THRESHOLD_MS=1500 `
   performance/k6/device-ingestion.js
 ```
 
@@ -50,6 +52,7 @@ Variables principales:
 | `JWT` | Si | Token JWT valido para endpoints protegidos. | `<JWT>` |
 | `VUS` | No | Usuarios virtuales. | `2` |
 | `DURATION` | No | Duracion total del escenario. | `30s` |
+| `P95_THRESHOLD_MS` | No | Threshold p95 de latencia en milisegundos. Default: `1500`. | `1500` |
 | `INCLUDE_ADMIN_OUTBOX` | No | Incluye outbox admin si el JWT es ADMINISTRADOR. | `true` |
 | `INCLUDE_AI_SUMMARY` | No | Incluye endpoint de IA con posible costo Gemini. | `true` |
 
@@ -59,8 +62,19 @@ k6 run `
   -e JWT=<JWT> `
   -e VUS=2 `
   -e DURATION=30s `
+  -e P95_THRESHOLD_MS=1500 `
   performance/k6/operational-read.js
 ```
+
+## Thresholds por ambiente
+
+`P95_THRESHOLD_MS` permite calibrar el threshold de latencia p95 segun el ambiente:
+
+- Local: `700`.
+- Render/demo: `1500`.
+- Red lenta o Render con cold start: `2000`.
+
+Un threshold fallido no siempre significa que el backend este roto. Si `checks` esta en 100%, `http_req_failed` es 0% y los status son `200`, puede indicar que el valor de p95 esta demasiado estricto para la red o plataforma usada.
 
 ## Seguridad
 

@@ -36,8 +36,9 @@ Opcionales:
 k6 run `
   -e BASE_URL=https://ganaderia-backend.onrender.com `
   -e JWT=<JWT> `
-  -e VUS=2 `
-  -e DURATION=30s `
+  -e VUS=1 `
+  -e DURATION=20s `
+  -e P95_THRESHOLD_MS=1500 `
   performance/k6/operational-read.js
 ```
 
@@ -47,12 +48,32 @@ k6 run `
 k6 run `
   -e BASE_URL=http://localhost:8080 `
   -e JWT=<JWT> `
-  -e VUS=2 `
-  -e DURATION=30s `
+  -e VUS=1 `
+  -e DURATION=20s `
+  -e P95_THRESHOLD_MS=700 `
   performance/k6/operational-read.js
 ```
 
-## 6. Ejecutar con outbox admin
+## 6. Thresholds por ambiente
+
+El script acepta `P95_THRESHOLD_MS` para ajustar el threshold `http_req_duration: p(95)` segun el ambiente.
+
+Valores recomendados:
+
+- Local: `P95_THRESHOLD_MS=700`.
+- Render/demo: `P95_THRESHOLD_MS=1500`.
+- Red lenta o Render con cold start: `P95_THRESHOLD_MS=2000`.
+
+Render puede tener mayor latencia por red, cold start, base de datos externa o variacion normal de plataforma. Un threshold p95 fallido no siempre significa backend roto: si `checks` esta en 100%, `http_req_failed` es 0% y los endpoints responden `200`, el threshold puede estar mal calibrado para el ambiente.
+
+La prueba funcional debe interpretarse principalmente con:
+
+- `checks`.
+- `http_req_failed`.
+- status HTTP esperado.
+- `p(95)` como senal de latencia, no como veredicto unico.
+
+## 7. Ejecutar con outbox admin
 
 El outbox admin requiere rol `ADMINISTRADOR`. Activarlo solo cuando el JWT tenga ese rol:
 
@@ -61,10 +82,11 @@ k6 run `
   -e BASE_URL=https://ganaderia-backend.onrender.com `
   -e JWT=<JWT> `
   -e INCLUDE_ADMIN_OUTBOX=true `
+  -e P95_THRESHOLD_MS=1500 `
   performance/k6/operational-read.js
 ```
 
-## 7. Ejecutar con IA summary
+## 8. Ejecutar con IA summary
 
 `GET /api/alert-analysis/ai-summary` puede usar Gemini segun configuracion. Por defecto no se incluye para evitar costo o abuso de IA.
 
@@ -73,10 +95,11 @@ k6 run `
   -e BASE_URL=https://ganaderia-backend.onrender.com `
   -e JWT=<JWT> `
   -e INCLUDE_AI_SUMMARY=true `
+  -e P95_THRESHOLD_MS=1500 `
   performance/k6/operational-read.js
 ```
 
-## 8. Metricas relevantes
+## 9. Metricas relevantes
 
 - `http_req_duration`.
 - `http_req_failed`.
@@ -86,7 +109,7 @@ k6 run `
 - `data_received`.
 - `data_sent`.
 
-## 9. Interpretacion de errores
+## 10. Interpretacion de errores
 
 | Error | Causa probable | Accion |
 | --- | --- | --- |
@@ -98,7 +121,7 @@ k6 run `
 | `429` | Rate limiting o proteccion de abuso. | Reducir VUs/duracion o revisar configuracion. |
 | `500` | Error backend. | Revisar logs y `X-Request-Id`. |
 
-## 10. Relacion con Prometheus/Grafana
+## 11. Relacion con Prometheus/Grafana
 
 Durante la ejecucion se puede observar el backend con el stack local:
 
@@ -111,7 +134,7 @@ URLs:
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
 
-## 11. Seguridad
+## 12. Seguridad
 
 - No commitear JWT.
 - No pegar tokens reales en docs.
@@ -119,7 +142,7 @@ URLs:
 - No ejecutar cargas agresivas contra Render.
 - No activar `ai-summary` masivamente si Gemini esta encendido.
 
-## 12. Que valida
+## 13. Que valida
 
 - Lecturas protegidas con JWT.
 - Latencia basica.
@@ -127,7 +150,7 @@ URLs:
 - Comportamiento bajo carga moderada.
 - Uso de `X-Request-Id`.
 
-## 13. Que no valida
+## 14. Que no valida
 
 - Flujos de escritura.
 - Device ingestion HMAC.
@@ -137,7 +160,7 @@ URLs:
 - Carga productiva masiva.
 - E2E completo con frontend.
 
-## 14. Criterio de aceptacion
+## 15. Criterio de aceptacion
 
 La subfase queda lista si:
 

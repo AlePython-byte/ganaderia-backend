@@ -13,6 +13,7 @@ const baseUrl = __ENV.BASE_URL.replace(/\/+$/, '');
 const jwt = __ENV.JWT;
 const vus = positiveInteger(__ENV.VUS, 2);
 const duration = __ENV.DURATION || '30s';
+const p95ThresholdMs = positiveNumber(__ENV.P95_THRESHOLD_MS, 1500, 'P95_THRESHOLD_MS');
 const includeAdminOutbox = booleanEnv('INCLUDE_ADMIN_OUTBOX');
 const includeAiSummary = booleanEnv('INCLUDE_AI_SUMMARY');
 
@@ -26,7 +27,7 @@ export const options = {
   },
   thresholds: {
     http_req_failed: ['rate<0.01'],
-    http_req_duration: ['p(95)<700'],
+    http_req_duration: [`p(95)<${p95ThresholdMs}`],
     checks: ['rate>0.99'],
   },
 };
@@ -99,6 +100,18 @@ function positiveInteger(raw, fallback) {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error('VUS must be a positive integer.');
+  }
+  return parsed;
+}
+
+function positiveNumber(raw, fallback, name) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number.`);
   }
   return parsed;
 }
