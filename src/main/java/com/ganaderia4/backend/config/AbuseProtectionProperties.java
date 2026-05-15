@@ -14,6 +14,7 @@ public class AbuseProtectionProperties {
     private Login login = new Login();
     private Device device = new Device();
     private PasswordReset passwordReset = new PasswordReset();
+    private AiSummary aiSummary = new AiSummary();
 
     public boolean isEnabled() {
         return enabled;
@@ -53,6 +54,14 @@ public class AbuseProtectionProperties {
 
     public void setPasswordReset(PasswordReset passwordReset) {
         this.passwordReset = passwordReset;
+    }
+
+    public AiSummary getAiSummary() {
+        return aiSummary;
+    }
+
+    public void setAiSummary(AiSummary aiSummary) {
+        this.aiSummary = aiSummary;
     }
 
     public static class ClientIp {
@@ -210,6 +219,45 @@ public class AbuseProtectionProperties {
         private Duration window = Duration.ofMinutes(15);
         private int maxAttempts = 5;
         private Duration blockDuration = Duration.ofMinutes(15);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
+        }
+
+        public int getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public void setMaxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
+
+        public Duration getBlockDuration() {
+            return blockDuration;
+        }
+
+        public void setBlockDuration(Duration blockDuration) {
+            this.blockDuration = blockDuration;
+        }
+    }
+
+    public static class AiSummary {
+        private boolean enabled = true;
+        private Duration window = Duration.ofMinutes(10);
+        private int maxAttempts = 10;
+        private Duration blockDuration = Duration.ofMinutes(10);
 
         public boolean isEnabled() {
             return enabled;

@@ -10,6 +10,7 @@ import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.model.Role;
 import com.ganaderia4.backend.model.User;
+import com.ganaderia4.backend.repository.AbuseRateLimitRepository;
 import com.ganaderia4.backend.repository.AlertRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.UserRepository;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -29,9 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@TestPropertySource(properties = {
+        "app.abuse-protection.ai-summary.max-attempts=2",
+        "app.abuse-protection.ai-summary.window=10m",
+        "app.abuse-protection.ai-summary.block-duration=5m"
+})
 class AlertAnalysisControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -47,12 +55,16 @@ class AlertAnalysisControllerIntegrationTest extends AbstractIntegrationTest {
     private AlertRepository alertRepository;
 
     @Autowired
+    private AbuseRateLimitRepository abuseRateLimitRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
+        abuseRateLimitRepository.deleteAll();
         alertRepository.deleteAll();
         cowRepository.deleteAll();
         userRepository.deleteAll();
@@ -145,6 +157,39 @@ class AlertAnalysisControllerIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fallbackUsed").value(true))
                 .andExpect(jsonPath("$.summary").isString())
                 .andExpect(jsonPath("$.recommendation").isString());
+    }
+
+    @Test
+    void shouldRateLimitAiSummaryWithoutAffectingHeuristicEndpointsOrStoringUserInPlainText() throws Exception {
+        String token = loginAndGetToken("operador@test.com", "12345678");
+
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(get("/api/alert-analysis/ai-summary")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+        }
+
+        mockMvc.perform(get("/api/alert-analysis/ai-summary")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Request-Id", "ai-summary-rate-limit-test"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.requestId").value("ai-summary-rate-limit-test"))
+                .andExpect(jsonPath("$.path").value("/api/alert-analysis/ai-summary"));
+
+        mockMvc.perform(get("/api/alert-analysis/summary")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/alert-analysis/top-priorities")
+                        .param("limit", "5")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        assertTrue(abuseRateLimitRepository.findAll().stream()
+                .noneMatch(entry -> entry.getAbuseKey().contains("operador@test.com")));
     }
 
     private void createUser(String name, String email, String rawPassword, Role role, boolean active) {

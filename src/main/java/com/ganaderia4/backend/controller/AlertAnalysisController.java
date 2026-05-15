@@ -5,6 +5,8 @@ import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
 import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
+import com.ganaderia4.backend.security.AiAnalysisAbuseProtectionService;
+import com.ganaderia4.backend.security.ClientIpResolver;
 import com.ganaderia4.backend.service.AlertAiAnalysisService;
 import com.ganaderia4.backend.service.AlertAnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +18,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,11 +35,17 @@ public class AlertAnalysisController {
 
     private final AlertAnalysisService alertAnalysisService;
     private final AlertAiAnalysisService alertAiAnalysisService;
+    private final AiAnalysisAbuseProtectionService aiAnalysisAbuseProtectionService;
+    private final ClientIpResolver clientIpResolver;
 
     public AlertAnalysisController(AlertAnalysisService alertAnalysisService,
-                                   AlertAiAnalysisService alertAiAnalysisService) {
+                                   AlertAiAnalysisService alertAiAnalysisService,
+                                   AiAnalysisAbuseProtectionService aiAnalysisAbuseProtectionService,
+                                   ClientIpResolver clientIpResolver) {
         this.alertAnalysisService = alertAnalysisService;
         this.alertAiAnalysisService = alertAiAnalysisService;
+        this.aiAnalysisAbuseProtectionService = aiAnalysisAbuseProtectionService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @GetMapping("/summary")
@@ -88,9 +98,17 @@ public class AlertAnalysisController {
             @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "429",
+                    description = "Se excedio el limite de solicitudes de IA para el usuario o IP actual",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
-    public AlertAiSummaryDTO getAiSummary() {
+    public AlertAiSummaryDTO getAiSummary(Authentication authentication,
+                                          HttpServletRequest httpServletRequest) {
+        aiAnalysisAbuseProtectionService.recordAiSummaryRequest(
+                authentication == null ? null : authentication.getName(),
+                clientIpResolver.resolve(httpServletRequest)
+        );
         return alertAiAnalysisService.getAiSummary();
     }
 }
