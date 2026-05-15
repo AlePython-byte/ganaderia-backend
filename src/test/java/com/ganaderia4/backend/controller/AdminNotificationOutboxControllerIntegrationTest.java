@@ -8,6 +8,7 @@ import com.ganaderia4.backend.model.User;
 import com.ganaderia4.backend.notification.NotificationChannel;
 import com.ganaderia4.backend.notification.NotificationOutboxMessage;
 import com.ganaderia4.backend.notification.NotificationOutboxStatus;
+import com.ganaderia4.backend.repository.AbuseRateLimitRepository;
 import com.ganaderia4.backend.repository.NotificationOutboxRepository;
 import com.ganaderia4.backend.repository.UserRepository;
 import com.ganaderia4.backend.support.AbstractIntegrationTest;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -29,9 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@TestPropertySource(properties = {
+        "app.abuse-protection.outbox-requeue.max-attempts=2",
+        "app.abuse-protection.outbox-requeue.window=10m",
+        "app.abuse-protection.outbox-requeue.block-duration=5m"
+})
 class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -44,6 +52,9 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
     private NotificationOutboxRepository notificationOutboxRepository;
 
     @Autowired
+    private AbuseRateLimitRepository abuseRateLimitRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -52,6 +63,7 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
 
     @BeforeEach
     void setUp() {
+        abuseRateLimitRepository.deleteAll();
         notificationOutboxRepository.deleteAll();
         userRepository.deleteAll();
 
@@ -260,6 +272,36 @@ class AdminNotificationOutboxControllerIntegrationTest extends AbstractIntegrati
         assertFalse(content.contains("reset-secret-token-value"));
         assertFalse(content.contains("Texto muy largo sensible"));
         assertFalse(content.contains("<p>Html sensible</p>"));
+    }
+
+    @Test
+    void shouldRateLimitRequeueAndKeepMessageUnchangedWhenBlocked() throws Exception {
+        String token = loginAndGetToken("admin@test.com", "12345678");
+
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", 999998L)
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        }
+
+        mockMvc.perform(post("/api/admin/notification-outbox/{id}/requeue", existingMessageId)
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Request-Id", "outbox-requeue-rate-limit-test"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.requestId").value("outbox-requeue-rate-limit-test"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox/" + existingMessageId + "/requeue"));
+
+        NotificationOutboxMessage unchanged = notificationOutboxRepository.findById(existingMessageId).orElseThrow();
+        assertEquals(NotificationOutboxStatus.FAILED, unchanged.getStatus());
+        assertEquals(1, unchanged.getAttempts());
+        assertNotNull(unchanged.getFailedAt());
+        assertTrue(abuseRateLimitRepository.findAll().stream()
+                .allMatch(entry -> !entry.getAbuseKey().equals("admin@test.com")
+                        && !entry.getAbuseKey().equals(String.valueOf(existingMessageId))
+                        && !entry.getAbuseKey().contains("@")));
     }
 
     @Test

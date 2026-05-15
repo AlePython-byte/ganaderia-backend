@@ -6,6 +6,8 @@ import com.ganaderia4.backend.dto.NotificationOutboxDetailDTO;
 import com.ganaderia4.backend.dto.NotificationOutboxSummaryDTO;
 import com.ganaderia4.backend.dto.PagedResponseDTO;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import com.ganaderia4.backend.security.ClientIpResolver;
+import com.ganaderia4.backend.security.OutboxAdminAbuseProtectionService;
 import com.ganaderia4.backend.service.NotificationOutboxQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,10 +17,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,9 +39,15 @@ public class AdminNotificationOutboxController {
     private static final Logger log = LoggerFactory.getLogger(AdminNotificationOutboxController.class);
 
     private final NotificationOutboxQueryService notificationOutboxQueryService;
+    private final OutboxAdminAbuseProtectionService outboxAdminAbuseProtectionService;
+    private final ClientIpResolver clientIpResolver;
 
-    public AdminNotificationOutboxController(NotificationOutboxQueryService notificationOutboxQueryService) {
+    public AdminNotificationOutboxController(NotificationOutboxQueryService notificationOutboxQueryService,
+                                             OutboxAdminAbuseProtectionService outboxAdminAbuseProtectionService,
+                                             ClientIpResolver clientIpResolver) {
         this.notificationOutboxQueryService = notificationOutboxQueryService;
+        this.outboxAdminAbuseProtectionService = outboxAdminAbuseProtectionService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @GetMapping
@@ -105,9 +115,19 @@ public class AdminNotificationOutboxController {
             @ApiResponse(responseCode = "404", description = "Mensaje no encontrado",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "409", description = "El estado o canal actual no permite reencolar",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "429",
+                    description = "Se excedio el limite de reintentos administrativos de requeue para el usuario, IP o mensaje actual",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
-    public NotificationOutboxDetailDTO requeue(@PathVariable Long id) {
+    public NotificationOutboxDetailDTO requeue(@PathVariable Long id,
+                                               Authentication authentication,
+                                               HttpServletRequest httpServletRequest) {
+        outboxAdminAbuseProtectionService.recordRequeueRequest(
+                authentication == null ? null : authentication.getName(),
+                clientIpResolver.resolve(httpServletRequest),
+                id
+        );
         return notificationOutboxQueryService.requeue(id);
     }
 }
