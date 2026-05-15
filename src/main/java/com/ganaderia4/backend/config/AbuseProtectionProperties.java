@@ -13,6 +13,7 @@ public class AbuseProtectionProperties {
     private ClientIp clientIp = new ClientIp();
     private Login login = new Login();
     private Device device = new Device();
+    private PasswordReset passwordReset = new PasswordReset();
 
     public boolean isEnabled() {
         return enabled;
@@ -44,6 +45,14 @@ public class AbuseProtectionProperties {
 
     public void setDevice(Device device) {
         this.device = device;
+    }
+
+    public PasswordReset getPasswordReset() {
+        return passwordReset;
+    }
+
+    public void setPasswordReset(PasswordReset passwordReset) {
+        this.passwordReset = passwordReset;
     }
 
     public static class ClientIp {
@@ -102,6 +111,105 @@ public class AbuseProtectionProperties {
         private Duration window = Duration.ofMinutes(1);
         private int maxAttempts = 300;
         private Duration blockDuration = Duration.ofMinutes(5);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
+        }
+
+        public int getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public void setMaxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
+
+        public Duration getBlockDuration() {
+            return blockDuration;
+        }
+
+        public void setBlockDuration(Duration blockDuration) {
+            this.blockDuration = blockDuration;
+        }
+    }
+
+    public static class PasswordReset {
+        private Forgot forgot = new Forgot();
+        private Reset reset = new Reset();
+
+        public Forgot getForgot() {
+            return forgot;
+        }
+
+        public void setForgot(Forgot forgot) {
+            this.forgot = forgot;
+        }
+
+        public Reset getReset() {
+            return reset;
+        }
+
+        public void setReset(Reset reset) {
+            this.reset = reset;
+        }
+    }
+
+    public static class Forgot {
+        private boolean enabled = true;
+        private Duration window = Duration.ofMinutes(15);
+        private int maxAttempts = 3;
+        private Duration blockDuration = Duration.ofMinutes(15);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
+        }
+
+        public int getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public void setMaxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
+
+        public Duration getBlockDuration() {
+            return blockDuration;
+        }
+
+        public void setBlockDuration(Duration blockDuration) {
+            this.blockDuration = blockDuration;
+        }
+    }
+
+    public static class Reset {
+        private boolean enabled = true;
+        private Duration window = Duration.ofMinutes(15);
+        private int maxAttempts = 5;
+        private Duration blockDuration = Duration.ofMinutes(15);
 
         public boolean isEnabled() {
             return enabled;

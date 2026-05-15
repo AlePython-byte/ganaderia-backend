@@ -12,6 +12,7 @@ import com.ganaderia4.backend.notification.EmailProviderClient;
 import com.ganaderia4.backend.notification.NotificationChannel;
 import com.ganaderia4.backend.notification.NotificationOutboxService;
 import com.ganaderia4.backend.repository.UserRepository;
+import com.ganaderia4.backend.security.PasswordResetAbuseProtectionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -33,6 +34,7 @@ class AuthPasswordResetServiceTest {
         PasswordResetTokenService tokenService = mock(PasswordResetTokenService.class);
         PasswordResetEmailService emailService = mock(PasswordResetEmailService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        PasswordResetAbuseProtectionService abuseProtectionService = mock(PasswordResetAbuseProtectionService.class);
         User user = user("admin@test.com", true);
 
         when(userRepository.findByEmailIgnoreCase("admin@test.com")).thenReturn(Optional.of(user));
@@ -44,7 +46,8 @@ class AuthPasswordResetServiceTest {
                 userRepository,
                 tokenService,
                 emailService,
-                passwordEncoder
+                passwordEncoder,
+                abuseProtectionService
         );
 
         ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO();
@@ -62,6 +65,7 @@ class AuthPasswordResetServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         PasswordResetTokenService tokenService = mock(PasswordResetTokenService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        PasswordResetAbuseProtectionService abuseProtectionService = mock(PasswordResetAbuseProtectionService.class);
         EmailProviderClient providerClient = mock(EmailProviderClient.class);
         when(providerClient.getProviderName()).thenReturn("resend");
         NotificationOutboxService outboxService = mock(NotificationOutboxService.class);
@@ -85,7 +89,8 @@ class AuthPasswordResetServiceTest {
                 userRepository,
                 tokenService,
                 emailService,
-                passwordEncoder
+                passwordEncoder,
+                abuseProtectionService
         );
 
         ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO();
@@ -111,6 +116,7 @@ class AuthPasswordResetServiceTest {
         PasswordResetTokenService tokenService = mock(PasswordResetTokenService.class);
         PasswordResetEmailService emailService = mock(PasswordResetEmailService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        PasswordResetAbuseProtectionService abuseProtectionService = mock(PasswordResetAbuseProtectionService.class);
 
         when(userRepository.findByEmailIgnoreCase("missing@test.com")).thenReturn(Optional.empty());
 
@@ -118,7 +124,8 @@ class AuthPasswordResetServiceTest {
                 userRepository,
                 tokenService,
                 emailService,
-                passwordEncoder
+                passwordEncoder,
+                abuseProtectionService
         );
 
         ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO();
@@ -137,6 +144,7 @@ class AuthPasswordResetServiceTest {
         PasswordResetTokenService tokenService = mock(PasswordResetTokenService.class);
         PasswordResetEmailService emailService = mock(PasswordResetEmailService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        PasswordResetAbuseProtectionService abuseProtectionService = mock(PasswordResetAbuseProtectionService.class);
         User user = user("inactive@test.com", false);
 
         when(userRepository.findByEmailIgnoreCase("inactive@test.com")).thenReturn(Optional.of(user));
@@ -145,7 +153,8 @@ class AuthPasswordResetServiceTest {
                 userRepository,
                 tokenService,
                 emailService,
-                passwordEncoder
+                passwordEncoder,
+                abuseProtectionService
         );
 
         ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO();

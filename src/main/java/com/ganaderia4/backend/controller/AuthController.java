@@ -87,6 +87,11 @@ public class AuthController {
                     responseCode = "400",
                     description = "Solicitud invalida o payload mal formado",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Demasiadas solicitudes de recuperacion de contrasena",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
             )
     })
     public ForgotPasswordResponseDTO forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO requestDTO,
@@ -110,10 +115,16 @@ public class AuthController {
                     responseCode = "400",
                     description = "Token invalido, expirado, usado o payload mal formado",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "Demasiados intentos de reset de contrasena",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
             )
     })
-    public ResetPasswordResponseDTO resetPassword(@Valid @RequestBody ResetPasswordRequestDTO requestDTO) {
-        return authPasswordResetService.resetPassword(requestDTO);
+    public ResetPasswordResponseDTO resetPassword(@Valid @RequestBody ResetPasswordRequestDTO requestDTO,
+                                                  HttpServletRequest httpServletRequest) {
+        return authPasswordResetService.resetPassword(requestDTO, clientIpResolver.resolve(httpServletRequest));
     }
 
     @GetMapping("/me")

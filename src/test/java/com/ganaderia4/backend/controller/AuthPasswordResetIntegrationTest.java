@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -28,9 +29,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@TestPropertySource(properties = {
+        "app.abuse-protection.password-reset.forgot.max-attempts=2",
+        "app.abuse-protection.password-reset.forgot.window=10m",
+        "app.abuse-protection.password-reset.forgot.block-duration=5m",
+        "app.abuse-protection.password-reset.reset.max-attempts=2",
+        "app.abuse-protection.password-reset.reset.window=10m",
+        "app.abuse-protection.password-reset.reset.block-duration=5m"
+})
 class AuthPasswordResetIntegrationTest extends AbstractIntegrationTest {
 
     private static final String GENERIC_FORGOT_MESSAGE =
@@ -110,6 +120,62 @@ class AuthPasswordResetIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.message").value(GENERIC_FORGOT_MESSAGE));
 
         assertEquals(0, passwordResetTokenRepository.count());
+    }
+
+    @Test
+    void shouldRateLimitForgotPasswordAndNotStoreEmailInPlainText() throws Exception {
+        Map<String, String> request = Map.of("email", "ADMIN@test.com");
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(GENERIC_FORGOT_MESSAGE));
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(GENERIC_FORGOT_MESSAGE));
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Request-Id", "forgot-rate-limit-test")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.requestId").value("forgot-rate-limit-test"));
+
+        assertEquals(2, passwordResetTokenRepository.count());
+        assertTrue(abuseRateLimitRepository.findAll().stream()
+                .noneMatch(entry -> entry.getAbuseKey().contains("admin@test.com")));
+    }
+
+    @Test
+    void shouldReturnSameRateLimitedResponseForUnknownForgotPasswordEmail() throws Exception {
+        Map<String, String> request = Map.of("email", "missing@test.com");
+
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/auth/forgot-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value(GENERIC_FORGOT_MESSAGE));
+        }
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Request-Id", "forgot-unknown-rate-limit-test")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.requestId").value("forgot-unknown-rate-limit-test"));
+
+        assertEquals(0, passwordResetTokenRepository.count());
+        assertTrue(abuseRateLimitRepository.findAll().stream()
+                .noneMatch(entry -> entry.getAbuseKey().contains("missing@test.com")));
     }
 
     @Test
@@ -225,6 +291,36 @@ class AuthPasswordResetIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
+    void shouldRateLimitResetPasswordAndNotStoreTokenInPlainText() throws Exception {
+        String invalidToken = "invalid-reset-token-value";
+        Map<String, String> request = Map.of(
+                "token", invalidToken,
+                "newPassword", "NuevaClave123*",
+                "confirmPassword", "NuevaClave123*"
+        );
+
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/auth/reset-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(INVALID_TOKEN_MESSAGE));
+        }
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Request-Id", "reset-rate-limit-test")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"))
+                .andExpect(jsonPath("$.requestId").value("reset-rate-limit-test"));
+
+        assertTrue(abuseRateLimitRepository.findAll().stream()
+                .noneMatch(entry -> entry.getAbuseKey().contains(invalidToken)));
     }
 
     private User user(String email, String password, boolean active) {

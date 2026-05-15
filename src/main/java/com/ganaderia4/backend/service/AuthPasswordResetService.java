@@ -9,6 +9,7 @@ import com.ganaderia4.backend.model.PasswordResetToken;
 import com.ganaderia4.backend.model.User;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.repository.UserRepository;
+import com.ganaderia4.backend.security.PasswordResetAbuseProtectionService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,15 +31,18 @@ public class AuthPasswordResetService {
     private final PasswordResetTokenService passwordResetTokenService;
     private final PasswordResetEmailService passwordResetEmailService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetAbuseProtectionService passwordResetAbuseProtectionService;
 
     public AuthPasswordResetService(UserRepository userRepository,
                                     PasswordResetTokenService passwordResetTokenService,
                                     PasswordResetEmailService passwordResetEmailService,
-                                    PasswordEncoder passwordEncoder) {
+                                    PasswordEncoder passwordEncoder,
+                                    PasswordResetAbuseProtectionService passwordResetAbuseProtectionService) {
         this.userRepository = userRepository;
         this.passwordResetTokenService = passwordResetTokenService;
         this.passwordResetEmailService = passwordResetEmailService;
         this.passwordEncoder = passwordEncoder;
+        this.passwordResetAbuseProtectionService = passwordResetAbuseProtectionService;
     }
 
     @Transactional
@@ -46,6 +50,7 @@ public class AuthPasswordResetService {
                                                     String requestIp,
                                                     String userAgent) {
         String normalizedEmail = normalizeEmail(requestDTO.getEmail());
+        passwordResetAbuseProtectionService.recordForgotPasswordRequest(requestIp, normalizedEmail);
         Optional<User> userOptional = userRepository.findByEmailIgnoreCase(normalizedEmail);
 
         if (userOptional.isPresent() && Boolean.TRUE.equals(userOptional.get().getActive())) {
@@ -76,7 +81,8 @@ public class AuthPasswordResetService {
     }
 
     @Transactional
-    public ResetPasswordResponseDTO resetPassword(ResetPasswordRequestDTO requestDTO) {
+    public ResetPasswordResponseDTO resetPassword(ResetPasswordRequestDTO requestDTO, String requestIp) {
+        passwordResetAbuseProtectionService.recordResetPasswordRequest(requestIp, requestDTO.getToken());
         validatePasswordResetRequest(requestDTO);
 
         PasswordResetToken token;
