@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Ganadería 4.0 Backend API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

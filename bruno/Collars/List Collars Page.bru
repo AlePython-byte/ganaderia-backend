@@ -1,0 +1,19 @@
+meta {
+  name: List Collars Page
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/collars/page?status=ACTIVO&page=0&size=10&sort=id&direction=ASC
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

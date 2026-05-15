@@ -1,0 +1,19 @@
+meta {
+  name: Priority Queue
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/alerts/pending/priority-queue?limit=10
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

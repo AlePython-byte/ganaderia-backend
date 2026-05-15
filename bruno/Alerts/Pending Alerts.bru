@@ -1,0 +1,19 @@
+meta {
+  name: Pending Alerts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/alerts/status/PENDIENTE
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

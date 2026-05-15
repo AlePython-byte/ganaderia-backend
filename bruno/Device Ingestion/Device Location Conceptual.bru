@@ -1,0 +1,30 @@
+meta {
+  name: Device Location Conceptual
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/device/locations
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Request-Id: {{requestId}}
+  X-Device-Token: {{deviceToken}}
+  X-Device-Timestamp: {{deviceTimestamp}}
+  X-Device-Nonce: {{deviceNonce}}
+  X-Device-Signature: {{deviceSignature}}
+}
+
+body:json {
+  {
+    "latitude": 1.2136,
+    "longitude": -77.2811,
+    "timestamp": "2026-05-12T10:00:00",
+    "batteryLevel": 85,
+    "gpsAccuracy": 8.5
+  }
+}

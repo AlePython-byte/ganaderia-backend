@@ -1,0 +1,19 @@
+meta {
+  name: AI Summary
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/alert-analysis/ai-summary
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

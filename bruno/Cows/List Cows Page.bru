@@ -1,0 +1,19 @@
+meta {
+  name: List Cows Page
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/cows/page?status=SIN_UBICACION&page=0&size=10&sort=id&direction=ASC
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

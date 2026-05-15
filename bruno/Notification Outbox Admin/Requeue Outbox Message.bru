@@ -1,0 +1,19 @@
+meta {
+  name: Requeue Outbox Message
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/admin/notification-outbox/{{outboxMessageId}}/requeue
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

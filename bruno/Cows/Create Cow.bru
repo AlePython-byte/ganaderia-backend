@@ -1,0 +1,28 @@
+meta {
+  name: Create Cow
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/cows
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Request-Id: {{requestId}}
+}
+
+body:json {
+  {
+    "name": "Luna Bruno",
+    "status": "SIN_UBICACION",
+    "observations": "Creada desde Bruno"
+  }
+}

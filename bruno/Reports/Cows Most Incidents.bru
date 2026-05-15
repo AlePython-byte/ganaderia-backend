@@ -1,0 +1,19 @@
+meta {
+  name: Cows Most Incidents
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/reports/cows-most-incidents?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

@@ -1,0 +1,19 @@
+meta {
+  name: List Outbox
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/admin/notification-outbox?channel=EMAIL&page=0&size=10
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

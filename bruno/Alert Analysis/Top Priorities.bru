@@ -1,0 +1,19 @@
+meta {
+  name: Top Priorities
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/alert-analysis/top-priorities?limit=5
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  X-Request-Id: {{requestId}}
+}

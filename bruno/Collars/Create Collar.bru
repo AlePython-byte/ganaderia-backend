@@ -1,0 +1,33 @@
+meta {
+  name: Create Collar
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/collars
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  Content-Type: application/json
+  X-Request-Id: {{requestId}}
+}
+
+body:json {
+  {
+    "status": "ACTIVO",
+    "cowId": {{cowId}},
+    "batteryLevel": 85,
+    "signalStatus": "FUERTE",
+    "firmwareVersion": "bruno-1.0.0",
+    "gpsAccuracy": 8.5,
+    "enabled": true,
+    "notes": "Collar creado desde Bruno"
+  }
+}

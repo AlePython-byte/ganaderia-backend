@@ -1,0 +1,20 @@
+meta {
+  name: Alerts CSV
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/reports/alerts/export.csv?from=2026-05-01T00:00:00&to=2026-05-12T23:59:59&type=LOW_BATTERY&status=PENDIENTE
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt}}
+}
+
+headers {
+  Accept: text/csv
+  X-Request-Id: {{requestId}}
+}
