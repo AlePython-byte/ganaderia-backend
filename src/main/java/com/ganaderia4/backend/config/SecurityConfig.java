@@ -11,7 +11,6 @@ import com.ganaderia4.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -36,8 +35,6 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final boolean apiDocsEnabled;
-    private final boolean swaggerUiEnabled;
 
     private final RequestCorrelationFilter requestCorrelationFilter = new RequestCorrelationFilter();
 
@@ -45,12 +42,8 @@ public class SecurityConfig {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
-                          @Value("${springdoc.api-docs.enabled:true}") boolean apiDocsEnabled,
-                          @Value("${springdoc.swagger-ui.enabled:true}") boolean swaggerUiEnabled) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.apiDocsEnabled = apiDocsEnabled;
-        this.swaggerUiEnabled = swaggerUiEnabled;
     }
 
     @Bean
@@ -77,19 +70,14 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/device/locations").permitAll();
-
-                        if (apiDocsEnabled) {
-                            auth.requestMatchers("/v3/api-docs/**").permitAll();
-                        } else {
-                            auth.requestMatchers("/v3/api-docs/**").denyAll();
-                        }
-
-                        if (swaggerUiEnabled) {
-                            auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll();
-                        } else {
-                            auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html").denyAll();
-                        }
 
                         auth
 

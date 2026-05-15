@@ -78,12 +78,67 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldAllowSwaggerUiWithoutAuthentication() throws Exception {
+        MvcResult result = mockMvc.perform(get("/swagger-ui/index.html"))
+                .andReturn();
+
+        assertTrue(result.getResponse().getStatus() != 401,
+                "Swagger UI must be public for demo and must not return 401");
+    }
+
+    @Test
+    void shouldAllowOpenApiDocsWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+    }
+
+    @Test
+    void shouldAllowOpenApiYamlWithoutAuthentication() throws Exception {
+        MvcResult result = mockMvc.perform(get("/v3/api-docs.yaml"))
+                .andReturn();
+
+        assertTrue(result.getResponse().getStatus() != 401,
+                "OpenAPI YAML must be public for demo and must not return 401");
+    }
+
+    @Test
     void shouldKeepApiHealthProtected() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message").value("No autorizado"))
                 .andExpect(jsonPath("$.path").value("/api/health"));
+    }
+
+    @Test
+    void shouldKeepForgotPasswordPublicWithoutJwt() throws Exception {
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.path").value("/api/auth/forgot-password"));
+    }
+
+    @Test
+    void shouldKeepResetPasswordPublicWithoutJwt() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.path").value("/api/auth/reset-password"));
+    }
+
+    @Test
+    void shouldKeepDeviceIngestionOnHmacFlowWithoutJwt() throws Exception {
+        mockMvc.perform(post("/api/device/locations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("DEVICE_UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/device/locations"));
     }
 
     @Test
@@ -211,6 +266,14 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.path").value("/api/users/page"));
+    }
+
+    @Test
+    void shouldKeepAdminEndpointProtectedWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/api/admin/notification-outbox"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/admin/notification-outbox"));
     }
 
     @Test
