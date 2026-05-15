@@ -3,6 +3,7 @@ package com.ganaderia4.backend.notification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ganaderia4.backend.config.EmailNotificationProperties;
 import com.ganaderia4.backend.observability.DomainMetricsService;
+import com.ganaderia4.backend.security.EmailNotificationThrottleService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -313,6 +314,76 @@ class EmailNotificationServiceTest {
         verify(outboxService, times(2)).enqueue(eq(NotificationChannel.EMAIL), eq("CRITICAL_ALERT_CREATED"), any(), any(), any());
         assertTrue(output.getOut().contains("event=email_notification_enqueued_for_outbox"));
         assertTrue(output.getOut().contains("mode=OUTBOX"));
+    }
+
+    @Test
+    void shouldSkipDirectSendWhenAllRecipientsAreThrottled(CapturedOutput output) {
+        EmailProviderClient providerClient = mock(EmailProviderClient.class);
+        when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        NotificationOutboxService outboxService = mock(NotificationOutboxService.class);
+        EmailNotificationThrottleService throttleService = mock(EmailNotificationThrottleService.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(
+                        List.of("admin@test.com"),
+                        com.ganaderia4.backend.model.NotificationSeverity.HIGH,
+                        false
+                )
+        );
+        when(throttleService.filterAllowedRecipients(any(NotificationMessage.class), eq(List.of("admin@test.com"))))
+                .thenReturn(List.of());
+
+        EmailNotificationService service = new EmailNotificationService(
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "direct"),
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder(),
+                recipientResolver,
+                outboxService,
+                throttleService,
+                new ObjectMapper()
+        );
+
+        NotificationSendResult result = service.send(sampleMessage());
+
+        assertEquals(NotificationSendResult.SKIPPED, result);
+        verify(providerClient, never()).send(any());
+        verifyNoInteractions(outboxService);
+        assertTrue(output.getOut().contains("reason=throttled"));
+    }
+
+    @Test
+    void shouldNotEnqueueOutboxWhenAllRecipientsAreThrottled(CapturedOutput output) {
+        EmailProviderClient providerClient = mock(EmailProviderClient.class);
+        when(providerClient.getProviderName()).thenReturn("resend");
+        EmailNotificationRecipientResolver recipientResolver = mock(EmailNotificationRecipientResolver.class);
+        NotificationOutboxService outboxService = mock(NotificationOutboxService.class);
+        EmailNotificationThrottleService throttleService = mock(EmailNotificationThrottleService.class);
+        when(recipientResolver.resolveRecipients(any(NotificationMessage.class))).thenReturn(
+                new EmailNotificationRecipientsResolution(
+                        List.of("admin@test.com"),
+                        com.ganaderia4.backend.model.NotificationSeverity.HIGH,
+                        false
+                )
+        );
+        when(throttleService.filterAllowedRecipients(any(NotificationMessage.class), eq(List.of("admin@test.com"))))
+                .thenReturn(List.of());
+
+        EmailNotificationService service = new EmailNotificationService(
+                emailProperties(true, "api-key", "alerts@ganaderia.test", "ops@ganaderia.test", "outbox"),
+                List.of(providerClient),
+                new AlertEmailTemplateBuilder(),
+                recipientResolver,
+                outboxService,
+                throttleService,
+                new ObjectMapper()
+        );
+
+        NotificationSendResult result = service.send(sampleMessage());
+
+        assertEquals(NotificationSendResult.SKIPPED, result);
+        verify(providerClient, never()).send(any());
+        verifyNoInteractions(outboxService);
+        assertTrue(output.getOut().contains("reason=throttled"));
     }
 
     @Test

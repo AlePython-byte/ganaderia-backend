@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ganaderia4.backend.config.EmailNotificationProperties;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import com.ganaderia4.backend.security.EmailNotificationThrottleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class EmailNotificationService implements NotificationService {
     private final AlertEmailTemplateBuilder templateBuilder;
     private final EmailNotificationRecipientResolver recipientResolver;
     private final NotificationOutboxService notificationOutboxService;
+    private final EmailNotificationThrottleService emailNotificationThrottleService;
     private final ObjectMapper objectMapper;
 
     public EmailNotificationService(EmailNotificationProperties properties,
@@ -32,6 +35,25 @@ public class EmailNotificationService implements NotificationService {
                                     AlertEmailTemplateBuilder templateBuilder,
                                     EmailNotificationRecipientResolver recipientResolver,
                                     NotificationOutboxService notificationOutboxService,
+                                    ObjectMapper objectMapper) {
+        this(
+                properties,
+                providerClients,
+                templateBuilder,
+                recipientResolver,
+                notificationOutboxService,
+                null,
+                objectMapper
+        );
+    }
+
+    @Autowired
+    public EmailNotificationService(EmailNotificationProperties properties,
+                                    List<EmailProviderClient> providerClients,
+                                    AlertEmailTemplateBuilder templateBuilder,
+                                    EmailNotificationRecipientResolver recipientResolver,
+                                    NotificationOutboxService notificationOutboxService,
+                                    EmailNotificationThrottleService emailNotificationThrottleService,
                                     ObjectMapper objectMapper) {
         this.properties = properties;
         this.providerClients = providerClients.stream()
@@ -43,6 +65,7 @@ public class EmailNotificationService implements NotificationService {
         this.templateBuilder = templateBuilder;
         this.recipientResolver = recipientResolver;
         this.notificationOutboxService = notificationOutboxService;
+        this.emailNotificationThrottleService = emailNotificationThrottleService;
         this.objectMapper = objectMapper;
     }
 
@@ -88,6 +111,27 @@ public class EmailNotificationService implements NotificationService {
 
         if (recipientsResolution.globalFallbackUsed()) {
             logGlobalFallbackUsed();
+        }
+
+        List<String> allowedRecipients = emailNotificationThrottleService != null
+                ? emailNotificationThrottleService.filterAllowedRecipients(
+                notificationMessage,
+                request.to()
+        )
+                : request.to();
+        if (allowedRecipients.isEmpty()) {
+            logSkipped("throttled", recipientsResolution.severity());
+            return NotificationSendResult.SKIPPED;
+        }
+        if (allowedRecipients.size() < request.to().size()) {
+            logThrottledRecipients(request.to().size(), allowedRecipients.size(), notificationMessage.getEventType());
+            request = new EmailNotificationRequest(
+                    request.from(),
+                    allowedRecipients,
+                    request.subject(),
+                    request.textBody(),
+                    request.htmlBody()
+            );
         }
 
         EmailDeliveryMode deliveryMode = resolveDeliveryMode();
@@ -180,6 +224,16 @@ public class EmailNotificationService implements NotificationService {
         logger.info(
                 "event=email_notification_global_fallback_used requestId={} reason=no_preference_recipients",
                 OperationalLogSanitizer.requestId()
+        );
+    }
+
+    private void logThrottledRecipients(int originalCount, int allowedCount, String eventType) {
+        logger.warn(
+                "event=email_notification_recipients_partially_throttled requestId={} originalCount={} allowedCount={} notificationType={} channel=EMAIL",
+                OperationalLogSanitizer.requestId(),
+                originalCount,
+                allowedCount,
+                OperationalLogSanitizer.safe(eventType)
         );
     }
 

@@ -22,6 +22,7 @@ public class DomainMetricsService {
     private static final String NOTIFICATIONS_FAILED = "ganaderia.notifications.failed";
     private static final String NOTIFICATIONS_QUEUED = "ganaderia.notifications.queued";
     private static final String NOTIFICATIONS_RETRIED = "ganaderia.notifications.retried";
+    private static final String NOTIFICATIONS_EMAIL_THROTTLED = "ganaderia.notifications.email.throttled.count";
     private static final String GPS_ACCURACY_QUALITY_COUNT = "ganaderia.gps.accuracy.quality.count";
     private static final String DEVICE_REPLAY_NONCE_CLEANUP_DELETED_COUNT = "ganaderia.device.replay_nonce.cleanup.deleted.count";
     private static final String ABUSE_RATE_LIMIT_CLEANUP_DELETED_COUNT = "ganaderia.abuse.rate_limit.cleanup.deleted.count";
@@ -88,6 +89,20 @@ public class DomainMetricsService {
 
     public void incrementNotificationRetried(String channel, String eventType) {
         counterWithNotificationTags(NOTIFICATIONS_RETRIED, channel, eventType).increment();
+    }
+
+    public void incrementEmailNotificationThrottled(String eventType, String scope) {
+        String eventTypeValue = normalizeTagValue(eventType);
+        String scopeValue = normalizeTagValue(scope);
+        String key = NOTIFICATIONS_EMAIL_THROTTLED + "|eventType=" + eventTypeValue + "|scope=" + scopeValue;
+
+        counters.computeIfAbsent(key, ignored ->
+                Counter.builder(NOTIFICATIONS_EMAIL_THROTTLED)
+                        .description("Cantidad de correos de notificacion omitidos por throttle transversal")
+                        .tag("eventType", eventTypeValue)
+                        .tag("scope", scopeValue)
+                        .register(meterRegistry)
+        ).increment();
     }
 
     public void incrementGpsAccuracyQuality(GpsAccuracyQuality quality) {

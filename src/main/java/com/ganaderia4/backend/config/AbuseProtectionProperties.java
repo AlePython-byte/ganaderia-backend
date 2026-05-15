@@ -16,6 +16,7 @@ public class AbuseProtectionProperties {
     private PasswordReset passwordReset = new PasswordReset();
     private AiSummary aiSummary = new AiSummary();
     private OutboxRequeue outboxRequeue = new OutboxRequeue();
+    private Email email = new Email();
 
     public boolean isEnabled() {
         return enabled;
@@ -71,6 +72,14 @@ public class AbuseProtectionProperties {
 
     public void setOutboxRequeue(OutboxRequeue outboxRequeue) {
         this.outboxRequeue = outboxRequeue;
+    }
+
+    public Email getEmail() {
+        return email;
+    }
+
+    public void setEmail(Email email) {
+        this.email = email;
     }
 
     public static class ClientIp {
@@ -313,6 +322,85 @@ public class AbuseProtectionProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public Duration getWindow() {
+            return window;
+        }
+
+        public void setWindow(Duration window) {
+            this.window = window;
+        }
+
+        public int getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public void setMaxAttempts(int maxAttempts) {
+            this.maxAttempts = maxAttempts;
+        }
+
+        public Duration getBlockDuration() {
+            return blockDuration;
+        }
+
+        public void setBlockDuration(Duration blockDuration) {
+            this.blockDuration = blockDuration;
+        }
+    }
+
+    public static class Email {
+        private boolean enabled = true;
+        private EmailLimit recipient = new EmailLimit(10, Duration.ofMinutes(10), Duration.ofMinutes(10));
+        private EmailLimit recipientEventType = new EmailLimit(5, Duration.ofMinutes(10), Duration.ofMinutes(10));
+        private EmailLimit channel = new EmailLimit(100, Duration.ofMinutes(10), Duration.ofMinutes(5));
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public EmailLimit getRecipient() {
+            return recipient;
+        }
+
+        public void setRecipient(EmailLimit recipient) {
+            this.recipient = recipient;
+        }
+
+        public EmailLimit getRecipientEventType() {
+            return recipientEventType;
+        }
+
+        public void setRecipientEventType(EmailLimit recipientEventType) {
+            this.recipientEventType = recipientEventType;
+        }
+
+        public EmailLimit getChannel() {
+            return channel;
+        }
+
+        public void setChannel(EmailLimit channel) {
+            this.channel = channel;
+        }
+    }
+
+    public static class EmailLimit {
+        private Duration window;
+        private int maxAttempts;
+        private Duration blockDuration;
+
+        public EmailLimit() {
+            this(10, Duration.ofMinutes(10), Duration.ofMinutes(10));
+        }
+
+        public EmailLimit(int maxAttempts, Duration window, Duration blockDuration) {
+            this.maxAttempts = maxAttempts;
+            this.window = window;
+            this.blockDuration = blockDuration;
         }
 
         public Duration getWindow() {
