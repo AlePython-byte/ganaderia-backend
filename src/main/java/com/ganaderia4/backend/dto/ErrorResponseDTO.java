@@ -1,8 +1,10 @@
 package com.ganaderia4.backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "Contrato estandar de error REST del backend")
 public class ErrorResponseDTO {
@@ -28,6 +30,10 @@ public class ErrorResponseDTO {
     @Schema(description = "Fecha y hora del error con el contrato temporal actual", example = "2026-04-28T20:52:08")
     private LocalDateTime timestamp;
 
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @Schema(description = "Lista opcional de errores por campo. Solo se informa en validaciones de DTO.")
+    private List<FieldErrorDTO> fieldErrors;
+
     public ErrorResponseDTO() {
     }
 
@@ -38,6 +44,17 @@ public class ErrorResponseDTO {
                             String path,
                             String requestId,
                             LocalDateTime timestamp) {
+        this(status, error, code, message, path, requestId, timestamp, null);
+    }
+
+    public ErrorResponseDTO(int status,
+                            String error,
+                            String code,
+                            String message,
+                            String path,
+                            String requestId,
+                            LocalDateTime timestamp,
+                            List<FieldErrorDTO> fieldErrors) {
         this.status = status;
         this.error = error;
         this.code = code;
@@ -45,6 +62,7 @@ public class ErrorResponseDTO {
         this.path = path;
         this.requestId = requestId;
         this.timestamp = timestamp;
+        this.fieldErrors = fieldErrors;
     }
 
     public int getStatus() {
@@ -101,5 +119,47 @@ public class ErrorResponseDTO {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public List<FieldErrorDTO> getFieldErrors() {
+        return fieldErrors;
+    }
+
+    public void setFieldErrors(List<FieldErrorDTO> fieldErrors) {
+        this.fieldErrors = fieldErrors;
+    }
+
+    @Schema(description = "Error de validacion asociado a un campo especifico")
+    public static class FieldErrorDTO {
+
+        @Schema(description = "Nombre del campo del DTO que fallo validacion", example = "email")
+        private String field;
+
+        @Schema(description = "Mensaje de validacion asociado al campo", example = "El correo es obligatorio")
+        private String message;
+
+        public FieldErrorDTO() {
+        }
+
+        public FieldErrorDTO(String field, String message) {
+            this.field = field;
+            this.message = message;
+        }
+
+        public String getField() {
+            return field;
+        }
+
+        public void setField(String field) {
+            this.field = field;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
     }
 }

@@ -19,8 +19,10 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.validation.FieldError;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -107,12 +109,14 @@ public class GlobalExceptionHandler {
                 : "Error de validación";
 
         logHandled(HttpStatus.BAD_REQUEST, "validation", request);
-        return buildErrorResponse(
+        ErrorResponseDTO error = buildError(
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.VALIDATION_ERROR,
                 message,
                 request
         );
+        error.setFieldErrors(buildFieldErrors(ex));
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -233,6 +237,21 @@ public class GlobalExceptionHandler {
                 path(request),
                 requestId(request),
                 LocalDateTime.now()
+        );
+    }
+
+    private List<ErrorResponseDTO.FieldErrorDTO> buildFieldErrors(MethodArgumentNotValidException ex) {
+        return ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(this::mapFieldError)
+                .toList();
+    }
+
+    private ErrorResponseDTO.FieldErrorDTO mapFieldError(FieldError fieldError) {
+        return new ErrorResponseDTO.FieldErrorDTO(
+                fieldError.getField(),
+                fieldError.getDefaultMessage() != null ? fieldError.getDefaultMessage() : "Valor invalido"
         );
     }
 

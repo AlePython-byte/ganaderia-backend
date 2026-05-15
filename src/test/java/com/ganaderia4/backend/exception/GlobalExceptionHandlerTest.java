@@ -1,5 +1,8 @@
 package com.ganaderia4.backend.exception;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +22,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -26,6 +30,7 @@ import static org.mockito.Mockito.mock;
 class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @AfterEach
     void tearDown() {
@@ -39,14 +44,40 @@ class GlobalExceptionHandlerTest {
         request.setQueryString("token=secret");
 
         BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "cowRequest");
-        bindingResult.addError(new FieldError("cowRequest", "name", "name is required"));
+        bindingResult.addError(new FieldError(
+                "cowRequest",
+                "name",
+                "secret-cow-name",
+                false,
+                null,
+                null,
+                "name is required"
+        ));
+        bindingResult.addError(new FieldError(
+                "cowRequest",
+                "status",
+                "INVALID_STATUS",
+                false,
+                null,
+                null,
+                "status is required"
+        ));
         MethodArgumentNotValidException exception =
                 new MethodArgumentNotValidException(mock(MethodParameter.class), bindingResult);
 
         var response = handler.handleValidationException(exception, request);
 
         assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_ERROR", response.getBody().getCode());
+        assertEquals("name is required", response.getBody().getMessage());
         assertEquals("req-validation-001", response.getBody().getRequestId());
+        assertEquals(2, response.getBody().getFieldErrors().size());
+        assertEquals("name", response.getBody().getFieldErrors().get(0).getField());
+        assertEquals("name is required", response.getBody().getFieldErrors().get(0).getMessage());
+        assertEquals("status", response.getBody().getFieldErrors().get(1).getField());
+        assertEquals("status is required", response.getBody().getFieldErrors().get(1).getMessage());
+        assertFalse(writeJson(response.getBody()).contains("secret-cow-name"));
+        assertFalse(writeJson(response.getBody()).contains("INVALID_STATUS"));
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_handled"));
         assertTrue(logs.contains("requestId=req-validation-001"));
@@ -71,6 +102,8 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(404, response.getStatusCode().value());
         assertEquals("req-not-found-001", response.getBody().getRequestId());
+        assertNull(response.getBody().getFieldErrors());
+        assertFalse(writeJson(response.getBody()).contains("fieldErrors"));
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_handled"));
         assertTrue(logs.contains("requestId=req-not-found-001"));
@@ -93,6 +126,8 @@ class GlobalExceptionHandlerTest {
         assertEquals(500, response.getStatusCode().value());
         assertEquals("req-unhandled-001", response.getBody().getRequestId());
         assertEquals("Ocurrió un error interno del servidor", response.getBody().getMessage());
+        assertNull(response.getBody().getFieldErrors());
+        assertFalse(writeJson(response.getBody()).contains("fieldErrors"));
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_unhandled"));
         assertTrue(logs.contains("requestId=req-unhandled-001"));
@@ -120,6 +155,8 @@ class GlobalExceptionHandlerTest {
         assertEquals("El cuerpo de la solicitud no es válido o no tiene formato JSON correcto.",
                 response.getBody().getMessage());
         assertEquals("req-json-001", response.getBody().getRequestId());
+        assertNull(response.getBody().getFieldErrors());
+        assertFalse(writeJson(response.getBody()).contains("fieldErrors"));
     }
 
     @Test
@@ -174,5 +211,13 @@ class GlobalExceptionHandlerTest {
         assertEquals("BAD_REQUEST", response.getBody().getCode());
         assertEquals("Método HTTP no permitido para este endpoint", response.getBody().getMessage());
         assertEquals("req-method-001", response.getBody().getRequestId());
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 }
