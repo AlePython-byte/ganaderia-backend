@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ganaderia4.backend.config.AiAnalysisProperties;
+import com.ganaderia4.backend.model.AlertAnalysisRiskLevel;
+import com.ganaderia4.backend.observability.OperationalLogSanitizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -12,18 +16,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
+import java.text.Normalizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
 public class GeminiAiClient {
 
+    private static final Logger log = LoggerFactory.getLogger(GeminiAiClient.class);
     private static final Pattern JSON_CODE_FENCE = Pattern.compile("```(?:json)?\\s*(\\{.*?})\\s*```", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
-    private static final Pattern GENERIC_INTRO_TEXT = Pattern.compile(
-            "^(here\\s+is\\s+the\\s+json(?:\\s+requested)?|here\\s+is\\s+the\\s+requested\\s+json|sure[,!]?\\s+here\\s+is|of\\s+course[,!]?|claro[,!]?|aqui\\s+esta\\s+el\\s+json|aqui\\s+tienes\\s+el\\s+json)\\b.*",
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    );
 
     private final AiAnalysisProperties properties;
     private final ObjectMapper objectMapper;
@@ -48,6 +49,12 @@ public class GeminiAiClient {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.warn(
+                        "event=gemini_provider_http_error requestId={} provider=gemini model={} status={}",
+                        OperationalLogSanitizer.requestId(),
+                        OperationalLogSanitizer.safe(properties.getGeminiModel()),
+                        response.statusCode()
+                );
                 throw new GeminiAiClientException("http_" + response.statusCode());
             }
 
@@ -110,22 +117,26 @@ public class GeminiAiClient {
         if (jsonCandidate != null) {
             try {
                 JsonNode summaryJson = objectMapper.readTree(jsonCandidate);
+                AlertAnalysisRiskLevel riskLevel = parseRiskLevel(summaryJson.path("riskLevel").asText(""));
                 String summary = summaryJson.path("summary").asText("").trim();
                 String recommendation = summaryJson.path("recommendation").asText("").trim();
 
-                if (!summary.isBlank()) {
-                    return new AiGeneratedSummary(summary, recommendation);
+                if (riskLevel != null && !summary.isBlank() && !recommendation.isBlank()) {
+                    return new AiGeneratedSummary(riskLevel, summary, recommendation);
                 }
             } catch (IOException ignored) {
-                // Fall through to plain-text handling.
+                throw new GeminiAiClientException("parse_error", ignored);
             }
         }
 
-        if (!isUsefulPlainText(trimmed)) {
-            throw new GeminiAiClientException("unusable_plain_text");
-        }
+        log.warn(
+                "event=gemini_response_unusable requestId={} provider=gemini model={} reason=unusable_response responseLength={}",
+                OperationalLogSanitizer.requestId(),
+                OperationalLogSanitizer.safe(properties.getGeminiModel()),
+                trimmed.length()
+        );
 
-        return new AiGeneratedSummary(trimmed, "");
+        throw new GeminiAiClientException("unusable_response");
     }
 
     private String extractCodeFenceJson(String value) {
@@ -147,32 +158,28 @@ public class GeminiAiClient {
         return null;
     }
 
-    private boolean isUsefulPlainText(String value) {
-        String normalized = value == null ? "" : value.trim();
-        if (normalized.isBlank()) {
-            return false;
-        }
-
-        String collapsed = normalized.replaceAll("\\s+", " ").trim();
-        if (GENERIC_INTRO_TEXT.matcher(collapsed).matches()) {
-            return false;
-        }
-
-        String lower = collapsed.toLowerCase(Locale.ROOT);
-        if (lower.length() < 25) {
-            return false;
-        }
-
-        return lower.contains("alert")
-                || lower.contains("riesgo")
-                || lower.contains("collar")
-                || lower.contains("bater")
-                || lower.contains("geocerca")
-                || lower.contains("prior")
-                || lower.contains("operativ");
+    private AlertAnalysisRiskLevel parseRiskLevel(String value) {
+        String normalized = normalizeRiskLevel(value);
+        return switch (normalized) {
+            case "LOW", "BAJO" -> AlertAnalysisRiskLevel.LOW;
+            case "MEDIUM", "MEDIO" -> AlertAnalysisRiskLevel.MEDIUM;
+            case "HIGH", "ALTO" -> AlertAnalysisRiskLevel.HIGH;
+            case "CRITICAL", "CRITICO" -> AlertAnalysisRiskLevel.CRITICAL;
+            default -> null;
+        };
     }
 
-    public record AiGeneratedSummary(String summary, String recommendation) {
+    private String normalizeRiskLevel(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String withoutAccents = Normalizer.normalize(value.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return withoutAccents.toUpperCase(java.util.Locale.ROOT);
+    }
+
+    public record AiGeneratedSummary(AlertAnalysisRiskLevel riskLevel, String summary, String recommendation) {
     }
 
     public static class GeminiAiClientException extends RuntimeException {

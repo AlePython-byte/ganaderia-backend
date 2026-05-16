@@ -75,17 +75,18 @@ class AlertAiAnalysisServiceTest {
                 .thenReturn(List.of(priority("COLLAR_OFFLINE")));
         when(geminiAiClient.generateOperationalSummary(anyString()))
                 .thenReturn(new GeminiAiClient.AiGeneratedSummary(
+                        AlertAnalysisRiskLevel.CRITICAL,
                         "El sistema presenta alertas pendientes que requieren atencion inmediata.",
                         "Revise primero los collares offline y luego las alertas de bateria baja."
                 ));
 
         AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
 
-        assertEquals("AI", response.getSource());
+        assertEquals("GEMINI", response.getSource());
         assertEquals(false, response.isFallbackUsed());
         assertEquals(AlertAnalysisRiskLevel.CRITICAL, response.getRiskLevel());
         verify(domainMetricsService).incrementAiProviderRequest("gemini", "success");
-        verify(domainMetricsService).incrementAiSummaryGenerated("AI", "CRITICAL");
+        verify(domainMetricsService).incrementAiSummaryGenerated("GEMINI", "CRITICAL");
         verify(domainMetricsService, never()).incrementAiSummaryFallback(anyString());
     }
 
@@ -112,7 +113,7 @@ class AlertAiAnalysisServiceTest {
     }
 
     @Test
-    void shouldUseAiSourceWhenClientReturnsPlainTextWithoutRecommendation() {
+    void shouldUseGeminiSourceOnlyWhenClientReturnsUsableSummary() {
         properties.setEnabled(true);
         properties.setProvider("gemini");
         properties.setGeminiApiKey("test-key");
@@ -122,18 +123,19 @@ class AlertAiAnalysisServiceTest {
                 .thenReturn(List.of(priority("LOW_BATTERY")));
         when(geminiAiClient.generateOperationalSummary(anyString()))
                 .thenReturn(new GeminiAiClient.AiGeneratedSummary(
+                        AlertAnalysisRiskLevel.HIGH,
                         "Hay varias alertas pendientes que requieren atencion operativa.",
-                        ""
+                        "Revise primero las alertas de bateria baja."
                 ));
 
         AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
 
-        assertEquals("AI", response.getSource());
+        assertEquals("GEMINI", response.getSource());
         assertEquals(false, response.isFallbackUsed());
         assertEquals("Hay varias alertas pendientes que requieren atencion operativa.", response.getSummary());
-        assertTrue(response.getRecommendation().contains("mayor prioridad"));
+        assertEquals("Revise primero las alertas de bateria baja.", response.getRecommendation());
         verify(domainMetricsService).incrementAiProviderRequest("gemini", "success");
-        verify(domainMetricsService).incrementAiSummaryGenerated("AI", "HIGH");
+        verify(domainMetricsService).incrementAiSummaryGenerated("GEMINI", "HIGH");
     }
 
     @Test
@@ -146,7 +148,7 @@ class AlertAiAnalysisServiceTest {
         when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
                 .thenReturn(List.of(priority("LOW_BATTERY")));
         when(geminiAiClient.generateOperationalSummary(anyString()))
-                .thenThrow(new GeminiAiClient.GeminiAiClientException("unusable_plain_text"));
+                .thenThrow(new GeminiAiClient.GeminiAiClientException("unusable_response"));
 
         AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
 

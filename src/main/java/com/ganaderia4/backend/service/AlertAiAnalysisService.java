@@ -18,7 +18,7 @@ import java.util.Locale;
 public class AlertAiAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(AlertAiAnalysisService.class);
-    private static final String SOURCE_AI = "AI";
+    private static final String SOURCE_GEMINI = "GEMINI";
     private static final String SOURCE_RULE_BASED_FALLBACK = "RULE_BASED_FALLBACK";
 
     private final AlertAnalysisService alertAnalysisService;
@@ -58,24 +58,22 @@ public class AlertAiAnalysisService {
                     geminiAiClient.generateOperationalSummary(buildPrompt(heuristicSummary, topPriorities));
 
             AlertAiSummaryDTO response = new AlertAiSummaryDTO(
-                    heuristicSummary.getRiskLevel(),
+                    aiGeneratedSummary.riskLevel(),
                     aiGeneratedSummary.summary(),
-                    aiGeneratedSummary.recommendation() != null && !aiGeneratedSummary.recommendation().isBlank()
-                            ? aiGeneratedSummary.recommendation()
-                            : fallbackRecommendationFor(heuristicSummary, topPriorities),
-                    SOURCE_AI,
+                    aiGeneratedSummary.recommendation(),
+                    SOURCE_GEMINI,
                     false
             );
 
             domainMetricsService.incrementAiProviderRequest("gemini", "success");
-            domainMetricsService.incrementAiSummaryGenerated(SOURCE_AI, heuristicSummary.getRiskLevel().name());
+            domainMetricsService.incrementAiSummaryGenerated(SOURCE_GEMINI, aiGeneratedSummary.riskLevel().name());
 
             log.info(
                     "event=alert_ai_summary_generated requestId={} source={} fallbackUsed={} riskLevel={}",
                     OperationalLogSanitizer.requestId(),
-                    SOURCE_AI,
+                    SOURCE_GEMINI,
                     false,
-                    heuristicSummary.getRiskLevel()
+                    aiGeneratedSummary.riskLevel()
             );
 
             return response;
@@ -150,7 +148,7 @@ public class AlertAiAnalysisService {
         StringBuilder prompt = new StringBuilder()
                 .append("Eres un asistente operativo para monitoreo ganadero.\n")
                 .append("Debes responder en espanol claro, breve y operativo.\n")
-                .append("Responde unicamente con JSON valido.\n")
+                .append("Responde unicamente con JSON puro y valido.\n")
                 .append("No uses markdown.\n")
                 .append("No uses bloques ```.\n")
                 .append("No escribas texto antes ni despues del JSON.\n")
@@ -158,10 +156,12 @@ public class AlertAiAnalysisService {
                 .append("No inventes alertas, vacas, collares, cantidades ni hechos que no aparezcan en los datos.\n")
                 .append("Usa solo la informacion entregada por el backend. Si faltan datos, responde con cautela.\n")
                 .append("No recomiendes acciones destructivas ni cambios automaticos en el sistema.\n")
+                .append("Usa exactamente los campos riskLevel, summary y recommendation.\n")
+                .append("riskLevel debe ser exactamente uno de estos valores: LOW, MEDIUM, HIGH, CRITICAL.\n")
                 .append("El campo summary debe estar en espanol y describir el estado operativo actual.\n")
                 .append("El campo recommendation debe estar en espanol y dar una accion operativa concreta.\n")
                 .append("Devuelve solo JSON valido con este formato exacto y sin campos adicionales: ")
-                .append("{\"summary\":\"...\",\"recommendation\":\"...\"}\n")
+                .append("{\"riskLevel\":\"LOW|MEDIUM|HIGH|CRITICAL\",\"summary\":\"...\",\"recommendation\":\"...\"}\n")
                 .append("Datos del backend:\n")
                 .append("- riskLevel: ").append(heuristicSummary.getRiskLevel()).append('\n')
                 .append("- totalPendingAlerts: ").append(heuristicSummary.getTotalPendingAlerts()).append('\n')
