@@ -127,7 +127,10 @@ class GlobalExceptionHandlerTest {
         assertEquals("req-unhandled-001", response.getBody().getRequestId());
         assertEquals("Ocurrió un error interno del servidor", response.getBody().getMessage());
         assertNull(response.getBody().getFieldErrors());
-        assertFalse(writeJson(response.getBody()).contains("fieldErrors"));
+        String responseJson = writeJson(response.getBody());
+        assertFalse(responseJson.contains("fieldErrors"));
+        assertFalse(responseJson.contains("database unavailable"));
+        assertFalse(responseJson.contains("IllegalStateException"));
         String logs = output.getOut() + output.getErr();
         assertTrue(logs.contains("event=http_error_unhandled"));
         assertTrue(logs.contains("requestId=req-unhandled-001"));
@@ -136,6 +139,8 @@ class GlobalExceptionHandlerTest {
         assertTrue(logs.contains("method=PATCH"));
         assertTrue(logs.contains("path=/api/collars/7"));
         assertTrue(logs.contains("queryPresent=true"));
+        assertTrue(logs.contains("exceptionClass=java.lang.IllegalStateException"));
+        assertTrue(logs.contains("exceptionMessage=database_unavailable"));
         assertTrue(logs.contains("java.lang.IllegalStateException"));
         assertFalse(logs.contains("secret=hidden"));
     }

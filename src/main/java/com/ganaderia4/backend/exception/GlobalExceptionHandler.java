@@ -175,12 +175,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleGenericException(Exception ex,
                                                                    HttpServletRequest request) {
         log.error(
-                "event=http_error_unhandled requestId={} category=internal_error status={} method={} path={} queryPresent={}",
+                "event=http_error_unhandled requestId={} category=internal_error status={} method={} path={} queryPresent={} exceptionClass={} exceptionMessage={}",
                 OperationalLogSanitizer.requestId(),
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 method(request),
                 path(request),
                 queryPresent(request),
+                exceptionClass(ex),
+                exceptionMessage(ex),
                 ex
         );
 
@@ -277,6 +279,18 @@ public class GlobalExceptionHandler {
 
     private boolean queryPresent(HttpServletRequest request) {
         return request != null && request.getQueryString() != null && !request.getQueryString().isBlank();
+    }
+
+    private String exceptionClass(Exception ex) {
+        return ex == null ? "-" : OperationalLogSanitizer.safe(ex.getClass().getName());
+    }
+
+    private String exceptionMessage(Exception ex) {
+        if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
+            return "-";
+        }
+
+        return OperationalLogSanitizer.safe(ex.getMessage());
     }
 
     private String requestId(HttpServletRequest request) {
