@@ -1,0 +1,5 @@
+ALTER TABLE cows
+    ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_cows_active
+    ON cows (active);

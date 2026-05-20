@@ -122,6 +122,50 @@ public class GeofenceController {
         return geofenceService.getGeofenceById(id);
     }
 
+    @PatchMapping("/{id}/deactivate")
+    @Operation(
+            summary = "Desactivar geocerca",
+            description = "Marca la geocerca como inactiva sin borrar su configuracion ni la asociacion historica con la vaca."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Geocerca desactivada o ya inactiva",
+                    content = @Content(schema = @Schema(implementation = GeofenceResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Geocerca no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Error inesperado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public GeofenceResponseDTO deactivateGeofence(@PathVariable Long id) {
+        return geofenceService.deactivateGeofence(id);
+    }
+
+    @PatchMapping("/{id}/activate")
+    @Operation(
+            summary = "Activar geocerca",
+            description = "Marca la geocerca como activa respetando la regla de una sola geocerca activa por vaca."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Geocerca activada o ya activa",
+                    content = @Content(schema = @Schema(implementation = GeofenceResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Geocerca no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "La vaca ya tiene una geocerca activa asignada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Error inesperado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public GeofenceResponseDTO activateGeofence(@PathVariable Long id) {
+        return geofenceService.activateGeofence(id);
+    }
+
     @GetMapping("/active/{active}")
     @Deprecated(since = "2.5", forRemoval = false)
     @Operation(

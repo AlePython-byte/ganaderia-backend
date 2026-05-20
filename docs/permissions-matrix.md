@@ -96,6 +96,7 @@ Los siguientes endpoints fueron verificados como públicos en la auditoría del 
 | Vacas | `GET /api/cows/**` | Sí | Sí | No | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")` |
 | Vacas | `POST /api/cows/**` | Sí | Sí | No | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")` |
 | Vacas | `PUT /api/cows/**` | Sí | Sí | No | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")` |
+| Vacas | `PATCH /api/cows/**` (activar/desactivar) | Sí | Sí | No | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")` |
 | Collares | `GET /api/collars/**` | Sí | Sí | Sí | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")` |
 | Collares | `POST /api/collars/**` | Sí | Sí | Sí | No | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")` |
 | Collares | `PUT /api/collars/**` | Sí | Sí | Sí | No | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "TECNICO")` |
@@ -107,6 +108,7 @@ Los siguientes endpoints fueron verificados como públicos en la auditoría del 
 | Alertas | `GET /api/alerts/**` | Sí | Sí | Sí | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")` |
 | Alertas | `PUT /api/alerts/**` | Sí | No | No | No | No | `hasRole("ADMINISTRADOR")` + `@PreAuthorize` |
 | Alertas | `PATCH /api/alerts/**` | Sí | No | No | No | No | `hasRole("ADMINISTRADOR")` + `@PreAuthorize` |
+| Análisis alertas | `GET /api/alert-analysis/**` | Sí | Sí | Sí | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")` |
 | Dashboard | `GET /api/dashboard/**` | Sí | Sí | Sí | Sí | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")` |
 | Reportes | `GET /api/reports/**` | Sí | Sí | No | No | No | `hasAnyRole("ADMINISTRADOR", "SUPERVISOR")` |
 | Device ingestion | `POST /api/device/locations` | No aplica | No aplica | No aplica | No aplica | HMAC | `permitAll` + autenticación HMAC del flujo device |
@@ -124,7 +126,7 @@ Los siguientes endpoints fueron verificados como públicos en la auditoría del 
 | Usuarios | administración de usuarios | Sí | No | No | No | No |
 | Auditoría | consulta de logs | Sí | No | No | No | No |
 | Vacas | lectura | Sí | Sí | No | Sí | No |
-| Vacas | creación / actualización | Sí | Sí | No | Sí | No |
+| Vacas | creación / actualización / activación / desactivación | Sí | Sí | No | Sí | No |
 | Collares | lectura | Sí | Sí | Sí | Sí | No |
 | Collares | creación / actualización / enable / disable / asignación | Sí | Sí | Sí | No | No |
 | Collares | rotación de secreto | Sí | No | No | No | No |
@@ -141,11 +143,12 @@ Los siguientes endpoints fueron verificados como públicos en la auditoría del 
 
 ## Decisiones explícitas del MVP
 
-- `OPERADOR` puede crear y actualizar vacas en el MVP actual.
-- `TECNICO` puede consultar alertas y dashboard operativo.
+- `OPERADOR` puede crear, actualizar, activar y desactivar vacas en el MVP actual.
+- `TECNICO` puede consultar alertas, análisis de alertas y dashboard operativo.
+- Los cuatro roles (ADMINISTRADOR, SUPERVISOR, TECNICO, OPERADOR) tienen acceso a `GET /api/alert-analysis/**`.
 - `POST /api/device/locations` es público para Spring Security, pero no es anónimo funcionalmente porque exige HMAC y controles adicionales del flujo device.
 - `GET /healthz` es público por diseño.
-- Swagger/OpenAPI puede estar público solo cuando está habilitado en entornos locales o de desarrollo.
+- Swagger/OpenAPI es público en todos los perfiles cuando `springdoc` está habilitado; en producción se puede deshabilitar por configuración.
 
 ## Riesgos y controles
 

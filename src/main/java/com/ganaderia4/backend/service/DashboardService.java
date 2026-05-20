@@ -155,6 +155,7 @@ public class DashboardService {
                 cow.getInternalCode(),
                 cow.getName(),
                 cow.getStatus().name(),
+                cow.getActive(),
                 cow.getObservations()
         );
     }

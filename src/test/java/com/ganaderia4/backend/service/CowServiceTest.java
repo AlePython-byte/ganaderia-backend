@@ -4,6 +4,7 @@ import com.ganaderia4.backend.config.PaginationProperties;
 import com.ganaderia4.backend.dto.CowRequestDTO;
 import com.ganaderia4.backend.dto.CowResponseDTO;
 import com.ganaderia4.backend.exception.ConflictException;
+import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
 import com.ganaderia4.backend.repository.CowRepository;
@@ -22,7 +23,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
@@ -246,5 +249,67 @@ class CowServiceTest {
         verify(cowRepository, times(3)).save(any(Cow.class));
         verify(cowRepository, times(3)).findAllTokens();
         verify(cowRepository, times(3)).findAllInternalCodes();
+    }
+
+    @Test
+    void shouldDeactivateCowWithoutDeletingIt() {
+        Cow existing = new Cow();
+        existing.setId(10L);
+        existing.setToken("COW-010");
+        existing.setInternalCode("INT-010");
+        existing.setName("Luna");
+        existing.setStatus(CowStatus.DENTRO);
+        existing.setActive(true);
+
+        when(cowRepository.findById(10L)).thenReturn(Optional.of(existing));
+        when(cowRepository.save(existing)).thenReturn(existing);
+
+        CowResponseDTO response = cowService.deactivateCow(10L);
+
+        assertFalse(response.getActive());
+        verify(cowRepository).save(existing);
+        verify(auditLogService).logWithCurrentActor(
+                "DEACTIVATE_COW",
+                "COW",
+                10L,
+                "API",
+                "Desactivacion operativa de vaca con token COW-010",
+                true
+        );
+    }
+
+    @Test
+    void shouldActivateCowWithoutDeletingIt() {
+        Cow existing = new Cow();
+        existing.setId(11L);
+        existing.setToken("COW-011");
+        existing.setInternalCode("INT-011");
+        existing.setName("Brisa");
+        existing.setStatus(CowStatus.FUERA);
+        existing.setActive(false);
+
+        when(cowRepository.findById(11L)).thenReturn(Optional.of(existing));
+        when(cowRepository.save(existing)).thenReturn(existing);
+
+        CowResponseDTO response = cowService.activateCow(11L);
+
+        assertTrue(response.getActive());
+        verify(cowRepository).save(existing);
+        verify(auditLogService).logWithCurrentActor(
+                "ACTIVATE_COW",
+                "COW",
+                11L,
+                "API",
+                "Activacion operativa de vaca con token COW-011",
+                true
+        );
+    }
+
+    @Test
+    void shouldRejectDeactivateWhenCowDoesNotExist() {
+        when(cowRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> cowService.deactivateCow(404L));
+        verify(cowRepository, never()).save(any());
     }
 }

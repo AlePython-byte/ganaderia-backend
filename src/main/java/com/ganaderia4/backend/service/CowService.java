@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @Service
 public class CowService {
 
-    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "token", "internalCode", "name", "status");
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "token", "internalCode", "name", "status", "active");
     private static final int MAX_TOKEN_GENERATION_ATTEMPTS = 3;
     private static final String COW_TOKEN_PREFIX = "COW-";
     private static final String COW_INTERNAL_CODE_PREFIX = "INT-";
@@ -64,6 +64,7 @@ public class CowService {
             cow.setInternalCode(generateCowInternalCode());
             cow.setName(requestDTO.getName().trim());
             cow.setStatus(requestDTO.getStatus());
+            cow.setActive(true);
             cow.setObservations(normalizeNullable(requestDTO.getObservations()));
 
             try {
@@ -128,14 +129,69 @@ public class CowService {
                 .collect(Collectors.toList());
     }
 
-    public Page<CowResponseDTO> getCowsPage(CowStatus status, int page, int size, String sort, String direction) {
+    public Page<CowResponseDTO> getCowsPage(CowStatus status, Boolean active, int page, int size, String sort, String direction) {
         PageRequest pageable = paginationService.createPageRequest(page, size, sort, direction, ALLOWED_SORT_FIELDS);
 
-        Page<Cow> cows = status != null
-                ? cowRepository.findByStatus(status, pageable)
-                : cowRepository.findAll(pageable);
+        Page<Cow> cows;
+        if (status != null && active != null) {
+            cows = cowRepository.findByStatusAndActive(status, active, pageable);
+        } else if (status != null) {
+            cows = cowRepository.findByStatus(status, pageable);
+        } else if (active != null) {
+            cows = cowRepository.findByActive(active, pageable);
+        } else {
+            cows = cowRepository.findAll(pageable);
+        }
 
         return cows.map(this::mapToResponseDTO);
+    }
+
+    @Transactional
+    public CowResponseDTO deactivateCow(Long id) {
+        Cow cow = cowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+        if (Boolean.FALSE.equals(cow.getActive())) {
+            return mapToResponseDTO(cow);
+        }
+
+        cow.setActive(false);
+        Cow updatedCow = cowRepository.save(cow);
+
+        auditLogService.logWithCurrentActor(
+                "DEACTIVATE_COW",
+                "COW",
+                updatedCow.getId(),
+                "API",
+                "Desactivacion operativa de vaca con token " + updatedCow.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCow);
+    }
+
+    @Transactional
+    public CowResponseDTO activateCow(Long id) {
+        Cow cow = cowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+        if (Boolean.TRUE.equals(cow.getActive())) {
+            return mapToResponseDTO(cow);
+        }
+
+        cow.setActive(true);
+        Cow updatedCow = cowRepository.save(cow);
+
+        auditLogService.logWithCurrentActor(
+                "ACTIVATE_COW",
+                "COW",
+                updatedCow.getId(),
+                "API",
+                "Activacion operativa de vaca con token " + updatedCow.getToken(),
+                true
+        );
+
+        return mapToResponseDTO(updatedCow);
     }
 
     public CowResponseDTO getCowById(Long id) {
@@ -234,6 +290,7 @@ public class CowService {
                 cow.getInternalCode(),
                 cow.getName(),
                 cow.getStatus().name(),
+                cow.getActive(),
                 cow.getObservations()
         );
     }

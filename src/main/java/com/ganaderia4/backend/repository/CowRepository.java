@@ -20,6 +20,10 @@ public interface CowRepository extends JpaRepository<Cow, Long> {
 
     Page<Cow> findByStatus(CowStatus status, Pageable pageable);
 
+    Page<Cow> findByActive(Boolean active, Pageable pageable);
+
+    Page<Cow> findByStatusAndActive(CowStatus status, Boolean active, Pageable pageable);
+
     long countByStatus(CowStatus status);
 
     @Query("select cow.token from Cow cow")

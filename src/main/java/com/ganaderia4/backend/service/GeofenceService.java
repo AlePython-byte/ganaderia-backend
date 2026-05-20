@@ -96,6 +96,41 @@ public class GeofenceService {
         return mapToResponseDTO(geofence);
     }
 
+    @Transactional
+    public GeofenceResponseDTO deactivateGeofence(Long id) {
+        Geofence geofence = geofenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Geocerca no encontrada"));
+
+        if (Boolean.FALSE.equals(geofence.getActive())) {
+            return mapToResponseDTO(geofence);
+        }
+
+        geofence.setActive(false);
+        return mapToResponseDTO(geofenceRepository.save(geofence));
+    }
+
+    @Transactional
+    public GeofenceResponseDTO activateGeofence(Long id) {
+        Geofence geofence = geofenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Geocerca no encontrada"));
+
+        if (Boolean.TRUE.equals(geofence.getActive())) {
+            return mapToResponseDTO(geofence);
+        }
+
+        Cow cow = geofence.getCow();
+        if (cow != null) {
+            geofenceRepository.findByCowAndActive(cow, true)
+                    .filter(activeGeofence -> !activeGeofence.getId().equals(geofence.getId()))
+                    .ifPresent(activeGeofence -> {
+                        throw new ConflictException("La vaca ya tiene una geocerca activa asignada");
+                    });
+        }
+
+        geofence.setActive(true);
+        return mapToResponseDTO(geofenceRepository.save(geofence));
+    }
+
     public boolean isInsideGeofence(Double latitude, Double longitude, Geofence geofence) {
         return geofenceStrategyResolver.resolve(geofence)
                 .isInside(latitude, longitude, geofence);

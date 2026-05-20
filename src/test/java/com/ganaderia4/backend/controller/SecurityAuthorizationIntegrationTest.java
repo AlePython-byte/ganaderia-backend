@@ -476,6 +476,54 @@ class SecurityAuthorizationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/cows/page"));
     }
 
+    @Test
+    void shouldRejectCowDeactivateWhenTokenIsMissing() throws Exception {
+        mockMvc.perform(patch("/api/cows/999/deactivate"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/cows/999/deactivate"));
+    }
+
+    @Test
+    void shouldDenyTecnicoFromCowDeactivate() throws Exception {
+        mockMvc.perform(patch("/api/cows/999/deactivate")
+                        .header("Authorization", "Bearer " + loginAndGetToken("tecnico@test.com", "12345678")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.path").value("/api/cows/999/deactivate"));
+    }
+
+    @Test
+    void shouldAllowSupervisorToReachCowDeactivate() throws Exception {
+        assertAllowedStatus(patch("/api/cows/999/deactivate"),
+                loginAndGetToken("supervisor@test.com", "12345678"),
+                200, 404);
+    }
+
+    @Test
+    void shouldRejectGeofenceDeactivateWhenTokenIsMissing() throws Exception {
+        mockMvc.perform(patch("/api/geofences/999/deactivate"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.path").value("/api/geofences/999/deactivate"));
+    }
+
+    @Test
+    void shouldDenyOperadorFromGeofenceDeactivate() throws Exception {
+        mockMvc.perform(patch("/api/geofences/999/deactivate")
+                        .header("Authorization", "Bearer " + loginAndGetToken("operador@test.com", "12345678")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.path").value("/api/geofences/999/deactivate"));
+    }
+
+    @Test
+    void shouldAllowSupervisorToReachGeofenceDeactivate() throws Exception {
+        assertAllowedStatus(patch("/api/geofences/999/deactivate"),
+                loginAndGetToken("supervisor@test.com", "12345678"),
+                200, 404);
+    }
+
     private void assertForbiddenForRole(String path, String token) throws Exception {
         mockMvc.perform(get(path)
                         .header("Authorization", "Bearer " + token))

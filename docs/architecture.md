@@ -97,10 +97,10 @@ Esta separación permite que los controladores se mantengan delgados, que las re
 | Módulo | Responsabilidad | Clases representativas | Endpoints principales |
 | --- | --- | --- | --- |
 | Auth/Users | Login, usuario actual, usuarios y recuperación de contraseña | `AuthController`, `AuthService`, `AuthPasswordResetService`, `UserService`, `JwtService` | `/api/auth/login`, `/api/auth/me`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/users` |
-| Cows | Gestión de vacas, token técnico y código interno generado por backend | `CowController`, `CowService`, `CowRepository`, `Cow` | `/api/cows`, `/api/cows/page`, `/api/cows/{id}`, `/api/cows/token/{token}` |
+| Cows | Gestión de vacas, activación/desactivación operativa, token técnico y código interno generado por backend | `CowController`, `CowService`, `CowRepository`, `Cow` | `/api/cows`, `/api/cows/page`, `/api/cows/{id}`, `/api/cows/token/{token}`, `/api/cows/{id}/deactivate`, `/api/cows/{id}/activate` |
 | Collars | Gestión de collares, asignación, habilitación, rotación de secreto y token técnico | `CollarController`, `CollarService`, `CollarRepository`, `Collar` | `/api/collars`, `/api/collars/{id}/rotate-secret`, `/api/collars/{id}/assign/{cowId}` |
 | Locations | Registro manual/API de ubicaciones y consulta por vaca | `LocationController`, `LocationService`, `LocationRepository`, `Location` | `/api/locations`, `/api/locations/cow/{cowId}`, `/api/locations/cow/{cowId}/last` |
-| Geofences | Gestión y evaluación de geocercas | `GeofenceController`, `GeofenceService`, `GeofenceRepository`, `CircularGeofenceStrategy` | `/api/geofences`, `/api/geofences/page`, `/api/geofences/active/{active}` |
+| Geofences | Gestión y evaluación de geocercas, activación/desactivación operativa | `GeofenceController`, `GeofenceService`, `GeofenceRepository`, `CircularGeofenceStrategy` | `/api/geofences`, `/api/geofences/page`, `/api/geofences/{id}`, `/api/geofences/{id}/deactivate`, `/api/geofences/{id}/activate` |
 | Alerts | Gestión, consulta, resolución y descarte de alertas | `AlertController`, `AlertService`, `AlertRepository`, `Alert` | `/api/alerts`, `/api/alerts/page`, `/api/alerts/status/{status}`, `/api/alerts/{id}/resolve` |
 | Reports | Reportes operativos y exportación CSV | `ReportController`, `AlertReportService`, `CollarReportService`, `CowIncidentReportService`, `ReportCsvService` | `/api/reports/alerts`, `/api/reports/alerts/export.csv`, `/api/reports/offline-collars`, `/api/reports/cows-most-incidents` |
 | Device ingestion | Recepción IoT firmada con HMAC | `DeviceController`, `DeviceRequestAuthenticationService`, `DeviceReplayProtectionStore`, `LocationService` | `/api/device/locations` |
@@ -115,7 +115,7 @@ Esta separación permite que los controladores se mantengan delgados, que las re
 | Entidad | Responsabilidad | Comentario técnico |
 | --- | --- | --- |
 | `User` | Usuario del sistema | Tiene rol operativo y participa en autenticación/autorización. |
-| `Cow` | Animal monitoreado | Usa token técnico `COW-xxx` y código interno `INT-xxx` generados por backend. |
+| `Cow` | Animal monitoreado | Usa token técnico `COW-xxx` y código interno `INT-xxx` generados por backend. Campo `active` (booleano) permite activación/desactivación operativa sin borrar historial. |
 | `Collar` | Dispositivo asociado a una vaca | Tiene token `COLLAR-xxx`, secreto de firma, estado, enabled y telemetría. |
 | `Location` | Reporte de ubicación | Guarda coordenadas, timestamp, batería, precisión GPS y relación con vaca/collar. |
 | `Geofence` | Zona geográfica | Permite evaluar permanencia/salida de animales. |
@@ -404,7 +404,23 @@ Limitaciones conocidas:
 - La validación E2E completa depende del frontend y del ambiente de demo.
 - Los resultados de pruebas de carga documentados son locales y no representan capacidad máxima de producción.
 
-## 17. Mejoras futuras recomendadas
+## 17. Lifecycle de vacas
+
+La entidad `Cow` expone un campo `active` (booleano, `true` por defecto) que permite controlar la participación operativa de una vaca sin eliminar su historial de ubicaciones, alertas ni collar asociado.
+
+Operaciones disponibles:
+
+- `PATCH /api/cows/{id}/deactivate`: marca la vaca como inactiva (`active = false`). Si ya estaba inactiva, no genera error.
+- `PATCH /api/cows/{id}/activate`: marca la vaca como activa (`active = true`). Si ya estaba activa, no genera error.
+- `GET /api/cows/page`: soporta filtro por `active=true/false` combinable con el filtro por `status`.
+
+La desactivación registra auditoría y no modifica `status`, collar, ni ubicaciones históricas. El campo `active` es visible en `CowResponseDTO`.
+
+Roles permitidos para activar/desactivar vacas: `ADMINISTRADOR`, `SUPERVISOR`, `OPERADOR`.
+
+Ver documento de referencia: [docs/cow-lifecycle.md](cow-lifecycle.md).
+
+## 18. Mejoras futuras recomendadas
 
 Mejoras razonables:
 
@@ -418,7 +434,7 @@ Mejoras razonables:
 - Auditoría más avanzada para acciones administrativas sensibles.
 - Panel operativo específico para outbox, métricas e incidentes.
 
-## 18. Conclusión técnica
+## 19. Conclusión técnica
 
 Ganadería 4.0 no es solo un backend CRUD. Integra autenticación y autorización, monitoreo IoT firmado con HMAC, protección anti-replay, persistencia versionada, alertas operativas, notificaciones reales, outbox para EMAIL, recuperación de contraseña segura, IA con fallback, reportes, observabilidad y verificación automatizada.
 

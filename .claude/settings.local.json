@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\" -Recurse -Directory | ForEach-Object { $_.FullName } | Sort-Object)"
+    ]
+  }
+}

@@ -67,10 +67,12 @@ El proyecto cuenta actualmente con:
 
 - Gestion de vacas con token tecnico generado por backend (`COW-001`, `COW-002`, ...).
 - Codigo interno de vaca generado por backend (`INT-001`, `INT-002`, ...).
+- Campo `active` en vacas para activacion/desactivacion operativa sin borrar historial.
+- Consulta paginada de vacas con filtros por `status` y `active`.
 - Gestion de collares con token tecnico generado por backend (`COLLAR-001`, `COLLAR-002`, ...).
 - Asociacion de collares a vacas.
 - Rotacion de secreto HMAC de collares.
-- Gestion de geocercas.
+- Gestion de geocercas con activacion/desactivacion por endpoint y consulta paginada.
 - Registro manual y por dispositivo de ubicaciones.
 - Persistencia de `batteryLevel` y `gpsAccuracy`.
 - Alertas `EXIT_GEOFENCE`, `COLLAR_OFFLINE` y `LOW_BATTERY`.
@@ -228,8 +230,14 @@ Autenticacion:
 
 Vacas:
 
-- `GET /api/cows`
+- `GET /api/cows` (legacy, sin paginacion)
+- `GET /api/cows/page` (paginado, filtros por `status` y `active`)
 - `POST /api/cows`
+- `PUT /api/cows/{id}`
+- `GET /api/cows/{id}`
+- `GET /api/cows/token/{token}`
+- `PATCH /api/cows/{id}/deactivate`
+- `PATCH /api/cows/{id}/activate`
 
 Collares:
 
@@ -239,8 +247,12 @@ Collares:
 
 Geocercas y ubicaciones:
 
-- `GET /api/geofences`
+- `GET /api/geofences` (legacy, sin paginacion)
+- `GET /api/geofences/page` (paginado, filtro por `active`)
 - `POST /api/geofences`
+- `GET /api/geofences/{id}`
+- `PATCH /api/geofences/{id}/deactivate`
+- `PATCH /api/geofences/{id}/activate`
 - `GET /api/locations/cow/{cowId}`
 - `POST /api/locations`
 
@@ -488,6 +500,7 @@ No activar `outbox` o `processor` en produccion sin validar primero el flujo en 
 
 - [Pruebas de carga de device ingestion](docs/device-ingestion-load-test.md)
 - [Ciclo de vida de collares](docs/collar-lifecycle.md)
+- [Ciclo de vida de vacas](docs/cow-lifecycle.md)
 - [Runbook operativo](docs/operational-runbook.md)
 - [Matriz de permisos](docs/permissions-matrix.md)
 - [Politica temporal](docs/time-policy.md)

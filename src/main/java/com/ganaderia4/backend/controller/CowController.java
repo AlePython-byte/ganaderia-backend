@@ -100,7 +100,7 @@ public class CowController {
     @GetMapping("/page")
     @Operation(
             summary = "Listar vacas paginadas",
-            description = "Consulta paginada de vacas con filtros por estado y ordenamiento controlado por el backend."
+            description = "Consulta paginada de vacas con filtros por estado, estado activo y ordenamiento controlado por el backend."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pagina de vacas obtenida correctamente"),
@@ -114,16 +114,60 @@ public class CowController {
     public Page<CowResponseDTO> getCowsPage(
             @Parameter(description = "Filtro opcional por estado de la vaca")
             @RequestParam(required = false) CowStatus status,
+            @Parameter(description = "Filtro opcional por estado activo operativo")
+            @RequestParam(required = false) Boolean active,
             @Parameter(description = "Numero de pagina base cero", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Tamano de pagina", example = "20")
             @RequestParam(defaultValue = "${app.pagination.default-size:20}") int size,
-            @Parameter(description = "Campo de ordenamiento permitido. Ejemplos: id, token, internalCode, name, status", example = "id")
+            @Parameter(description = "Campo de ordenamiento permitido. Ejemplos: id, token, internalCode, name, status, active", example = "id")
             @RequestParam(defaultValue = "id") String sort,
             @Parameter(description = "Direccion de ordenamiento", example = "ASC")
             @RequestParam(defaultValue = "ASC") String direction
     ) {
-        return cowService.getCowsPage(status, page, size, sort, direction);
+        return cowService.getCowsPage(status, active, page, size, sort, direction);
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @Operation(
+            summary = "Desactivar vaca",
+            description = "Marca la vaca como inactiva operativamente sin borrar ubicaciones, alertas, collar asociado ni historial."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vaca desactivada o ya inactiva",
+                    content = @Content(schema = @Schema(implementation = CowResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Vaca no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Error inesperado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public CowResponseDTO deactivateCow(@PathVariable Long id) {
+        return cowService.deactivateCow(id);
+    }
+
+    @PatchMapping("/{id}/activate")
+    @Operation(
+            summary = "Activar vaca",
+            description = "Marca la vaca como activa operativamente sin recrear ni alterar su historial."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vaca activada o ya activa",
+                    content = @Content(schema = @Schema(implementation = CowResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Vaca no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Error inesperado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public CowResponseDTO activateCow(@PathVariable Long id) {
+        return cowService.activateCow(id);
     }
 
     @GetMapping("/{id}")

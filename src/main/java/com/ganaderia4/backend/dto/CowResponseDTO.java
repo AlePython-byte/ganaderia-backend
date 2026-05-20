@@ -17,8 +17,11 @@ public class CowResponseDTO {
     @Schema(description = "Nombre visible de la vaca", example = "Luna")
     private String name;
 
-    @Schema(description = "Estado de ubicación actual", example = "SIN_UBICACION")
+    @Schema(description = "Estado de ubicacion actual", example = "SIN_UBICACION")
     private String status;
+
+    @Schema(description = "Indica si la vaca esta activa operativamente", example = "true")
+    private Boolean active;
 
     @Schema(description = "Observaciones operativas", example = "Vaca en monitoreo diario")
     private String observations;
@@ -27,11 +30,16 @@ public class CowResponseDTO {
     }
 
     public CowResponseDTO(Long id, String token, String internalCode, String name, String status, String observations) {
+        this(id, token, internalCode, name, status, true, observations);
+    }
+
+    public CowResponseDTO(Long id, String token, String internalCode, String name, String status, Boolean active, String observations) {
         this.id = id;
         this.token = token;
         this.internalCode = internalCode;
         this.name = name;
         this.status = status;
+        this.active = active;
         this.observations = observations;
     }
 
@@ -73,6 +81,14 @@ public class CowResponseDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 
     public String getObservations() {
