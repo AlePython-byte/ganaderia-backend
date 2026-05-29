@@ -197,7 +197,7 @@ public class AlertAiAnalysisService {
             case "disabled", "ai_disabled" -> "disabled";
             case "missing_api_key" -> "missing_api_key";
             case "provider_error" -> "provider_error";
-            case "io_error", "interrupted" -> "provider_error";
+            case "io_error", "interrupted", "prompt_too_long" -> "provider_error";
             case "unusable_response" -> "unusable_response";
             case "parse_error", "missing_candidates", "missing_text",
                  "missing_choices", "missing_content" -> "parse_error";

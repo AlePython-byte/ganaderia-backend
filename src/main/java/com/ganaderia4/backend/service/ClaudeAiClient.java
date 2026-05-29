@@ -37,6 +37,14 @@ public class ClaudeAiClient {
     }
 
     public String complete(String prompt) {
+        if (prompt != null && prompt.length() > properties.getMaxPromptChars()) {
+            log.warn(
+                    "event=claude_prompt_too_long provider={} prompt_chars={} max_chars={}",
+                    PROVIDER, prompt.length(), properties.getMaxPromptChars()
+            );
+            throw new ClaudeAiClientException("prompt_too_long");
+        }
+
         try {
             URI uri = URI.create(properties.getApiUrl());
             String body = buildRequestBody(prompt);

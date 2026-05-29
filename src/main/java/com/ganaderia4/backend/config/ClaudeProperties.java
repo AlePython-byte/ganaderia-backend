@@ -13,6 +13,7 @@ public class ClaudeProperties {
     private String apiUrl = "https://api.anthropic.com/v1/messages";
     private String model = "claude-haiku-4-5-20251001";
     private int maxTokens = 500;
+    private int maxPromptChars = 6000;
     private Duration connectTimeout = Duration.ofSeconds(5);
     private Duration readTimeout = Duration.ofSeconds(30);
 
@@ -46,6 +47,14 @@ public class ClaudeProperties {
 
     public void setMaxTokens(int maxTokens) {
         this.maxTokens = maxTokens;
+    }
+
+    public int getMaxPromptChars() {
+        return maxPromptChars;
+    }
+
+    public void setMaxPromptChars(int maxPromptChars) {
+        this.maxPromptChars = maxPromptChars;
     }
 
     public Duration getConnectTimeout() {

@@ -318,7 +318,25 @@ Patrones reales presentes en el código:
 
 La decisión central es mantener los flujos críticos desacoplados: autenticación de usuarios, autenticación de dispositivos, persistencia, reglas operativas, notificaciones e IA pueden evolucionar sin mezclarse en controladores.
 
-## 12. Observabilidad
+## 12. Estructuras de datos
+
+Estructuras de datos concretas presentes en el código:
+
+| Estructura | Tipo | Dónde se usa |
+|---|---|---|
+| `List<T>` | Lista dinámica ordenada (interfaz) | Servicios, controladores y repositorios. Estructura más usada para retornar colecciones de resultados. |
+| `ArrayList<T>` | Lista con array interno redimensionable | `AlertAnalysisService`, `AlertService`, `AlertReportService`, `AdminBootstrapConfig`, notificaciones. Usada cuando la colección se construye por iteración. |
+| `Set<T>` | Conjunto sin duplicados (interfaz) | `UserService`, `CowService`, `CollarService`, `AlertService`, `PaginationService`. Garantiza unicidad sin orden garantizado. |
+| `LinkedHashSet<T>` | Conjunto sin duplicados con orden de inserción | `AlertAnalysisService`: acumula acciones recomendadas únicas respetando el orden en que se agregan. |
+| `Map<K,V>` | Mapa clave-valor (interfaz) | Servicios de notificación, observabilidad y reportes para construir payloads y agrupar datos. |
+| `HashMap<K,V>` | Mapa con acceso O(1), sin orden garantizado | `AlertPriorityScorer` para agrupar incidentes por vaca; `NotificationMessage` para metadata. |
+| `LinkedHashMap<K,V>` | Mapa con orden de inserción garantizado | `AlertService`, `EmailNotificationRecipientResolver`, `EmailNotificationService`, `CowIncidentReportService`, `PasswordResetEmailService`. Usado cuando el orden de los campos en el payload importa. |
+| `ConcurrentHashMap<K,V>` | Mapa thread-safe | `DomainMetricsService`: caché de contadores Micrometer accedidos desde múltiples hilos. |
+| `Optional<T>` | Contenedor de valor presente o ausente | Repositorios y servicios para representar resultados que pueden no existir (`findByEmail`, `findByToken`, etc.). |
+| `Page<T>` | Página de resultados con metadatos (Spring Data) | Endpoints paginados de usuarios, vacas, collares, geocercas, alertas, ubicaciones y outbox. |
+| `Collection<T>` | Superinterfaz genérica de colecciones | `UserNotificationPreferenceRepository`, `CollarRepository`: parámetro en queries con cláusula `IN`. |
+
+## 13. Observabilidad
 
 El backend incluye observabilidad técnica y de dominio:
 
@@ -335,7 +353,7 @@ El backend incluye observabilidad técnica y de dominio:
 
 Algunos endpoints de Actuator requieren rol `ADMINISTRADOR` según configuración de seguridad.
 
-## 13. Testing y calidad
+## 14. Testing y calidad
 
 Estrategia de calidad:
 
@@ -366,7 +384,7 @@ Comando:
 
 Este resultado es el último conocido y no implica que la suite haya sido ejecutada durante esta subfase documental.
 
-## 14. Despliegue
+## 15. Despliegue
 
 El backend está desplegado en Render.
 
@@ -386,7 +404,7 @@ Aspectos operativos:
 
 La configuración sensible debe definirse por variables de entorno, nunca hardcodearse.
 
-## 15. Integración con frontend
+## 16. Integración con frontend
 
 El frontend consume la API REST del backend.
 
@@ -399,7 +417,7 @@ Principios de integración:
 - El frontend puede consumir vacas, collares, geocercas, ubicaciones, alertas, dashboard, reportes e IA.
 - La validez del backend no depende del frontend; el contrato puede probarse con Swagger, scripts y tests.
 
-## 16. Limitaciones actuales
+## 17. Limitaciones actuales
 
 Limitaciones conocidas:
 
@@ -411,7 +429,7 @@ Limitaciones conocidas:
 - La validación E2E completa depende del frontend y del ambiente de demo.
 - Los resultados de pruebas de carga documentados son locales y no representan capacidad máxima de producción.
 
-## 17. Lifecycle de vacas
+## 18. Lifecycle de vacas
 
 La entidad `Cow` expone un campo `active` (booleano, `true` por defecto) que permite controlar la participación operativa de una vaca sin eliminar su historial de ubicaciones, alertas ni collar asociado.
 
@@ -427,7 +445,7 @@ Roles permitidos para activar/desactivar vacas: `ADMINISTRADOR`, `SUPERVISOR`, `
 
 Ver documento de referencia: [docs/cow-lifecycle.md](cow-lifecycle.md).
 
-## 18. Mejoras futuras recomendadas
+## 19. Mejoras futuras recomendadas
 
 Mejoras razonables:
 
@@ -441,7 +459,7 @@ Mejoras razonables:
 - Auditoría más avanzada para acciones administrativas sensibles.
 - Panel operativo específico para outbox, métricas e incidentes.
 
-## 19. Conclusión técnica
+## 20. Conclusión técnica
 
 Ganadería 4.0 no es solo un backend CRUD. Integra autenticación y autorización, monitoreo IoT firmado con HMAC, protección anti-replay, persistencia versionada, alertas operativas, notificaciones reales, outbox para EMAIL, recuperación de contraseña segura, IA con fallback, reportes, observabilidad y verificación automatizada.
 
