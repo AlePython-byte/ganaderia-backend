@@ -16,7 +16,7 @@ import java.util.List;
 public class DeepSeekService {
 
     private static final Logger log = LoggerFactory.getLogger(DeepSeekService.class);
-    private static final String PROVIDER = "DEEPSEEK";
+    private static final String PROVIDER = "CLAUDE";
 
     private static final String SYSTEM_PROMPT =
             "Eres un asistente experto en monitoreo ganadero. " +

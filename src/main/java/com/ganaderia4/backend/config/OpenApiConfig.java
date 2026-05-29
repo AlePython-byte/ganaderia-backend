@@ -44,7 +44,7 @@ public class OpenApiConfig {
 
                                 Módulo IA:
                                 - Análisis heurístico interno (sin dependencia externa) disponible en /api/alert-analysis.
-                                - Análisis narrativo con DeepSeek AI disponible en /api/alerts/analyze (requiere DEEPSEEK_API_KEY).
+                                - Análisis narrativo con Claude AI (Anthropic) disponible en /api/alerts/analyze (requiere CLAUDE_API_KEY).
                                 """)
                         .version("0.0.1-SNAPSHOT")
                         .contact(new Contact()
@@ -70,7 +70,7 @@ public class OpenApiConfig {
                         new Tag().name("Reportes").description("Analitica y exportaciones CSV"),
                         new Tag().name("Dispositivos").description("Ingestion de telemetria desde collares usando HMAC"),
                         new Tag().name("Alert Analysis").description("Analisis heuristico y asistido por IA"),
-                        new Tag().name("IA / Análisis Operativo").description("Análisis inteligente de alertas ganaderas usando DeepSeek AI — diagnóstico narrativo, detección de riesgos y recomendaciones operativas"),
+                        new Tag().name("IA / Análisis Operativo").description("Análisis inteligente de alertas ganaderas usando Claude AI (Anthropic) — diagnóstico narrativo, detección de riesgos y recomendaciones operativas"),
                         new Tag().name("Preferencias de notificacion").description("Configuracion administrativa de preferencias de notificacion"),
                         new Tag().name("Notification outbox admin").description("Diagnostico y requeue administrativo del outbox EMAIL"),
                         new Tag().name("Dashboard").description("Indicadores operativos del monitoreo"),

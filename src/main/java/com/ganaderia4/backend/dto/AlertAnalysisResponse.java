@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
 @Schema(
-        description = "Resultado del análisis inteligente generado por DeepSeek AI sobre el estado operativo del hato",
+        description = "Resultado del análisis inteligente generado por Claude AI (Anthropic) sobre el estado operativo del hato",
         example = """
                 {
                   "analysis": "El hato presenta un nivel de riesgo ALTO con 7 alertas activas. La vaca 42 lleva más \
@@ -13,7 +13,7 @@ de 2 horas fuera de la geocerca asignada, lo cual puede indicar una ruptura en e
 El collar 15 sin señal GPS desde las 06:30 impide el monitoreo de ese animal. Las condiciones ambientales \
 con temperatura superior a 35°C y el déficit hídrico agravan el riesgo de estrés calórico en el hato. \
 Acción prioritaria: verificar el estado del cerco perimetral y restablecer comunicación con el collar 15.",
-                  "provider": "DEEPSEEK",
+                  "provider": "CLAUDE",
                   "generatedAt": "2026-05-29T14:32:00Z"
                 }
                 """
@@ -31,7 +31,7 @@ public class AlertAnalysisResponse {
 
     @Schema(
             description = "Identificador del proveedor de IA que generó el análisis",
-            example = "DEEPSEEK"
+            example = "CLAUDE"
     )
     private String provider;
 

@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/alerts")
 @Tag(
         name = "IA / Análisis Operativo",
-        description = "Análisis inteligente de alertas ganaderas usando DeepSeek AI — " +
+        description = "Análisis inteligente de alertas ganaderas usando Claude AI (Anthropic) — " +
                       "diagnóstico narrativo, detección de riesgos y recomendaciones operativas"
 )
 @SecurityRequirement(name = OpenApiConfig.JWT_SECURITY_SCHEME)
@@ -39,11 +39,11 @@ public class DeepSeekAlertController {
 
     @PostMapping(value = "/analyze", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
-            summary = "Analizar alertas con DeepSeek AI",
+            summary = "Analizar alertas con Claude AI",
             description = """
                     Recibe el estado operativo actual del hato (alertas activas, nivel de riesgo, \
                     eventos críticos y problemas identificados) y genera un diagnóstico narrativo \
-                    en español usando DeepSeek AI.
+                    en español usando Claude AI (Anthropic).
 
                     El análisis incluye:
                     - Descripción del estado operativo actual del hato
@@ -52,7 +52,7 @@ public class DeepSeekAlertController {
 
                     **Requisitos:**
                     - Autenticación JWT Bearer obligatoria
-                    - La variable de entorno `DEEPSEEK_API_KEY` debe estar configurada en el servidor
+                    - La variable de entorno `CLAUDE_API_KEY` debe estar configurada en el servidor
 
                     **Límites de entrada:**
                     - `activeAlerts`: número entero ≥ 0
@@ -64,7 +64,7 @@ public class DeepSeekAlertController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Análisis generado correctamente por DeepSeek AI",
+                    description = "Análisis generado correctamente por Claude AI (Anthropic)",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = AlertAnalysisResponse.class),
@@ -80,7 +80,7 @@ el monitoreo de ese individuo. Las condiciones de temperatura superior a 35°C y
 principal agravan el riesgo de estrés calórico en el hato. Acción prioritaria: inspeccionar el cerco perimetral \
 del sector donde fue visto por última vez el animal 42, restablecer la conexión del collar 15 y garantizar \
 el suministro de agua fresca.",
-                                              "provider": "DEEPSEEK",
+                                              "provider": "CLAUDE",
                                               "generatedAt": "2026-05-29T14:32:00Z"
                                             }
                                             """
@@ -95,7 +95,7 @@ el suministro de agua fresca.",
                             - `riskLevel` no es `LOW`, `MEDIUM` o `HIGH`
                             - `activeAlerts` es negativo
                             - Algún elemento de las listas supera 300 caracteres
-                            - La API key de DeepSeek no está configurada en el servidor
+                            - La API key de Claude no está configurada en el servidor
                             """,
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -117,7 +117,7 @@ el suministro de agua fresca.",
                                     ),
                                     @ExampleObject(
                                             name = "API key no configurada",
-                                            summary = "La variable de entorno DEEPSEEK_API_KEY está vacía",
+                                            summary = "La variable de entorno CLAUDE_API_KEY está vacía",
                                             value = """
                                                     {
                                                       "status": 400,
@@ -151,9 +151,9 @@ el suministro de agua fresca.",
             @ApiResponse(
                     responseCode = "503",
                     description = """
-                            DeepSeek AI no disponible. Puede ocurrir cuando:
-                            - La API de DeepSeek devuelve un error HTTP (4xx/5xx)
-                            - Falla de conectividad de red hacia `api.deepseek.com`
+                            Claude AI no disponible. Puede ocurrir cuando:
+                            - La API de Claude (Anthropic) devuelve un error HTTP (4xx/5xx)
+                            - Falla de conectividad de red hacia `api.anthropic.com`
                             - Se agota el tiempo de espera (timeout configurado en el servidor)
                             """,
                     content = @Content(
