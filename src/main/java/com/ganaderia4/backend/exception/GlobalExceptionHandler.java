@@ -4,6 +4,7 @@ import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.observability.RequestCorrelationFilter;
+import com.ganaderia4.backend.service.DeepSeekAiClient;
 import com.ganaderia4.backend.service.InvalidPasswordResetTokenException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -167,6 +168,27 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 ApiErrorCode.VALIDATION_ERROR,
                 "La solicitud contiene valores inválidos.",
+                request
+        );
+    }
+
+    @ExceptionHandler(DeepSeekAiClient.DeepSeekAiClientException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDeepSeekAiClientException(
+            DeepSeekAiClient.DeepSeekAiClientException ex,
+            HttpServletRequest request) {
+        log.warn(
+                "event=http_error_handled requestId={} category=ai_provider_unavailable status={} method={} path={} queryPresent={} reason={}",
+                OperationalLogSanitizer.requestId(),
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                method(request),
+                path(request),
+                queryPresent(request),
+                OperationalLogSanitizer.safe(ex.getMessage())
+        );
+        return buildErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                ApiErrorCode.AI_PROVIDER_UNAVAILABLE,
+                "El servicio de análisis IA no está disponible en este momento. Intente nuevamente más tarde.",
                 request
         );
     }
