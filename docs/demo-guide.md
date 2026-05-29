@@ -16,7 +16,7 @@ Durante la demo se recomienda demostrar:
 - EMAIL real con Resend.
 - Outbox para EMAIL.
 - Recuperación de contraseña.
-- IA analítica con Gemini y fallback heurístico.
+- IA analítica con Claude (Anthropic) como proveedor por defecto, Gemini y DeepSeek como alternativos, y fallback heurístico.
 - Reportes CSV.
 - Observabilidad con health checks, Actuator, Prometheus y logs estructurados.
 - Calidad técnica con tests, JaCoCo y SpotBugs.
@@ -25,7 +25,7 @@ Durante la demo se recomienda demostrar:
 
 - Backend Render: https://ganaderia-backend.onrender.com
 - EMAIL: encendido para la demo, si las variables de entorno están configuradas.
-- IA: encendida para la demo, si la clave de Gemini está configurada.
+- IA: encendida para la demo si `CLAUDE_API_KEY` está configurada (`AI_PROVIDER=claude` por defecto).
 - Base de datos: PostgreSQL demo/configurada.
 - Scripts PowerShell disponibles en `scripts/`.
 - Swagger/OpenAPI: disponible en `/swagger-ui/index.html`.
@@ -510,7 +510,7 @@ Qué explicar:
 | Swagger no carga | Probar `/healthz` y `/actuator/health` | Si el backend responde, el problema puede ser carga de UI o red del navegador. |
 | Login falla | Verificar usuario, password y ambiente | No exponer credenciales; usar usuario demo válido. |
 | Email no llega | Revisar configuración Resend, destino y spam | El backend solicita envío, pero el proveedor y la bandeja destino también influyen. |
-| Gemini responde con fallback | Mostrar `fallbackUsed` y `source` | El sistema está diseñado para degradar con fallback heurístico. |
+| IA responde con fallback | Mostrar `fallbackUsed` y `source` | El sistema está diseñado para degradar con fallback heurístico cuando el proveedor no está disponible. |
 | Device ingestion falla por firma | Revisar token, timestamp, nonce, body y secret | HMAC protege el endpoint; cualquier cambio rompe la firma. |
 | Nonce repetido | Generar un nonce nuevo | La protección anti-replay rechaza nonces reutilizados. |
 | Outbox queda `FAILED` o `DEAD` | Revisar detalle admin y usar requeue si aplica | El outbox permite diagnóstico y recuperación controlada. |

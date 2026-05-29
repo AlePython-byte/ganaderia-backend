@@ -84,16 +84,30 @@ APP_FRONTEND_PASSWORD_RESET_URL=<FRONTEND_RESET_PASSWORD_URL>
 
 En la demo, EMAIL puede estar habilitado. En local o ambientes seguros puede apagarse por configuración.
 
-### Gemini / IA
+### IA analítica
+
+El proveedor por defecto es **Claude (Anthropic)**:
 
 ```env
 AI_ENABLED=true
+AI_PROVIDER=claude
+CLAUDE_API_KEY=<CLAUDE_API_KEY>
+```
+
+Proveedores alternativos:
+
+```env
+# Gemini
 AI_PROVIDER=gemini
 GEMINI_API_KEY=<GEMINI_API_KEY>
 GEMINI_MODEL=gemini-2.5-flash
+
+# DeepSeek
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=<DEEPSEEK_API_KEY>
 ```
 
-En la demo, IA puede estar habilitada. Si Gemini falla o la IA está apagada, el backend debe usar fallback heurístico.
+En la demo, IA puede estar habilitada. Si el proveedor falla o la IA está apagada, el backend usa fallback heurístico automáticamente.
 
 ### Device ingestion / HMAC
 
@@ -308,10 +322,11 @@ GET /api/alert-analysis/ai-summary
 
 Características:
 
-- IA con Google Gemini.
+- IA con Claude (Anthropic) como proveedor por defecto (modelo `claude-haiku-4-5-20251001`).
+- Proveedores alternativos: Gemini y DeepSeek (seleccionables con `AI_PROVIDER`).
 - IA habilitada para demo y configurable por entorno.
-- Fallback heurístico si Gemini falla o si IA está apagada.
-- Métricas de IA.
+- Fallback heurístico automático si el proveedor falla o si IA está apagada.
+- Métricas de uso, resultado y fallback.
 
 Campos esperados en respuestas analíticas:
 
@@ -468,7 +483,7 @@ Parámetros principales:
 | Render lento al primer request | Primer request demora o parece colgar | Servicio frío o inicializando | Esperar y reintentar; validar logs y `/healthz`. |
 | Testcontainers falla | `Could not find a valid Docker environment` | Docker Desktop apagado | Iniciar Docker Desktop y repetir `.\mvnw.cmd clean verify`. |
 | EMAIL no llega | Forgot-password responde OK pero no llega correo | Email deshabilitado, API key incorrecta, remitente inválido o provider fallando | Revisar variables Resend, logs `password_reset_email_*` y outbox si aplica. |
-| Gemini no responde | AI summary usa fallback o falla | API key ausente, cuota, timeout o Gemini no disponible | Revisar `AI_ENABLED`, `GEMINI_API_KEY`, logs y `fallbackUsed`. |
+| IA no responde | AI summary usa fallback o falla | API key ausente, cuota, timeout o proveedor no disponible | Revisar `AI_ENABLED`, `AI_PROVIDER`, la API key del proveedor activo, logs y `fallbackUsed`. |
 | Outbox queda en FAILED | Mensajes no enviados | Error de provider o payload/configuración inválida | Revisar `lastErrorSummary`, logs y configuración EMAIL. |
 | Outbox queda en DEAD | Mensaje agotó reintentos | Fallo persistente tras max attempts | Revisar detalle admin y usar requeue solo si la causa fue corregida. |
 | Device ingestion 401 por firma inválida | Request IoT rechazado | Canonical request, secreto o body firmado no coinciden | Usar `send-device-location.ps1` y confirmar que body firmado es el mismo enviado. |

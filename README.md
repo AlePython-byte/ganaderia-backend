@@ -58,7 +58,7 @@ El proyecto cuenta actualmente con:
 - EMAIL habilitado para la demo y configurable por entorno.
 - Preferencias de notificación por usuario.
 - Password reset por email.
-- IA analítica con Gemini, DeepSeek y fallback heurístico.
+- IA analítica con Claude (Anthropic) como proveedor por defecto, Gemini y DeepSeek como alternativos, y fallback heurístico.
 - IA habilitada para la demo y configurable por entorno.
 - Notification outbox para EMAIL, processor y requeue admin.
 - Generación automática de tokens `COW-*`, `COLLAR-*` e internal code `INT-*`.
@@ -82,8 +82,9 @@ El proyecto cuenta actualmente con:
 | Spring Boot Actuator | — | Health checks y métricas |
 | Micrometer / Prometheus | — | Métricas scrapeables |
 | Resend | — | Proveedor de EMAIL real |
-| Google Gemini | gemini-2.5-flash | IA analítica principal |
-| DeepSeek | — | IA analítica alternativa |
+| Claude (Anthropic) | claude-haiku-4-5-20251001 | IA analítica principal (provider por defecto) |
+| Google Gemini | gemini-2.5-flash | IA analítica alternativa |
+| DeepSeek | deepseek-chat | IA analítica alternativa |
 | JUnit 5 | — | Tests unitarios e integración |
 | MockMvc | — | Tests HTTP de controladores |
 | Testcontainers | — | PostgreSQL real en integración |
@@ -198,11 +199,12 @@ El endpoint de IA genera resumen analítico de alertas:
 
 Características:
 
-- Integración con Google Gemini (proveedor principal).
-- Integración con DeepSeek (proveedor alternativo).
-- Fallback heurístico `RULE_BASED_FALLBACK` cuando el proveedor no está disponible.
+- Integración con **Claude (Anthropic)** como proveedor por defecto (`AI_PROVIDER=claude`, modelo `claude-haiku-4-5-20251001`).
+- Integración con Google Gemini como proveedor alternativo (`AI_PROVIDER=gemini`).
+- Integración con DeepSeek como proveedor alternativo (`AI_PROVIDER=deepseek`).
+- Fallback heurístico `RULE_BASED_FALLBACK` cuando el proveedor no está disponible o falla.
 - Métricas de uso y resultado de IA.
-- Configuración por variables de entorno (`AI_PROVIDER=gemini` o `AI_PROVIDER=deepseek`).
+- Proveedor seleccionable por variable de entorno `AI_PROVIDER`.
 
 ## Notificaciones y outbox
 
@@ -468,9 +470,15 @@ DEVICE_HMAC_PEPPER=
 APP_CORS_ALLOWED_ORIGINS=http://localhost:5173
 
 AI_ENABLED=false
-AI_PROVIDER=gemini
-GEMINI_API_KEY=<GEMINI_API_KEY>
-GEMINI_MODEL=gemini-2.5-flash
+AI_PROVIDER=claude
+CLAUDE_API_KEY=<CLAUDE_API_KEY>
+
+# Alternativas:
+# AI_PROVIDER=gemini
+# GEMINI_API_KEY=<GEMINI_API_KEY>
+# GEMINI_MODEL=gemini-2.5-flash
+# AI_PROVIDER=deepseek
+# DEEPSEEK_API_KEY=<DEEPSEEK_API_KEY>
 
 APP_NOTIFICATIONS_EMAIL_ENABLED=false
 APP_NOTIFICATIONS_EMAIL_PROVIDER=resend

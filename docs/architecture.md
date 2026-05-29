@@ -19,7 +19,7 @@ flowchart LR
     Device[Collar IoT] -->|POST /api/device/locations + HMAC| Backend
     Backend -->|JPA/Hibernate| DB[(PostgreSQL)]
     Backend -->|EMAIL| Resend[Resend]
-    Backend -->|AI summary| Gemini[Google Gemini]
+    Backend -->|AI summary| ClaudeAI[Claude / Gemini / DeepSeek]
     Backend -->|metrics| Prometheus[Prometheus / Actuator]
     Render[Render] --> Backend
 ```
@@ -32,7 +32,9 @@ Actores y sistemas externos:
 - Dispositivos/collares IoT: reportan ubicaciones con token de dispositivo, timestamp, nonce y firma HMAC.
 - PostgreSQL: base de datos relacional principal.
 - Resend: proveedor de email real.
-- Google Gemini: proveedor de IA para resumen analítico de alertas.
+- Claude (Anthropic): proveedor de IA por defecto para resumen analítico de alertas (modelo `claude-haiku-4-5-20251001`).
+- Google Gemini: proveedor de IA alternativo.
+- DeepSeek: proveedor de IA alternativo.
 - Render: plataforma de despliegue del backend.
 - Swagger/OpenAPI: documentación interactiva de endpoints.
 - Actuator/Prometheus: health checks, métricas y observabilidad.
@@ -47,7 +49,7 @@ flowchart TB
     Collar[Collar IoT] -->|HMAC + nonce + timestamp| API
     API --> PostgreSQL[(PostgreSQL)]
     API --> Resend[Resend EMAIL]
-    API --> Gemini[Google Gemini]
+    API --> ClaudeAI[Claude / Gemini / DeepSeek]
     API --> Actuator[Actuator / Prometheus]
 ```
 
@@ -69,8 +71,9 @@ Stack real verificado:
 | Micrometer/Prometheus | — | Métricas scrapeables |
 | Springdoc OpenAPI | 3.0.2 | Swagger UI |
 | Resend | — | Proveedor de EMAIL real |
-| Google Gemini | gemini-2.5-flash | IA analítica principal |
-| DeepSeek | — | IA analítica alternativa |
+| Claude (Anthropic) | claude-haiku-4-5-20251001 | IA analítica principal (proveedor por defecto) |
+| Google Gemini | gemini-2.5-flash | IA analítica alternativa |
+| DeepSeek | deepseek-chat | IA analítica alternativa |
 | Maven Wrapper | — | Build reproducible |
 | Testcontainers | — | PostgreSQL real en integración |
 | JaCoCo | 0.8.13 | Cobertura de código |
@@ -109,7 +112,7 @@ Esta separación permite que los controladores se mantengan delgados, que las re
 | Device ingestion | Recepción IoT firmada con HMAC | `DeviceController`, `DeviceRequestAuthenticationService`, `DeviceReplayProtectionStore`, `LocationService` | `/api/device/locations` |
 | Notifications | Envío de notificaciones por LOG, WEBHOOK y EMAIL | `DefaultNotificationDispatcher`, `LoggingNotificationService`, `WebhookNotificationService`, `EmailNotificationService` | Usado internamente por eventos/alertas |
 | Notification outbox | Persistencia y procesamiento diferido de EMAIL | `NotificationOutboxService`, `NotificationOutboxEmailProcessor`, `AdminNotificationOutboxController`, `NotificationOutboxMessage` | `/api/admin/notification-outbox`, `/api/admin/notification-outbox/{id}/requeue` |
-| Alert analysis / IA | Análisis heurístico y resumen con Gemini o DeepSeek con fallback heurístico | `AlertAnalysisController`, `AlertAnalysisService`, `AlertAiAnalysisService`, `GeminiAiClient`, `DeepSeekAlertController` | `/api/alert-analysis/summary`, `/api/alert-analysis/top-priorities`, `/api/alert-analysis/ai-summary` |
+| Alert analysis / IA | Análisis heurístico y resumen con Claude (Anthropic) por defecto; Gemini y DeepSeek como alternativas; fallback heurístico | `AlertAnalysisController`, `AlertAnalysisService`, `AlertAiAnalysisService`, `ClaudeAiClient`, `GeminiAiClient`, `DeepSeekAlertController` | `/api/alert-analysis/summary`, `/api/alert-analysis/top-priorities`, `/api/alert-analysis/ai-summary` |
 | Observability | Logs, métricas, request correlation y health | `RequestCorrelationFilter`, `DomainMetricsService`, `DeviceMonitoringHealthIndicator`, `HealthzController` | `/healthz`, `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus` |
 | Scheduled jobs / cleanup | Limpiezas programadas | `DeviceReplayNonceCleanupJob`, `AbuseRateLimitCleanupJob`, `PasswordResetTokenCleanupJob`, `NotificationOutboxEmailProcessor` | Jobs internos programados |
 
@@ -291,7 +294,7 @@ Tipos principales:
 1. `GET /api/alert-analysis/summary` entrega resumen heurístico.
 2. `GET /api/alert-analysis/top-priorities?limit=5` entrega prioridades.
 3. `GET /api/alert-analysis/ai-summary` intenta generar resumen con el proveedor IA configurado.
-4. El proveedor se selecciona mediante `AI_PROVIDER`: `gemini` (default) o `deepseek`.
+4. El proveedor se selecciona mediante `AI_PROVIDER`: `claude` (default), `gemini` o `deepseek`.
 5. Si el proveedor está apagado, no configurado o falla, `AlertAiAnalysisService` usa fallback heurístico.
 6. La respuesta indica `source`, `fallbackUsed`, `riskLevel`, `summary`, `recommendations` y `generatedAt`.
 7. `DomainMetricsService` registra métricas de éxito/fallo/fallback.
@@ -403,7 +406,7 @@ Limitaciones conocidas:
 - SMS no está implementado como integración real con proveedor externo.
 - El outbox está implementado para EMAIL; no debe describirse como outbox universal para todos los canales.
 - Grafana visual puede quedar como mejora si no existe configuración real.
-- IA depende de disponibilidad/configuración de Gemini, aunque existe fallback heurístico.
+- IA depende de disponibilidad/configuración del proveedor activo (Claude por defecto), aunque existe fallback heurístico que evita fallos totales.
 - Testcontainers requiere Docker Desktop para ejecutar integración local.
 - La validación E2E completa depende del frontend y del ambiente de demo.
 - Los resultados de pruebas de carga documentados son locales y no representan capacidad máxima de producción.
