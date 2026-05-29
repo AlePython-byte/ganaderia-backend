@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.config.AiAnalysisProperties;
+import com.ganaderia4.backend.config.ClaudeProperties;
 import com.ganaderia4.backend.config.DeepSeekProperties;
 import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
@@ -21,6 +22,7 @@ public class AlertAiAnalysisService {
     private static final Logger log = LoggerFactory.getLogger(AlertAiAnalysisService.class);
     private static final String SOURCE_GEMINI = "GEMINI";
     private static final String SOURCE_DEEPSEEK = "DEEPSEEK";
+    private static final String SOURCE_CLAUDE = "CLAUDE";
     private static final String SOURCE_RULE_BASED_FALLBACK = "RULE_BASED_FALLBACK";
 
     private final AlertAnalysisService alertAnalysisService;
@@ -28,6 +30,8 @@ public class AlertAiAnalysisService {
     private final AiAnalysisProperties properties;
     private final DeepSeekAiClient deepSeekAiClient;
     private final DeepSeekProperties deepSeekProperties;
+    private final ClaudeAiClient claudeAiClient;
+    private final ClaudeProperties claudeProperties;
     private final DomainMetricsService domainMetricsService;
 
     public AlertAiAnalysisService(AlertAnalysisService alertAnalysisService,
@@ -35,12 +39,16 @@ public class AlertAiAnalysisService {
                                   AiAnalysisProperties properties,
                                   DeepSeekAiClient deepSeekAiClient,
                                   DeepSeekProperties deepSeekProperties,
+                                  ClaudeAiClient claudeAiClient,
+                                  ClaudeProperties claudeProperties,
                                   DomainMetricsService domainMetricsService) {
         this.alertAnalysisService = alertAnalysisService;
         this.geminiAiClient = geminiAiClient;
         this.properties = properties;
         this.deepSeekAiClient = deepSeekAiClient;
         this.deepSeekProperties = deepSeekProperties;
+        this.claudeAiClient = claudeAiClient;
+        this.claudeProperties = claudeProperties;
         this.domainMetricsService = domainMetricsService;
     }
 
@@ -61,6 +69,10 @@ public class AlertAiAnalysisService {
 
         if ("gemini".equalsIgnoreCase(provider)) {
             return getGeminiSummary(heuristicSummary, topPriorities);
+        }
+
+        if ("claude".equalsIgnoreCase(provider)) {
+            return getClaudeSummary(heuristicSummary, topPriorities);
         }
 
         return fallback("unknown", heuristicSummary, topPriorities);
@@ -200,6 +212,41 @@ public class AlertAiAnalysisService {
         };
     }
 
+    private AlertAiSummaryDTO getClaudeSummary(AlertAnalysisSummaryDTO heuristicSummary,
+                                               List<AlertPriorityRecommendationDTO> topPriorities) {
+        if (claudeProperties.getApiKey() == null || claudeProperties.getApiKey().isBlank()) {
+            return fallback("missing_api_key", heuristicSummary, topPriorities);
+        }
+
+        try {
+            String rawText = claudeAiClient.complete(buildClaudePrompt(heuristicSummary, topPriorities));
+
+            GeminiAiClient.AiGeneratedSummary aiGeneratedSummary = geminiAiClient.parseGeneratedText(rawText);
+
+            domainMetricsService.incrementAiProviderRequest("claude", "success");
+            domainMetricsService.incrementAiSummaryGenerated(SOURCE_CLAUDE, aiGeneratedSummary.riskLevel().name());
+
+            log.info(
+                    "event=alert_ai_summary_generated requestId={} source={} fallbackUsed={} riskLevel={}",
+                    OperationalLogSanitizer.requestId(),
+                    SOURCE_CLAUDE,
+                    false,
+                    aiGeneratedSummary.riskLevel()
+            );
+
+            return new AlertAiSummaryDTO(
+                    aiGeneratedSummary.riskLevel(),
+                    aiGeneratedSummary.summary(),
+                    aiGeneratedSummary.recommendation(),
+                    SOURCE_CLAUDE,
+                    false
+            );
+        } catch (ClaudeAiClient.ClaudeAiClientException | GeminiAiClient.GeminiAiClientException ex) {
+            domainMetricsService.incrementAiProviderRequest("claude", "failure");
+            return fallback(normalizeFallbackReason(ex.getMessage()), heuristicSummary, topPriorities);
+        }
+    }
+
     // --- Gemini prompt (single string, unchanged behavior) ---
 
     private String buildGeminiPrompt(AlertAnalysisSummaryDTO heuristicSummary,
@@ -222,6 +269,17 @@ public class AlertAiAnalysisService {
                 .append("Devuelve solo JSON valido con este formato exacto y sin campos adicionales: ")
                 .append("{\"riskLevel\":\"LOW|MEDIUM|HIGH|CRITICAL\",\"summary\":\"...\",\"recommendation\":\"...\"}\n");
 
+        appendBackendData(prompt, heuristicSummary, topPriorities);
+        return prompt.toString();
+    }
+
+    // --- Claude prompt (system instructions + data combined in single user message) ---
+
+    private String buildClaudePrompt(AlertAnalysisSummaryDTO heuristicSummary,
+                                     List<AlertPriorityRecommendationDTO> topPriorities) {
+        StringBuilder prompt = new StringBuilder(buildDeepSeekSystemPrompt())
+                .append('\n')
+                .append("Datos del backend:\n");
         appendBackendData(prompt, heuristicSummary, topPriorities);
         return prompt.toString();
     }

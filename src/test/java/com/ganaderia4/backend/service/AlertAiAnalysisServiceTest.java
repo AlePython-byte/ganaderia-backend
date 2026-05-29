@@ -1,7 +1,9 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.config.AiAnalysisProperties;
+import com.ganaderia4.backend.config.ClaudeProperties;
 import com.ganaderia4.backend.config.DeepSeekProperties;
+import com.ganaderia4.backend.service.ClaudeAiClient;
 import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
 import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
@@ -36,10 +38,16 @@ class AlertAiAnalysisServiceTest {
     private DeepSeekAiClient deepSeekAiClient;
 
     @Mock
+    private ClaudeAiClient claudeAiClient;
+
+    @Mock
     private DomainMetricsService domainMetricsService;
 
     @Mock
     private DeepSeekProperties deepSeekProperties;
+
+    @Mock
+    private ClaudeProperties claudeProperties;
 
     private AiAnalysisProperties properties;
     private AlertAiAnalysisService alertAiAnalysisService;
@@ -53,6 +61,8 @@ class AlertAiAnalysisServiceTest {
                 properties,
                 deepSeekAiClient,
                 deepSeekProperties,
+                claudeAiClient,
+                claudeProperties,
                 domainMetricsService
         );
     }
@@ -166,6 +176,74 @@ class AlertAiAnalysisServiceTest {
         verify(domainMetricsService).incrementAiProviderRequest("gemini", "failure");
         verify(domainMetricsService).incrementAiSummaryFallback("unusable_response");
         verify(domainMetricsService).incrementAiSummaryGenerated("RULE_BASED_FALLBACK", "HIGH");
+    }
+
+    @Test
+    void shouldUseClaudeResponseWhenProviderIsClaudeAndClientSucceeds() {
+        properties.setEnabled(true);
+        properties.setProvider("claude");
+        when(claudeProperties.getApiKey()).thenReturn("test-key");
+
+        when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.HIGH, 3));
+        when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
+                .thenReturn(List.of(priority("COLLAR_OFFLINE")));
+        when(claudeAiClient.complete(anyString())).thenReturn(
+                "{\"riskLevel\":\"HIGH\",\"summary\":\"Hay collares offline que requieren atencion.\",\"recommendation\":\"Revisar conectividad de los collares offline.\"}"
+        );
+        when(geminiAiClient.parseGeneratedText(anyString()))
+                .thenReturn(new GeminiAiClient.AiGeneratedSummary(
+                        AlertAnalysisRiskLevel.HIGH,
+                        "Hay collares offline que requieren atencion.",
+                        "Revisar conectividad de los collares offline."
+                ));
+
+        AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
+
+        assertEquals("CLAUDE", response.getSource());
+        assertEquals(false, response.isFallbackUsed());
+        assertEquals(AlertAnalysisRiskLevel.HIGH, response.getRiskLevel());
+        verify(domainMetricsService).incrementAiProviderRequest("claude", "success");
+        verify(domainMetricsService).incrementAiSummaryGenerated("CLAUDE", "HIGH");
+        verify(domainMetricsService, never()).incrementAiSummaryFallback(anyString());
+    }
+
+    @Test
+    void shouldFallbackWhenClaudeClientFails() {
+        properties.setEnabled(true);
+        properties.setProvider("claude");
+        when(claudeProperties.getApiKey()).thenReturn("test-key");
+
+        when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.MEDIUM, 2));
+        when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
+                .thenReturn(List.of(priority("LOW_BATTERY")));
+        when(claudeAiClient.complete(anyString()))
+                .thenThrow(new ClaudeAiClient.ClaudeAiClientException("http_529"));
+
+        AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
+
+        assertEquals("RULE_BASED_FALLBACK", response.getSource());
+        assertTrue(response.isFallbackUsed());
+        verify(domainMetricsService).incrementAiProviderRequest("claude", "failure");
+        verify(domainMetricsService).incrementAiSummaryFallback("provider_error");
+        verify(domainMetricsService).incrementAiSummaryGenerated("RULE_BASED_FALLBACK", "MEDIUM");
+    }
+
+    @Test
+    void shouldFallbackWhenClaudeApiKeyIsMissing() {
+        properties.setEnabled(true);
+        properties.setProvider("claude");
+        when(claudeProperties.getApiKey()).thenReturn("");
+
+        when(alertAnalysisService.getSummary()).thenReturn(summary(AlertAnalysisRiskLevel.LOW, 0));
+        when(alertAnalysisService.getTopPriorities(AlertAnalysisService.DEFAULT_TOP_PRIORITIES_LIMIT))
+                .thenReturn(List.of());
+
+        AlertAiSummaryDTO response = alertAiAnalysisService.getAiSummary();
+
+        assertEquals("RULE_BASED_FALLBACK", response.getSource());
+        assertTrue(response.isFallbackUsed());
+        verify(claudeAiClient, never()).complete(anyString());
+        verify(domainMetricsService).incrementAiSummaryFallback("missing_api_key");
     }
 
     @Test
