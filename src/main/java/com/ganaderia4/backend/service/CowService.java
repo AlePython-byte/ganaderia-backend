@@ -6,7 +6,11 @@ import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Cow;
 import com.ganaderia4.backend.model.CowStatus;
+import com.ganaderia4.backend.repository.AlertRepository;
+import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
+import com.ganaderia4.backend.repository.GeofenceRepository;
+import com.ganaderia4.backend.repository.LocationRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,13 +34,25 @@ public class CowService {
     private static final Pattern GENERATED_INTERNAL_CODE_PATTERN = Pattern.compile("^" + COW_INTERNAL_CODE_PREFIX + "(\\d+)$");
 
     private final CowRepository cowRepository;
+    private final CollarRepository collarRepository;
+    private final GeofenceRepository geofenceRepository;
+    private final LocationRepository locationRepository;
+    private final AlertRepository alertRepository;
     private final AuditLogService auditLogService;
     private final PaginationService paginationService;
 
     public CowService(CowRepository cowRepository,
+                      CollarRepository collarRepository,
+                      GeofenceRepository geofenceRepository,
+                      LocationRepository locationRepository,
+                      AlertRepository alertRepository,
                       AuditLogService auditLogService,
                       PaginationService paginationService) {
         this.cowRepository = cowRepository;
+        this.collarRepository = collarRepository;
+        this.geofenceRepository = geofenceRepository;
+        this.locationRepository = locationRepository;
+        this.alertRepository = alertRepository;
         this.auditLogService = auditLogService;
         this.paginationService = paginationService;
     }
@@ -192,6 +208,36 @@ public class CowService {
         );
 
         return mapToResponseDTO(updatedCow);
+    }
+
+    @Transactional
+    public void deleteCow(Long id) {
+        Cow cow = cowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaca no encontrada"));
+
+        if (collarRepository.findByCow(cow).isPresent()) {
+            throw new ConflictException("No se puede eliminar la vaca porque tiene un collar asociado");
+        }
+        if (geofenceRepository.existsByCow(cow)) {
+            throw new ConflictException("No se puede eliminar la vaca porque tiene geocercas asociadas");
+        }
+        if (locationRepository.existsByCow(cow)) {
+            throw new ConflictException("No se puede eliminar la vaca porque tiene ubicaciones registradas");
+        }
+        if (alertRepository.countByCow(cow) > 0) {
+            throw new ConflictException("No se puede eliminar la vaca porque tiene alertas asociadas");
+        }
+
+        cowRepository.delete(cow);
+
+        auditLogService.logWithCurrentActor(
+                "DELETE_COW",
+                "COW",
+                cow.getId(),
+                "API",
+                "Eliminacion de vaca con token " + cow.getToken(),
+                true
+        );
     }
 
     public CowResponseDTO getCowById(Long id) {

@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -160,6 +161,27 @@ public class CollarController {
     public CollarResponseDTO reassignCollar(@PathVariable Long id,
                                             @PathVariable Long cowId) {
         return collarService.reassignCollar(id, cowId);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Eliminar collar",
+            description = "Elimina fisicamente un collar por su identificador. Si el collar tiene ubicaciones registradas, la operacion falla por conflicto para no romper la integridad del historial."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Collar eliminado correctamente"),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Collar no encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "El collar tiene ubicaciones asociadas y no puede eliminarse",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public void deleteCollar(@PathVariable Long id) {
+        collarService.deleteCollar(id);
     }
 
     @GetMapping

@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -120,6 +121,25 @@ public class GeofenceController {
     })
     public GeofenceResponseDTO getGeofenceById(@PathVariable Long id) {
         return geofenceService.getGeofenceById(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Eliminar geocerca",
+            description = "Elimina fisicamente una geocerca por su identificador."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Geocerca eliminada correctamente"),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Geocerca no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public void deleteGeofence(@PathVariable Long id) {
+        geofenceService.deleteGeofence(id);
     }
 
     @PatchMapping("/{id}/deactivate")

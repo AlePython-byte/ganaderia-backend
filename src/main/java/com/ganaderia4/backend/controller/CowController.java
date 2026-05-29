@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -168,6 +169,27 @@ public class CowController {
     })
     public CowResponseDTO activateCow(@PathVariable Long id) {
         return cowService.activateCow(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Eliminar vaca",
+            description = "Elimina fisicamente una vaca por su identificador. Si la vaca tiene collar, geocercas, ubicaciones o alertas asociadas, la operacion falla por conflicto para no romper la integridad del historial."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Vaca eliminada correctamente"),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Acceso denegado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Vaca no encontrada",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "409", description = "La vaca tiene registros asociados y no puede eliminarse",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public void deleteCow(@PathVariable Long id) {
+        cowService.deleteCow(id);
     }
 
     @GetMapping("/{id}")

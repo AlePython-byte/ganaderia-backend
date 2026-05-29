@@ -16,4 +16,6 @@ public interface GeofenceRepository extends JpaRepository<Geofence, Long> {
     Page<Geofence> findByActive(Boolean active, Pageable pageable);
 
     Optional<Geofence> findByCowAndActive(Cow cow, Boolean active);
+
+    boolean existsByCow(Cow cow);
 }

@@ -2,9 +2,11 @@ package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.dto.LoginRequestDTO;
 import com.ganaderia4.backend.dto.LoginResponseDTO;
+import com.ganaderia4.backend.dto.UserCreateRequestDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
 import com.ganaderia4.backend.exception.BadRequestException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
+import com.ganaderia4.backend.model.Role;
 import com.ganaderia4.backend.model.User;
 import com.ganaderia4.backend.security.JwtService;
 import com.ganaderia4.backend.security.LoginAbuseProtectionService;
@@ -91,6 +93,14 @@ public class AuthService {
                 jwtService.getExpirationMs(),
                 "Inicio de sesi\u00f3n exitoso"
         );
+    }
+
+    public UserResponseDTO register(UserCreateRequestDTO requestDTO) {
+        if (requestDTO.getRole() == Role.ADMINISTRADOR) {
+            throw new BadRequestException("El registro público no permite crear usuarios con rol ADMINISTRADOR");
+        }
+
+        return userService.createUser(requestDTO);
     }
 
     public UserResponseDTO getCurrentUser(String email) {

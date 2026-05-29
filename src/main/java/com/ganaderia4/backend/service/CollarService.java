@@ -13,6 +13,7 @@ import com.ganaderia4.backend.model.DeviceSignalStatus;
 import com.ganaderia4.backend.repository.CollarRepository;
 import com.ganaderia4.backend.repository.CowRepository;
 import com.ganaderia4.backend.repository.DeviceReplayNonceRepository;
+import com.ganaderia4.backend.repository.LocationRepository;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.security.DeviceSigningSecretService;
 import org.slf4j.Logger;
@@ -44,6 +45,7 @@ public class CollarService {
     private final CollarRepository collarRepository;
     private final CowRepository cowRepository;
     private final DeviceReplayNonceRepository deviceReplayNonceRepository;
+    private final LocationRepository locationRepository;
     private final AuditLogService auditLogService;
     private final DeviceSigningSecretService deviceSigningSecretService;
     private final PaginationService paginationService;
@@ -51,12 +53,14 @@ public class CollarService {
     public CollarService(CollarRepository collarRepository,
                          CowRepository cowRepository,
                          DeviceReplayNonceRepository deviceReplayNonceRepository,
+                         LocationRepository locationRepository,
                          AuditLogService auditLogService,
                          DeviceSigningSecretService deviceSigningSecretService,
                          PaginationService paginationService) {
         this.collarRepository = collarRepository;
         this.cowRepository = cowRepository;
         this.deviceReplayNonceRepository = deviceReplayNonceRepository;
+        this.locationRepository = locationRepository;
         this.auditLogService = auditLogService;
         this.deviceSigningSecretService = deviceSigningSecretService;
         this.paginationService = paginationService;
@@ -304,6 +308,27 @@ public class CollarService {
         );
 
         return mapToResponseDTO(updatedCollar);
+    }
+
+    @Transactional
+    public void deleteCollar(Long id) {
+        Collar collar = collarRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Collar no encontrado"));
+
+        if (locationRepository.existsByCollar(collar)) {
+            throw new ConflictException("No se puede eliminar el collar porque tiene ubicaciones registradas");
+        }
+
+        collarRepository.delete(collar);
+
+        auditLogService.logWithCurrentActor(
+                "DELETE_COLLAR",
+                "COLLAR",
+                collar.getId(),
+                "API",
+                "Eliminación de collar con token " + collar.getToken(),
+                true
+        );
     }
 
     public List<CollarResponseDTO> getAllCollars() {

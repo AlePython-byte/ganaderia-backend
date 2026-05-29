@@ -27,4 +27,8 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
             Double latitude,
             Double longitude
     );
+
+    boolean existsByCow(Cow cow);
+
+    boolean existsByCollar(Collar collar);
 }

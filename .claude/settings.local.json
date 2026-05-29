@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\" -Recurse -Directory | ForEach-Object { $_.FullName } | Sort-Object)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\" -Recurse -Directory | ForEach-Object { $_.FullName } | Sort-Object)",
+      "Bash(./mvnw.cmd -q compile)",
+      "Bash(./mvnw.cmd compile *)"
     ]
   }
 }

@@ -131,6 +131,14 @@ public class GeofenceService {
         return mapToResponseDTO(geofenceRepository.save(geofence));
     }
 
+    @Transactional
+    public void deleteGeofence(Long id) {
+        Geofence geofence = geofenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Geocerca no encontrada"));
+
+        geofenceRepository.delete(geofence);
+    }
+
     public boolean isInsideGeofence(Double latitude, Double longitude, Geofence geofence) {
         return geofenceStrategyResolver.resolve(geofence)
                 .isInside(latitude, longitude, geofence);

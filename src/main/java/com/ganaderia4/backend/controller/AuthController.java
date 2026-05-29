@@ -8,6 +8,7 @@ import com.ganaderia4.backend.dto.LoginRequestDTO;
 import com.ganaderia4.backend.dto.LoginResponseDTO;
 import com.ganaderia4.backend.dto.ResetPasswordRequestDTO;
 import com.ganaderia4.backend.dto.ResetPasswordResponseDTO;
+import com.ganaderia4.backend.dto.UserCreateRequestDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
 import com.ganaderia4.backend.security.ClientIpResolver;
 import com.ganaderia4.backend.service.AuthService;
@@ -73,6 +74,29 @@ public class AuthController {
     public LoginResponseDTO login(@Valid @RequestBody LoginRequestDTO requestDTO,
                                   HttpServletRequest httpServletRequest) {
         return authService.login(requestDTO, clientIpResolver.resolve(httpServletRequest));
+    }
+
+    @PostMapping("/register")
+    @Operation(
+            summary = "Registrar usuario",
+            description = "Endpoint publico que registra un usuario nuevo. No permite el rol ADMINISTRADOR para evitar escalada de privilegios sin autenticacion."
+    )
+    @SecurityRequirements
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Usuario registrado correctamente"),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Payload invalido o rol no permitido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Ya existe un usuario con ese correo",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))
+            )
+    })
+    public UserResponseDTO register(@Valid @RequestBody UserCreateRequestDTO requestDTO) {
+        return authService.register(requestDTO);
     }
 
     @PostMapping("/forgot-password")

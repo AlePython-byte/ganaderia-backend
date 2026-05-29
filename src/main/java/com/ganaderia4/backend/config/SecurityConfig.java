@@ -63,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(
                                 "/api/auth/login",
+                                "/api/auth/register",
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password",
                                 "/healthz",
