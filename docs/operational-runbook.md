@@ -201,6 +201,12 @@ Roles principales:
 - `TECNICO`
 - `OPERADOR`
 
+Endpoints de auth sin JWT (públicos):
+
+- `POST /api/auth/login`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+
 No documentar credenciales reales. Para pruebas usar usuarios demo controlados o credenciales gestionadas por el entorno.
 
 ## 8. Device ingestion IoT
@@ -486,7 +492,14 @@ Parámetros principales:
 ## Referencias internas
 
 - [README principal](../README.md)
-- [Pruebas de carga device ingestion](device-ingestion-load-test.md)
+- [Arquitectura técnica](architecture.md)
 - [Matriz de permisos](permissions-matrix.md)
-- [Política temporal](time-policy.md)
-- [Ciclo de vida de collares](collar-lifecycle.md)
+- [Guía de demo técnica](demo-guide.md)
+- [Lifecycle de collares](collar-lifecycle.md)
+- [Lifecycle de vacas](cow-lifecycle.md)
+- [Política temporal UTC](time-policy.md)
+- [Rate limiting y abuse protection](rate-limiting-guide.md)
+- [Email throttle guide](email-throttle-guide.md)
+- [Pruebas de carga device ingestion](device-ingestion-load-test.md)
+- [Guía k6 performance](k6-performance-guide.md)
+- [Observabilidad local](observability-local-guide.md)

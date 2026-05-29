@@ -55,25 +55,28 @@ flowchart TB
 
 Stack real verificado:
 
-- Java 17.
-- Spring Boot.
-- Spring Web MVC.
-- Spring Security.
-- JWT con JJWT.
-- JPA/Hibernate.
-- PostgreSQL.
-- Flyway.
-- Spring Boot Actuator.
-- Micrometer/Prometheus.
-- Swagger/OpenAPI con Springdoc.
-- Resend para EMAIL.
-- Google Gemini para IA.
-- Maven Wrapper.
-- Testcontainers con PostgreSQL.
-- JaCoCo.
-- SpotBugs.
-- Render.
-- Scripts PowerShell operativos.
+| Tecnología | Versión | Rol |
+|---|---|---|
+| Java | 17+ | Lenguaje principal |
+| Spring Boot | 4.0.3 | Framework base |
+| Spring Web MVC | — | Capa HTTP/REST |
+| Spring Security | — | Autenticación y autorización |
+| JJWT | 0.12.7 | Tokens JWT |
+| JPA/Hibernate | — | ORM |
+| PostgreSQL | — | Base de datos relacional |
+| Flyway | — | Migraciones versionadas |
+| Spring Boot Actuator | — | Health checks y endpoints operativos |
+| Micrometer/Prometheus | — | Métricas scrapeables |
+| Springdoc OpenAPI | 3.0.2 | Swagger UI |
+| Resend | — | Proveedor de EMAIL real |
+| Google Gemini | gemini-2.5-flash | IA analítica principal |
+| DeepSeek | — | IA analítica alternativa |
+| Maven Wrapper | — | Build reproducible |
+| Testcontainers | — | PostgreSQL real en integración |
+| JaCoCo | 0.8.13 | Cobertura de código |
+| SpotBugs | 4.9.8.3 | Análisis estático |
+| Render | — | Plataforma de despliegue |
+| Scripts PowerShell | — | Operaciones y demos |
 
 ## 5. Organización por capas
 
@@ -102,11 +105,11 @@ Esta separación permite que los controladores se mantengan delgados, que las re
 | Locations | Registro manual/API de ubicaciones y consulta por vaca | `LocationController`, `LocationService`, `LocationRepository`, `Location` | `/api/locations`, `/api/locations/cow/{cowId}`, `/api/locations/cow/{cowId}/last` |
 | Geofences | Gestión y evaluación de geocercas, activación/desactivación operativa | `GeofenceController`, `GeofenceService`, `GeofenceRepository`, `CircularGeofenceStrategy` | `/api/geofences`, `/api/geofences/page`, `/api/geofences/{id}`, `/api/geofences/{id}/deactivate`, `/api/geofences/{id}/activate` |
 | Alerts | Gestión, consulta, resolución y descarte de alertas | `AlertController`, `AlertService`, `AlertRepository`, `Alert` | `/api/alerts`, `/api/alerts/page`, `/api/alerts/status/{status}`, `/api/alerts/{id}/resolve` |
-| Reports | Reportes operativos y exportación CSV | `ReportController`, `AlertReportService`, `CollarReportService`, `CowIncidentReportService`, `ReportCsvService` | `/api/reports/alerts`, `/api/reports/alerts/export.csv`, `/api/reports/offline-collars`, `/api/reports/cows-most-incidents` |
+| Reports | Reportes operativos y exportación CSV | `ReportController`, `AlertReportService`, `CollarReportService`, `CowIncidentReportService`, `ReportCsvService` | `/api/reports/alerts`, `/api/reports/alerts/page`, `/api/reports/alerts/trend`, `/api/reports/alerts/type-recurrence`, `/api/reports/alerts/export.csv`, `/api/reports/offline-collars`, `/api/reports/offline-collars/staleness`, `/api/reports/cows-most-incidents`, `/api/reports/cows-incident-recurrence` |
 | Device ingestion | Recepción IoT firmada con HMAC | `DeviceController`, `DeviceRequestAuthenticationService`, `DeviceReplayProtectionStore`, `LocationService` | `/api/device/locations` |
 | Notifications | Envío de notificaciones por LOG, WEBHOOK y EMAIL | `DefaultNotificationDispatcher`, `LoggingNotificationService`, `WebhookNotificationService`, `EmailNotificationService` | Usado internamente por eventos/alertas |
 | Notification outbox | Persistencia y procesamiento diferido de EMAIL | `NotificationOutboxService`, `NotificationOutboxEmailProcessor`, `AdminNotificationOutboxController`, `NotificationOutboxMessage` | `/api/admin/notification-outbox`, `/api/admin/notification-outbox/{id}/requeue` |
-| Alert analysis / IA | Análisis heurístico y resumen con Gemini/fallback | `AlertAnalysisController`, `AlertAnalysisService`, `AlertAiAnalysisService`, `GeminiAiClient` | `/api/alert-analysis/summary`, `/api/alert-analysis/top-priorities`, `/api/alert-analysis/ai-summary` |
+| Alert analysis / IA | Análisis heurístico y resumen con Gemini o DeepSeek con fallback heurístico | `AlertAnalysisController`, `AlertAnalysisService`, `AlertAiAnalysisService`, `GeminiAiClient`, `DeepSeekAlertController` | `/api/alert-analysis/summary`, `/api/alert-analysis/top-priorities`, `/api/alert-analysis/ai-summary` |
 | Observability | Logs, métricas, request correlation y health | `RequestCorrelationFilter`, `DomainMetricsService`, `DeviceMonitoringHealthIndicator`, `HealthzController` | `/healthz`, `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus` |
 | Scheduled jobs / cleanup | Limpiezas programadas | `DeviceReplayNonceCleanupJob`, `AbuseRateLimitCleanupJob`, `PasswordResetTokenCleanupJob`, `NotificationOutboxEmailProcessor` | Jobs internos programados |
 
@@ -287,10 +290,11 @@ Tipos principales:
 
 1. `GET /api/alert-analysis/summary` entrega resumen heurístico.
 2. `GET /api/alert-analysis/top-priorities?limit=5` entrega prioridades.
-3. `GET /api/alert-analysis/ai-summary` intenta generar resumen con Gemini.
-4. Si Gemini está apagado, no configurado o falla, `AlertAiAnalysisService` usa fallback heurístico.
-5. La respuesta indica `source`, `fallbackUsed`, `riskLevel`, `summary`, `recommendations` y `generatedAt`.
-6. `DomainMetricsService` registra métricas de éxito/fallo/fallback.
+3. `GET /api/alert-analysis/ai-summary` intenta generar resumen con el proveedor IA configurado.
+4. El proveedor se selecciona mediante `AI_PROVIDER`: `gemini` (default) o `deepseek`.
+5. Si el proveedor está apagado, no configurado o falla, `AlertAiAnalysisService` usa fallback heurístico.
+6. La respuesta indica `source`, `fallbackUsed`, `riskLevel`, `summary`, `recommendations` y `generatedAt`.
+7. `DomainMetricsService` registra métricas de éxito/fallo/fallback.
 
 ## 11. Patrones y decisiones de diseño
 

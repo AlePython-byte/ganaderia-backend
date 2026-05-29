@@ -71,11 +71,13 @@ La matriz de este documento debe mantenerse sincronizada con esas reglas.
 
 ## Endpoints públicos
 
-Los siguientes endpoints fueron verificados como públicos en la auditoría del Bloque 14A:
+Los siguientes endpoints son accesibles sin JWT:
 
 - `OPTIONS /**`
 - `GET /error`
 - `POST /api/auth/login`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 - `GET /healthz`
 - `GET /actuator/health`
 - `GET /actuator/health/**`
@@ -85,11 +87,15 @@ Los siguientes endpoints fueron verificados como públicos en la auditoría del 
 - `GET /swagger-ui/**` cuando `springdoc` está habilitado
 - `GET /swagger-ui.html` cuando `springdoc` está habilitado
 
+> `POST /api/auth/forgot-password` y `POST /api/auth/reset-password` son públicos para Spring Security, pero están protegidos por rate limiting (abuse protection) para prevenir spam y fuerza bruta.
+
 ## Matriz real actual
 
 | Módulo | Operación | ADMINISTRADOR | SUPERVISOR | TECNICO | OPERADOR | Público / HMAC | Fuente técnica |
 |---|---|---|---|---|---|---|---|
 | Autenticación | `POST /api/auth/login` | No aplica | No aplica | No aplica | No aplica | Público | `permitAll` en `SecurityConfig` |
+| Autenticación | `POST /api/auth/forgot-password` | No aplica | No aplica | No aplica | No aplica | Público + rate limit | `permitAll` en `SecurityConfig` + `PasswordResetAbuseProtectionService` |
+| Autenticación | `POST /api/auth/reset-password` | No aplica | No aplica | No aplica | No aplica | Público + rate limit | `permitAll` en `SecurityConfig` + `PasswordResetAbuseProtectionService` |
 | Autenticación | `GET /api/auth/me` | Sí | Sí | Sí | Sí | No | `authenticated()` en `SecurityConfig` |
 | Usuarios | `/api/users/**` | Sí | No | No | No | No | `hasRole("ADMINISTRADOR")` |
 | Auditoría | `/api/audit-logs/**` | Sí | No | No | No | No | `hasRole("ADMINISTRADOR")` |

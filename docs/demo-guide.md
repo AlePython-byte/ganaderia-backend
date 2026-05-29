@@ -415,12 +415,14 @@ Respuesta esperada con campos como:
 
 Qué explicar:
 
-- IA está encendida para la demo si `GEMINI_API_KEY` está configurada.
-- Si Gemini falla o está apagado, el sistema responde con fallback heurístico.
+- IA está encendida para la demo si la clave del proveedor está configurada.
+- El proveedor se selecciona con `AI_PROVIDER=gemini` (default) o `AI_PROVIDER=deepseek`.
+- Si el proveedor falla o está apagado, el sistema responde con fallback heurístico (`RULE_BASED_FALLBACK`).
 - La operación no se rompe por caída del proveedor externo.
-- Hay métricas de IA y fallback.
+- `fallbackUsed` y `source` en la respuesta permiten validar el modo de operación.
+- Hay métricas de IA y fallback registradas en Actuator/Prometheus.
 
-No se debe mostrar la API key de Gemini.
+No se debe mostrar la API key de Gemini ni de DeepSeek.
 
 ## 18. Paso 13 — Reportes
 
