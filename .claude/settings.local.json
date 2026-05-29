@@ -11,7 +11,11 @@
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(Find \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\\\\src\\\\main\\\\java\\\\com\\\\ganaderia4\\\\backend\\\\config\" -type f -name \"*.java\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\" -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(mvn compile *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\\\\src\\\\main\\\\java\" -Recurse -Filter \"*.java\")",
+      "Bash(Measure-Object)",
+      "Bash(Select-Object -ExpandProperty Count)"
     ]
   }
 }

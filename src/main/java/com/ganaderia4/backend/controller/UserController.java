@@ -4,6 +4,7 @@ import com.ganaderia4.backend.config.OpenApiConfig;
 import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.dto.UserCreateRequestDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
+import com.ganaderia4.backend.dto.UserStatusRequestDTO;
 import com.ganaderia4.backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -120,6 +121,30 @@ public class UserController {
     })
     public UserResponseDTO getUserById(@PathVariable Long id) {
         return userService.getUserById(id);
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(
+            summary = "Activar o desactivar usuario",
+            description = "Cambia el estado activo de un usuario sin eliminarlo. Un usuario desactivado no puede iniciar sesion. Requiere rol ADMINISTRADOR."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estado actualizado correctamente",
+                    content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Payload invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "JWT ausente o invalido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Se requiere rol ADMINISTRADOR",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    public UserResponseDTO setUserStatus(
+            @Parameter(description = "ID del usuario") @PathVariable Long id,
+            @Valid @RequestBody UserStatusRequestDTO requestDTO) {
+        return userService.setUserStatus(id, requestDTO);
     }
 
     @GetMapping("/active/{active}")

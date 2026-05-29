@@ -3,6 +3,7 @@ package com.ganaderia4.backend.service;
 import com.ganaderia4.backend.dto.UserCreateRequestDTO;
 import com.ganaderia4.backend.dto.UserRequestDTO;
 import com.ganaderia4.backend.dto.UserResponseDTO;
+import com.ganaderia4.backend.dto.UserStatusRequestDTO;
 import com.ganaderia4.backend.exception.ConflictException;
 import com.ganaderia4.backend.exception.ResourceNotFoundException;
 import com.ganaderia4.backend.model.Role;
@@ -86,6 +87,27 @@ public class UserService {
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    public UserResponseDTO setUserStatus(Long id, UserStatusRequestDTO requestDTO) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        boolean previousStatus = Boolean.TRUE.equals(user.getActive());
+        boolean newStatus = Boolean.TRUE.equals(requestDTO.getActive());
+
+        if (previousStatus == newStatus) {
+            return mapToResponseDTO(user);
+        }
+
+        user.setActive(newStatus);
+        User saved = userRepository.save(user);
+
+        String action = newStatus ? "ACTIVATE_USER" : "DEACTIVATE_USER";
+        String detail = (newStatus ? "Activación" : "Desactivación") + " de usuario " + saved.getEmail();
+        auditLogService.logWithCurrentActor(action, "USER", saved.getId(), "API", detail, true);
+
+        return mapToResponseDTO(saved);
     }
 
     public User getUserEntityByEmail(String email) {
