@@ -96,6 +96,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/reports/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
+                        .requestMatchers(HttpMethod.GET, "/api/geofences", "/api/geofences/**")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+
                         .requestMatchers("/api/geofences/**").hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/alerts/**")
@@ -114,13 +117,13 @@ public class SecurityConfig {
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
 
                         .requestMatchers(HttpMethod.POST, "/api/cows/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.PUT, "/api/cows/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.PATCH, "/api/cows/**")
-                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR")
+                        .hasAnyRole("ADMINISTRADOR", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.GET, "/api/collars/**")
                         .hasAnyRole("ADMINISTRADOR", "SUPERVISOR", "OPERADOR", "TECNICO")
