@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.config.AiAnalysisProperties;
+import com.ganaderia4.backend.config.DeepSeekProperties;
 import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
 import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
@@ -19,20 +20,27 @@ public class AlertAiAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(AlertAiAnalysisService.class);
     private static final String SOURCE_GEMINI = "GEMINI";
+    private static final String SOURCE_DEEPSEEK = "DEEPSEEK";
     private static final String SOURCE_RULE_BASED_FALLBACK = "RULE_BASED_FALLBACK";
 
     private final AlertAnalysisService alertAnalysisService;
     private final GeminiAiClient geminiAiClient;
     private final AiAnalysisProperties properties;
+    private final DeepSeekAiClient deepSeekAiClient;
+    private final DeepSeekProperties deepSeekProperties;
     private final DomainMetricsService domainMetricsService;
 
     public AlertAiAnalysisService(AlertAnalysisService alertAnalysisService,
                                   GeminiAiClient geminiAiClient,
                                   AiAnalysisProperties properties,
+                                  DeepSeekAiClient deepSeekAiClient,
+                                  DeepSeekProperties deepSeekProperties,
                                   DomainMetricsService domainMetricsService) {
         this.alertAnalysisService = alertAnalysisService;
         this.geminiAiClient = geminiAiClient;
         this.properties = properties;
+        this.deepSeekAiClient = deepSeekAiClient;
+        this.deepSeekProperties = deepSeekProperties;
         this.domainMetricsService = domainMetricsService;
     }
 
@@ -45,25 +53,28 @@ public class AlertAiAnalysisService {
             return fallback("disabled", heuristicSummary, topPriorities);
         }
 
-        if (!"gemini".equalsIgnoreCase(properties.getProvider())) {
-            return fallback("unknown", heuristicSummary, topPriorities);
+        String provider = properties.getProvider();
+
+        if ("deepseek".equalsIgnoreCase(provider)) {
+            return getDeepSeekSummary(heuristicSummary, topPriorities);
         }
 
+        if ("gemini".equalsIgnoreCase(provider)) {
+            return getGeminiSummary(heuristicSummary, topPriorities);
+        }
+
+        return fallback("unknown", heuristicSummary, topPriorities);
+    }
+
+    private AlertAiSummaryDTO getGeminiSummary(AlertAnalysisSummaryDTO heuristicSummary,
+                                               List<AlertPriorityRecommendationDTO> topPriorities) {
         if (properties.getGeminiApiKey() == null || properties.getGeminiApiKey().isBlank()) {
             return fallback("missing_api_key", heuristicSummary, topPriorities);
         }
 
         try {
             GeminiAiClient.AiGeneratedSummary aiGeneratedSummary =
-                    geminiAiClient.generateOperationalSummary(buildPrompt(heuristicSummary, topPriorities));
-
-            AlertAiSummaryDTO response = new AlertAiSummaryDTO(
-                    aiGeneratedSummary.riskLevel(),
-                    aiGeneratedSummary.summary(),
-                    aiGeneratedSummary.recommendation(),
-                    SOURCE_GEMINI,
-                    false
-            );
+                    geminiAiClient.generateOperationalSummary(buildGeminiPrompt(heuristicSummary, topPriorities));
 
             domainMetricsService.incrementAiProviderRequest("gemini", "success");
             domainMetricsService.incrementAiSummaryGenerated(SOURCE_GEMINI, aiGeneratedSummary.riskLevel().name());
@@ -76,9 +87,54 @@ public class AlertAiAnalysisService {
                     aiGeneratedSummary.riskLevel()
             );
 
-            return response;
+            return new AlertAiSummaryDTO(
+                    aiGeneratedSummary.riskLevel(),
+                    aiGeneratedSummary.summary(),
+                    aiGeneratedSummary.recommendation(),
+                    SOURCE_GEMINI,
+                    false
+            );
         } catch (GeminiAiClient.GeminiAiClientException ex) {
             domainMetricsService.incrementAiProviderRequest("gemini", "failure");
+            return fallback(normalizeFallbackReason(ex.getMessage()), heuristicSummary, topPriorities);
+        }
+    }
+
+    private AlertAiSummaryDTO getDeepSeekSummary(AlertAnalysisSummaryDTO heuristicSummary,
+                                                  List<AlertPriorityRecommendationDTO> topPriorities) {
+        if (deepSeekProperties.getApiKey() == null || deepSeekProperties.getApiKey().isBlank()) {
+            return fallback("missing_api_key", heuristicSummary, topPriorities);
+        }
+
+        try {
+            String rawText = deepSeekAiClient.complete(
+                    buildDeepSeekSystemPrompt(),
+                    buildDeepSeekUserMessage(heuristicSummary, topPriorities)
+            );
+
+            // Reuse Gemini's package-private JSON parser: same expected format {riskLevel, summary, recommendation}
+            GeminiAiClient.AiGeneratedSummary aiGeneratedSummary = geminiAiClient.parseGeneratedText(rawText);
+
+            domainMetricsService.incrementAiProviderRequest("deepseek", "success");
+            domainMetricsService.incrementAiSummaryGenerated(SOURCE_DEEPSEEK, aiGeneratedSummary.riskLevel().name());
+
+            log.info(
+                    "event=alert_ai_summary_generated requestId={} source={} fallbackUsed={} riskLevel={}",
+                    OperationalLogSanitizer.requestId(),
+                    SOURCE_DEEPSEEK,
+                    false,
+                    aiGeneratedSummary.riskLevel()
+            );
+
+            return new AlertAiSummaryDTO(
+                    aiGeneratedSummary.riskLevel(),
+                    aiGeneratedSummary.summary(),
+                    aiGeneratedSummary.recommendation(),
+                    SOURCE_DEEPSEEK,
+                    false
+            );
+        } catch (DeepSeekAiClient.DeepSeekAiClientException | GeminiAiClient.GeminiAiClientException ex) {
+            domainMetricsService.incrementAiProviderRequest("deepseek", "failure");
             return fallback(normalizeFallbackReason(ex.getMessage()), heuristicSummary, topPriorities);
         }
     }
@@ -131,7 +187,8 @@ public class AlertAiAnalysisService {
             case "provider_error" -> "provider_error";
             case "io_error", "interrupted" -> "provider_error";
             case "unusable_response" -> "unusable_response";
-            case "parse_error", "missing_candidates", "missing_text" -> "parse_error";
+            case "parse_error", "missing_candidates", "missing_text",
+                 "missing_choices", "missing_content" -> "parse_error";
             case "unusable_plain_text" -> "unusable_response";
             case "unknown", "unsupported_provider" -> "unknown";
             default -> {
@@ -143,8 +200,10 @@ public class AlertAiAnalysisService {
         };
     }
 
-    private String buildPrompt(AlertAnalysisSummaryDTO heuristicSummary,
-                               List<AlertPriorityRecommendationDTO> topPriorities) {
+    // --- Gemini prompt (single string, unchanged behavior) ---
+
+    private String buildGeminiPrompt(AlertAnalysisSummaryDTO heuristicSummary,
+                                     List<AlertPriorityRecommendationDTO> topPriorities) {
         StringBuilder prompt = new StringBuilder()
                 .append("Eres un asistente operativo para monitoreo ganadero.\n")
                 .append("Debes responder en espanol claro, breve y operativo.\n")
@@ -161,28 +220,59 @@ public class AlertAiAnalysisService {
                 .append("El campo summary debe estar en espanol y describir el estado operativo actual.\n")
                 .append("El campo recommendation debe estar en espanol y dar una accion operativa concreta.\n")
                 .append("Devuelve solo JSON valido con este formato exacto y sin campos adicionales: ")
-                .append("{\"riskLevel\":\"LOW|MEDIUM|HIGH|CRITICAL\",\"summary\":\"...\",\"recommendation\":\"...\"}\n")
-                .append("Datos del backend:\n")
-                .append("- riskLevel: ").append(heuristicSummary.getRiskLevel()).append('\n')
-                .append("- totalPendingAlerts: ").append(heuristicSummary.getTotalPendingAlerts()).append('\n')
-                .append("- criticalSignals: ").append(String.join(" | ", heuristicSummary.getCriticalSignals())).append('\n')
-                .append("- recommendedActions: ").append(String.join(" | ", heuristicSummary.getRecommendedActions())).append('\n')
-                .append("- topPriorities:\n");
+                .append("{\"riskLevel\":\"LOW|MEDIUM|HIGH|CRITICAL\",\"summary\":\"...\",\"recommendation\":\"...\"}\n");
+
+        appendBackendData(prompt, heuristicSummary, topPriorities);
+        return prompt.toString();
+    }
+
+    // --- DeepSeek prompt (system + user split for chat format) ---
+
+    private String buildDeepSeekSystemPrompt() {
+        return "Eres un asistente operativo para monitoreo ganadero.\n" +
+               "Debes responder en espanol claro, breve y operativo.\n" +
+               "Responde unicamente con JSON puro y valido.\n" +
+               "No uses markdown. No uses bloques ```.\n" +
+               "No escribas texto antes ni despues del JSON.\n" +
+               "No inventes alertas, vacas, collares, cantidades ni hechos que no aparezcan en los datos.\n" +
+               "Usa solo la informacion entregada. Si faltan datos, responde con cautela.\n" +
+               "No recomiendes acciones destructivas ni cambios automaticos en el sistema.\n" +
+               "Usa exactamente los campos riskLevel, summary y recommendation.\n" +
+               "riskLevel debe ser exactamente uno de estos valores: LOW, MEDIUM, HIGH, CRITICAL.\n" +
+               "El campo summary debe estar en espanol y describir el estado operativo actual.\n" +
+               "El campo recommendation debe estar en espanol y dar una accion operativa concreta.\n" +
+               "Devuelve solo JSON valido con este formato exacto y sin campos adicionales: " +
+               "{\"riskLevel\":\"LOW|MEDIUM|HIGH|CRITICAL\",\"summary\":\"...\",\"recommendation\":\"...\"}";
+    }
+
+    private String buildDeepSeekUserMessage(AlertAnalysisSummaryDTO heuristicSummary,
+                                            List<AlertPriorityRecommendationDTO> topPriorities) {
+        StringBuilder data = new StringBuilder("Datos del backend:\n");
+        appendBackendData(data, heuristicSummary, topPriorities);
+        return data.toString();
+    }
+
+    private void appendBackendData(StringBuilder sb,
+                                   AlertAnalysisSummaryDTO heuristicSummary,
+                                   List<AlertPriorityRecommendationDTO> topPriorities) {
+        sb.append("- riskLevel: ").append(heuristicSummary.getRiskLevel()).append('\n')
+          .append("- totalPendingAlerts: ").append(heuristicSummary.getTotalPendingAlerts()).append('\n')
+          .append("- criticalSignals: ").append(String.join(" | ", heuristicSummary.getCriticalSignals())).append('\n')
+          .append("- recommendedActions: ").append(String.join(" | ", heuristicSummary.getRecommendedActions())).append('\n')
+          .append("- topPriorities:\n");
 
         if (topPriorities.isEmpty()) {
-            prompt.append("  - sin casos pendientes\n");
+            sb.append("  - sin casos pendientes\n");
         } else {
             for (AlertPriorityRecommendationDTO recommendation : topPriorities) {
-                prompt.append("  - alertType=").append(recommendation.getAlertType())
-                        .append(", priorityLabel=").append(recommendation.getPriorityLabel())
-                        .append(", priorityScore=").append(recommendation.getPriorityScore())
-                        .append(", reason=").append(recommendation.getReason())
-                        .append(", recommendedAction=").append(recommendation.getRecommendedAction())
-                        .append('\n');
+                sb.append("  - alertType=").append(recommendation.getAlertType())
+                  .append(", priorityLabel=").append(recommendation.getPriorityLabel())
+                  .append(", priorityScore=").append(recommendation.getPriorityScore())
+                  .append(", reason=").append(recommendation.getReason())
+                  .append(", recommendedAction=").append(recommendation.getRecommendedAction())
+                  .append('\n');
             }
         }
-
-        return prompt.toString();
     }
 
     private String fallbackSummaryFor(AlertAnalysisSummaryDTO heuristicSummary) {

@@ -37,23 +37,37 @@ public class DeepSeekAiClient {
 
     public String complete(String systemPrompt, String userMessage) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(buildUri())
+            URI uri = buildUri();
+            String body = buildRequestBody(systemPrompt, userMessage);
+
+            log.info(
+                    "event=deepseek_request_start provider={} url={} api_key_prefix={}",
+                    PROVIDER, uri, resolveApiKeyPreview()
+            );
+            log.debug("event=deepseek_request_body provider={} body={}", PROVIDER, body);
+
+            HttpRequest request = HttpRequest.newBuilder(uri)
                     .timeout(properties.getReadTimeout())
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + properties.getApiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(
-                            buildRequestBody(systemPrompt, userMessage), StandardCharsets.UTF_8))
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
+            log.info(
+                    "event=deepseek_response_received provider={} status={}",
+                    PROVIDER, response.statusCode()
+            );
+
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.warn(
-                        "event=deepseek_provider_http_error requestId={} provider={} model={} status={}",
+                        "event=deepseek_provider_http_error requestId={} provider={} model={} status={} response_body={}",
                         OperationalLogSanitizer.requestId(),
                         PROVIDER,
                         OperationalLogSanitizer.safe(properties.getModel()),
-                        response.statusCode()
+                        response.statusCode(),
+                        response.body()
                 );
                 throw new DeepSeekAiClientException("http_" + response.statusCode());
             }
@@ -61,11 +75,22 @@ public class DeepSeekAiClient {
             return parseContent(response.body());
 
         } catch (IOException ex) {
+            log.warn(
+                    "event=deepseek_io_error provider={} error={}",
+                    PROVIDER, ex.getMessage()
+            );
             throw new DeepSeekAiClientException("io_error", ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            log.warn("event=deepseek_interrupted provider={}", PROVIDER);
             throw new DeepSeekAiClientException("interrupted", ex);
         }
+    }
+
+    private String resolveApiKeyPreview() {
+        String key = properties.getApiKey();
+        if (key == null || key.isBlank()) return "MISSING";
+        return key.substring(0, Math.min(8, key.length())) + "...";
     }
 
     private URI buildUri() {

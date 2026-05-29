@@ -5,7 +5,11 @@
       "Bash(./mvnw.cmd -q compile)",
       "Bash(./mvnw.cmd compile *)",
       "Bash(dir /s /b \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\\\\src\\\\main\\\\java\\\\com\\\\ganaderia4\\\\backend\")",
-      "Bash(findstr /c:controller /c:service /c:config /c:dto /c:model /c:repository)"
+      "Bash(findstr /c:controller /c:service /c:config /c:dto /c:model /c:repository)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\" -Recurse -Directory | Where-Object { $_.Name -in @\\(\"model\", \"service\", \"controller\", \"dto\", \"resources\", \"test\"\\) } | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\\\\src\\\\main\\\\java\\\\com\\\\ganaderia4\\\\backend\" -Recurse -Filter \"*Repository*\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Find \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\\\\src\\\\main\\\\java\\\\com\\\\ganaderia4\\\\backend\\\\config\" -type f -name \"*.java\")"
     ]
   }
 }
