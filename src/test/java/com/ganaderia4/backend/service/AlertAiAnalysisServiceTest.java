@@ -1,6 +1,7 @@
 package com.ganaderia4.backend.service;
 
 import com.ganaderia4.backend.config.AiAnalysisProperties;
+import com.ganaderia4.backend.config.DeepSeekProperties;
 import com.ganaderia4.backend.dto.AlertAiSummaryDTO;
 import com.ganaderia4.backend.dto.AlertAnalysisSummaryDTO;
 import com.ganaderia4.backend.dto.AlertPriorityRecommendationDTO;
@@ -32,7 +33,13 @@ class AlertAiAnalysisServiceTest {
     private GeminiAiClient geminiAiClient;
 
     @Mock
+    private DeepSeekAiClient deepSeekAiClient;
+
+    @Mock
     private DomainMetricsService domainMetricsService;
+
+    @Mock
+    private DeepSeekProperties deepSeekProperties;
 
     private AiAnalysisProperties properties;
     private AlertAiAnalysisService alertAiAnalysisService;
@@ -44,6 +51,8 @@ class AlertAiAnalysisServiceTest {
                 alertAnalysisService,
                 geminiAiClient,
                 properties,
+                deepSeekAiClient,
+                deepSeekProperties,
                 domainMetricsService
         );
     }
