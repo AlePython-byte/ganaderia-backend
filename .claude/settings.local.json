@@ -3,7 +3,9 @@
     "allow": [
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\" -Recurse -Directory | ForEach-Object { $_.FullName } | Sort-Object)",
       "Bash(./mvnw.cmd -q compile)",
-      "Bash(./mvnw.cmd compile *)"
+      "Bash(./mvnw.cmd compile *)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\ALEJANDRO\\\\IdeaProjects\\\\ganaderia4backend\\\\src\\\\main\\\\java\\\\com\\\\ganaderia4\\\\backend\")",
+      "Bash(findstr /c:controller /c:service /c:config /c:dto /c:model /c:repository)"
     ]
   }
 }
