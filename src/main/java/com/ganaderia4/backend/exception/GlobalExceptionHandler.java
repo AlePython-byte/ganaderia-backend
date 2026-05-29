@@ -4,6 +4,7 @@ import com.ganaderia4.backend.dto.ErrorResponseDTO;
 import com.ganaderia4.backend.model.ApiErrorCode;
 import com.ganaderia4.backend.observability.OperationalLogSanitizer;
 import com.ganaderia4.backend.observability.RequestCorrelationFilter;
+import com.ganaderia4.backend.service.ClaudeAiClient;
 import com.ganaderia4.backend.service.DeepSeekAiClient;
 import com.ganaderia4.backend.service.InvalidPasswordResetTokenException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -172,9 +173,12 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(DeepSeekAiClient.DeepSeekAiClientException.class)
-    public ResponseEntity<ErrorResponseDTO> handleDeepSeekAiClientException(
-            DeepSeekAiClient.DeepSeekAiClientException ex,
+    @ExceptionHandler({
+            ClaudeAiClient.ClaudeAiClientException.class,
+            DeepSeekAiClient.DeepSeekAiClientException.class
+    })
+    public ResponseEntity<ErrorResponseDTO> handleAiClientException(
+            RuntimeException ex,
             HttpServletRequest request) {
         log.warn(
                 "event=http_error_handled requestId={} category=ai_provider_unavailable status={} method={} path={} queryPresent={} reason={}",

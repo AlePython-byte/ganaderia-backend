@@ -1,6 +1,6 @@
 package com.ganaderia4.backend.service;
 
-import com.ganaderia4.backend.config.DeepSeekProperties;
+import com.ganaderia4.backend.config.ClaudeProperties;
 import com.ganaderia4.backend.dto.AlertAnalysisRequest;
 import com.ganaderia4.backend.dto.AlertAnalysisResponse;
 import com.ganaderia4.backend.exception.BadRequestException;
@@ -25,26 +25,26 @@ public class DeepSeekService {
             "No inventes datos ni hagas suposiciones fuera de la información entregada. " +
             "Responde en texto plano, sin markdown ni JSON. Máximo 300 palabras.";
 
-    private final DeepSeekAiClient deepSeekAiClient;
-    private final DeepSeekProperties properties;
+    private final ClaudeAiClient claudeAiClient;
+    private final ClaudeProperties claudeProperties;
 
-    public DeepSeekService(DeepSeekAiClient deepSeekAiClient, DeepSeekProperties properties) {
-        this.deepSeekAiClient = deepSeekAiClient;
-        this.properties = properties;
+    public DeepSeekService(ClaudeAiClient claudeAiClient, ClaudeProperties claudeProperties) {
+        this.claudeAiClient = claudeAiClient;
+        this.claudeProperties = claudeProperties;
     }
 
     public AlertAnalysisResponse analyzeAlerts(AlertAnalysisRequest request) {
-        if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
+        if (claudeProperties.getApiKey() == null || claudeProperties.getApiKey().isBlank()) {
             throw new BadRequestException("El servicio de análisis IA no está configurado.");
         }
 
-        String userMessage = buildUserMessage(request);
+        String prompt = SYSTEM_PROMPT + "\n\n" + buildUserMessage(request);
 
         try {
-            String analysis = deepSeekAiClient.complete(SYSTEM_PROMPT, userMessage);
+            String analysis = claudeAiClient.complete(prompt);
 
             log.info(
-                    "event=deepseek_analysis_generated requestId={} provider={} riskLevel={} activeAlerts={}",
+                    "event=claude_analysis_generated requestId={} provider={} riskLevel={} activeAlerts={}",
                     OperationalLogSanitizer.requestId(),
                     PROVIDER,
                     OperationalLogSanitizer.safe(request.getRiskLevel()),
@@ -53,9 +53,9 @@ public class DeepSeekService {
 
             return new AlertAnalysisResponse(analysis, PROVIDER, Instant.now());
 
-        } catch (DeepSeekAiClient.DeepSeekAiClientException ex) {
+        } catch (ClaudeAiClient.ClaudeAiClientException ex) {
             log.error(
-                    "event=deepseek_analysis_failed requestId={} provider={} reason={}",
+                    "event=claude_analysis_failed requestId={} provider={} reason={}",
                     OperationalLogSanitizer.requestId(),
                     PROVIDER,
                     OperationalLogSanitizer.safe(ex.getMessage())
