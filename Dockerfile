@@ -7,7 +7,7 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:25-jre
 
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV SERVER_PORT=10000
